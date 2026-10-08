@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"constant":["DAC_LEN","DAC_OFS"],"fn":["from_dac"],"struct":["Palette"]};

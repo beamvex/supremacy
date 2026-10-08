@@ -2,3 +2,5 @@
 *.dll
 *.EXE
 *.DLL
+target/
+.DS_Store

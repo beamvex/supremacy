@@ -1,9 +1,0 @@
-(function() {
-    const implementors = Object.fromEntries([["supremacy",[["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/1.98.0/core/cmp/trait.Eq.html\" title=\"trait core::cmp::Eq\">Eq</a> for <a class=\"struct\" href=\"supremacy/args/struct.Config.html\" title=\"struct supremacy::args::Config\">Config</a>",0],["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/1.98.0/core/cmp/trait.Eq.html\" title=\"trait core::cmp::Eq\">Eq</a> for <a class=\"enum\" href=\"supremacy/exepack/enum.Error.html\" title=\"enum supremacy::exepack::Error\">Error</a>",0],["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/1.98.0/core/cmp/trait.Eq.html\" title=\"trait core::cmp::Eq\">Eq</a> for <a class=\"enum\" href=\"supremacy/lzss/enum.Kind.html\" title=\"enum supremacy::lzss::Kind\">Kind</a>",0],["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/1.98.0/core/cmp/trait.Eq.html\" title=\"trait core::cmp::Eq\">Eq</a> for <a class=\"struct\" href=\"supremacy/gph/struct.Record.html\" title=\"struct supremacy::gph::Record\">Record</a>",0],["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/1.98.0/core/cmp/trait.Eq.html\" title=\"trait core::cmp::Eq\">Eq</a> for <a class=\"enum\" href=\"supremacy/args/enum.Sound.html\" title=\"enum supremacy::args::Sound\">Sound</a>",0],["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/1.98.0/core/cmp/trait.Eq.html\" title=\"trait core::cmp::Eq\">Eq</a> for <a class=\"enum\" href=\"supremacy/args/enum.Video.html\" title=\"enum supremacy::args::Video\">Video</a>",0]]]]);
-    if (window.register_implementors) {
-        window.register_implementors(implementors);
-    } else {
-        window.pending_implementors = implementors;
-    }
-})()
-//{"start":59,"fragment_lengths":[1486]}

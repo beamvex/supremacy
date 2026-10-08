@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["Sound","Video"],"fn":["parse"],"struct":["Config"]};
