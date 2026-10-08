@@ -16,7 +16,8 @@
 //! re-runs from its entry next tick, so scripts are guard+action rules
 //! whose state lives in `ds` flag cells, not in the instruction pointer.
 
-use super::consts::{REC_BASE, REC_STRIDE};
+use super::consts::{REC_BASE, REC_STRIDE, STATE_LEN, STATE_OFS};
+use super::keymap::KEYMAP_BYTES;
 use super::state::State;
 
 /// `ds:0x50E3` — op jump table base (file `0x37760`).
@@ -29,6 +30,14 @@ pub const TAB_BASE: u16 = 0x5183;
 pub const HI_OFS: usize = 0x9CC4;
 /// `ds:` limit of [`Vm::low`] — the save-block base.
 pub const LOW_LEN: usize = 0x7D39;
+/// `ds:0x7CBD` — the 62-entry `{code, output}` keymap the `0xE66E`
+/// line editor and the `0x32BA8` yes/no poll read (ends exactly at the
+/// save block).
+pub const KEYMAP: usize = 0x7CBD;
+/// `ds:0x76BF` — the shipped keymap template (file `0x1835F`).
+pub const KEYMAP_SRC: usize = 0x76BF;
+/// Keymap entry count — 62 `{code, output}` byte pairs.
+pub const KEYMAP_N: usize = 0x3E;
 
 /// Flow a handler returns — mirrors `jmp 0x7758` vs `ret`.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -49,18 +58,27 @@ pub struct Vm {
     /// The `cs:0xE713` modal-dialog flag (a code-segment cell in the
     /// asm; kept here since the port has no code segment).
     pub modal: bool,
+    /// The heap segment the `0x844B`/`0x8432` routines snapshot the
+    /// save block into/out of (allocated at `ds:0x3829` in the asm).
+    /// Seeded from the image so `0x8432` during new-game init restores
+    /// the pristine shipped state.
+    pub stage: Box<[u8; STATE_LEN]>,
 }
 
 impl Vm {
     /// Zeroed memory (the image ships real scripts — prefer
-    /// [`Vm::from_image`]).
+    /// [`Vm::from_image`]); the `ds:0x7CBD` keymap is installed from
+    /// [`KEYMAP_BYTES`][super::keymap::KEYMAP_BYTES] either way.
     #[must_use]
     pub fn new() -> Self {
-        Self {
+        let mut vm = Self {
             low: vec![0; LOW_LEN].into_boxed_slice(),
             hi: vec![0; 0x10000 - HI_OFS].into_boxed_slice(),
             modal: false,
-        }
+            stage: Box::new([0; STATE_LEN]),
+        };
+        vm.install_keymap();
+        vm
     }
 
     /// Load `ds:0x0000..0x9CC4` space from the unpacked exe — the low
@@ -73,7 +91,31 @@ impl Vm {
         let src = HI_OFS + 0x10CA0;
         let n = (0x10000 - HI_OFS).min(img.len().saturating_sub(src));
         vm.hi[..n].copy_from_slice(&img[src..src + n]);
+        let lo = STATE_OFS + 0x10CA0;
+        vm.stage.copy_from_slice(&img[lo..lo + STATE_LEN]);
+        // The asm copies `ds:0x76BF` → `ds:0x7CBD` at init (the site
+        // isn't located); use the image's own bytes when they're real.
+        let n = KEYMAP_N * 2;
+        if img.len() >= KEYMAP_SRC + 0x10CA0 + n {
+            vm.low.copy_within(KEYMAP_SRC..KEYMAP_SRC + n, KEYMAP);
+        }
         vm
+    }
+
+    /// Install the runtime keymap at `ds:0x7CBD` from the embedded
+    /// shipped bytes — for `Vm::new` rigs with no image.
+    pub fn install_keymap(&mut self) {
+        self.low[KEYMAP..KEYMAP + KEYMAP_BYTES.len()].copy_from_slice(&KEYMAP_BYTES);
+    }
+
+    /// `0x844B` — snapshot the save block into the staging heap.
+    pub fn stage_save(&mut self, st: &State) {
+        self.stage.copy_from_slice(&st.block[..]);
+    }
+
+    /// `0x8432` — restore the save block from the staging heap.
+    pub fn stage_load(&mut self, st: &mut State) {
+        st.block.copy_from_slice(&self.stage[..]);
     }
 
     /// Byte at `ds:` offset `a` across the three regions.

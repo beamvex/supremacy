@@ -3,7 +3,10 @@ use super::rec::{
     F_29, F_CREDITS, F_DEFENCE, F_ENERGY, F_FOOD, F_FUEL, F_MINERALS, F_NAME, F_OWNER, F_POP,
     F_SERIAL, F_TROOPS, F_WORD0,
 };
-use super::{Rng, State};
+use super::vhost::Call;
+use super::vm::Vm;
+use super::vops::{vsync, Ctx};
+use super::{selrec, Rng, State};
 
 /// Per-difficulty `F_TROOPS` parameter — `[0x91E4]` = 0/1/2 → these
 /// words (file `0x330A4`–`0x330CE`).
@@ -16,15 +19,20 @@ const SEL_INIT: [u16; 3] = [0x06, 0x0E, 0x1E];
 const LIFELESS: [u8; 9] = *b"LIFELESS!";
 
 /// New-game record init — the state writes of `cs:0x9DAB` (file
-/// `0x3305B`–`0x331C2`). Assumes [`select_galaxy`][super::select_galaxy]
-/// already anchored the array (`[0x9158]`) and set the counts; video and
-/// sound calls in the asm are the shell's job, not this fn's.
+/// `0x3305B`–`0x331C2`). Opens with `0x8432` (file `0x3309D`) — the
+/// staging-heap restore that resets the save block to the state the
+/// `0x844B` snapshot captured (menu picks like `[0x91E4]` survive
+/// because the snapshot runs after them). Assumes
+/// [`select_galaxy`][super::select_galaxy] already anchored the array
+/// (`[0x9158]`) and set the counts; video and sound calls in the asm
+/// are the shell's job, not this fn's.
 ///
 /// Record `0` gets the fixed starting block (credits `0x1879A`), the
 /// appended faction record `[count]` gets the rolled block
 /// (`0xC350 + rand(0x4E20)` credits), planets `1..count−1` are named
 /// `LIFELESS!`, every record gets its serial and a cleared `F_WORD0`.
-pub fn new_game(st: &mut State, rng: &mut Rng) {
+pub fn new_game(vm: &mut Vm, st: &mut State, rng: &mut Rng) {
+    vm.stage_load(st);
     let base = st.word(REC_BASE);
     let n = st.planets();
     home_planet(st, base, usize::from(st.byte(DIFFICULTY)));
@@ -44,6 +52,26 @@ pub fn new_game(st: &mut State, rng: &mut Rng) {
             0,
         );
     }
+}
+
+/// `cs:0x305B`/`cs:0x9DAB` — the new-game menu action: [`new_game`]
+/// (with its `0x8432` stage restore), then the asm tail at file
+/// `0x331C4`–`0x331E6` — `0xA3BC` input restrict (int-33 `ax=0x14`,
+/// mask `0x1E`), `0x83AA` mark, `0x5DD3` select-next, a `0x32`-frame
+/// `{0x2CA9, [cs:0x127C]}` wait, `0x2FD7`, `[0x1278]` reload, `0xA36A`
+/// input reinstall — before `jmp 0x2D27` re-enters the shell loop.
+pub fn act_newgame(c: &mut Ctx) {
+    new_game(c.vm, c.st, c.rng);
+    c.host.svc(Call::Mouse(0x14, 0x1E, 0));
+    selrec::mark_sel(c);
+    selrec::sel_next(c);
+    for _ in 0..=0x32 {
+        vsync(c);
+        c.host.svc(Call::Sound(0));
+    }
+    c.host.svc(Call::Native(0x2FD7));
+    c.host.svc(Call::Slot(0x1278, 0));
+    c.host.svc(Call::Mouse(0x14, 0x1F, 0));
 }
 
 /// `i·0x3A` as `u16` — the stride the asm multiplies by.

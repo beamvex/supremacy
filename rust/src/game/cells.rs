@@ -91,6 +91,11 @@ pub const NAME_LEN: usize = 0x4FCB;
 /// `ds:` slot of the filename limit byte `[0x4FCC]` — `0x1E` during
 /// input, `9` after (file `0x32F32`/`0x32F5F`).
 pub const NAME_MAX: usize = 0x4FCC;
+/// `ds:` slot of the line-editor dirty flag `[0x4FCA]` — set when an
+/// edit changed the buffer (file `0x2E6F3`).
+pub const IN_DIRTY: usize = 0x4FCA;
+/// `ds:` slot of the line-editor done flag `[0x4FCF]` (file `0x2E6F8`).
+pub const IN_DONE: usize = 0x4FCF;
 /// `ds:` offset of the save/load dialog's selection word (`0xB05A`,
 /// file `0x32E47`).
 pub const DLG_SEL: usize = 0xB05A;

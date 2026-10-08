@@ -24,6 +24,7 @@ struct Rig {
     st: State,
     rng: Rng,
     host: Rec,
+    files: supremacy::platform::MemFs,
 }
 
 impl Rig {
@@ -33,6 +34,7 @@ impl Rig {
             st: State::new(),
             rng: Rng::new(0x42),
             host: Rec(Vec::new()),
+            files: supremacy::platform::MemFs::new(),
         }
     }
 
@@ -42,6 +44,7 @@ impl Rig {
             st: &mut self.st,
             rng: &mut self.rng,
             host: &mut self.host,
+            files: &mut self.files,
         }
     }
 

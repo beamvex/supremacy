@@ -5,6 +5,9 @@
 //! The asm calls them directly; the port records them so the shell can
 //! hook real implementations later (GAM-7/GAM-9).
 
+use super::state::State;
+use super::vm::Vm;
+
 /// One host-side effect, in the order the asm issues it.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Call {
@@ -58,6 +61,10 @@ pub enum Call {
     /// `int 0x33` — mouse driver call (`ax`/`cx`/`dx`; `ax = 8` sets
     /// the vertical range, `ax = 4` sets the cursor position).
     Mouse(u16, u16, u16),
+    /// `call 0x37C0` — channel-A key pop: pulls a scancode/mouse-synth
+    /// byte off the int-9 stack (`cs:0x8B72`), `0` when empty. The
+    /// `0xE66E` line editor and `0xA1CA` menu path poll it.
+    KeyPop,
 }
 
 /// Host callback — one method keeps call sites uniform; the return word
@@ -71,6 +78,14 @@ pub trait VmHost {
     fn cs_word(&mut self, _ofs: u16) -> u16 {
         0
     }
+    /// Re-mirror the host's input state into the `ds:` latch cells —
+    /// the port's stand-in for the int-9/int-33 handlers that feed
+    /// `[0x9CCB]`/`[0x9CDA]` asynchronously. Runs at every `0x2CA9`
+    /// frame boundary so blocking modal loops still see input.
+    fn pump_input(&mut self, _vm: &mut Vm, _st: &mut State) {}
+    /// Reset the channel-A int-9 stack — the `cs:[0x8B7C] = -1` the
+    /// `0xE66E` editor entry writes (drops queued codes untouched).
+    fn key_flush(&mut self) {}
 }
 
 /// A sink that drops every call — used when no frontend is attached.

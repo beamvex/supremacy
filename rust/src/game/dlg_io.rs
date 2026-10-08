@@ -13,9 +13,9 @@ use super::cells::{
     S_PROMPT, S_SAVED,
 };
 use super::dialog::dlg_text;
-use super::text;
 use super::vhost::Call;
 use super::vops::Ctx;
+use super::{linein, text};
 
 /// `u16` casts for the `ds:` slot constants.
 macro_rules! a {
@@ -49,7 +49,8 @@ pub fn load_game(c: &mut Ctx) -> Option<Loaded> {
     dlg_text(c, a!(S_PROMPT));
     input_name(c);
     slot_mode(c, 1);
-    if c.host.svc(Call::Native(0x83CE)) != 0 {
+    let name = filename(c);
+    if !c.st.load(c.files, &name) {
         err(c);
         return None;
     }
@@ -70,12 +71,24 @@ pub fn load_game(c: &mut Ctx) -> Option<Loaded> {
 pub fn save_game(c: &mut Ctx) -> bool {
     dlg_text(c, a!(S_PROMPT));
     input_name(c);
-    if c.host.svc(Call::Native(0x83F3)) != 0 {
+    let name = filename(c);
+    if !c.st.save(c.files, &name) {
         err(c);
         return false;
     }
     dlg_text(c, a!(S_SAVED));
     true
+}
+
+/// The ASCIIZ filename the `ds:0` buffer holds after `input_name`.
+fn filename(c: &mut Ctx) -> String {
+    let n = (0..NAME_SPAN)
+        .position(|i| c.vm.r8(c.st, i) == 0)
+        .unwrap_or(usize::from(NAME_SPAN));
+    (0..NAME_SPAN)
+        .take(n)
+        .map(|i| char::from(c.vm.r8(c.st, i)))
+        .collect()
 }
 
 /// `cs:0x2EE7` — the error print arm (file `0x32EE7`–`0x32EED`).
@@ -104,15 +117,16 @@ pub fn input_name(c: &mut Ctx) {
     sanitize(c);
 }
 
-/// The capture half (file `0x32F43`–`0x32F5E`) — `0xA3BC` section,
-/// line-input mode `1` around `0xE66E`, then `0xA36A` reinstalls the
-/// int-33 handler.
+/// The capture half (file `0x32F43`–`0x32F5E`) — `0xA3BC` swaps the
+/// int-33 handler to the buttons-only mask (`0x1E`, `ax=0x14`),
+/// line-input mode `1` around the `0xE66E` editor, then `0xA36A`
+/// reinstalls the full mask (`0x1F`). `si/bx/bp` = `0`/`0x2B`/`0x20`.
 fn input_capture(c: &mut Ctx) {
-    c.host.svc(Call::Native(0xA3BC));
+    c.host.svc(Call::Mouse(0x14, 0x1E, 0));
     c.vm.w8(c.st, a!(LINE_MODE), 1);
-    c.host.svc(Call::Native(0xE66E));
+    linein::line_input(c, 0, 0x2B, 0x20);
     c.vm.w8(c.st, a!(LINE_MODE), 0);
-    c.host.svc(Call::Native(0xA36A));
+    c.host.svc(Call::Mouse(0x14, 0x1F, 0));
 }
 
 /// The `0x2F64`–`0x2F90` sanitiser — `0x20` → NUL terminates, `0x5B`
@@ -145,7 +159,8 @@ pub fn act_cancel(c: &mut Ctx) {
 }
 
 /// `cs:0x2F91` — the heap-staging call (`0x844B`) used by the save
-/// side (file `0x32F91`).
+/// side: snapshot the `ds:0x7D39..0x9CC4` block into the `0x3829`
+/// heap segment (file `0x32F91`, `0x3844B`).
 pub fn act_stage(c: &mut Ctx) {
-    c.host.svc(Call::Native(0x844B));
+    c.vm.stage_save(c.st);
 }

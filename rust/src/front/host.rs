@@ -84,11 +84,15 @@ impl Host {
         }
     }
 
-    /// `int 33` — `ax = 4` sets the position, `ax = 8` the y range.
+    /// `int 33` — `ax = 4` sets the position, `ax = 8` the y range,
+    /// `ax = 0x14` swaps the event-handler mask (`0xA3BC`/`0xA36A` —
+    /// `cx` = `0x1E` buttons-only vs `0x1F` full; `dx` is the handler
+    /// offset the port doesn't model).
     fn int33(&mut self, ax: u16, cx: u16, dx: u16) {
         match ax {
             4 => self.pump.move_to(cx, dx),
             8 => self.pump.set_range(cx, dx),
+            0x14 => self.pump.set_handler(cx),
             _ => self.dropped += 1,
         }
     }
@@ -111,6 +115,7 @@ impl VmHost for Host {
             }
             Call::Rect(a, b, x, d) => self.rect(a, b, x, d),
             Call::Mouse(ax, cx, dx) => self.int33(ax, cx, dx),
+            Call::KeyPop => return u16::from(self.pump.pop_key().unwrap_or(0)),
             Call::Slot(0x125C, _) => self.scr.buf.fill(0),
             Call::Slot(0x1260, _) => self.dac0(),
             Call::Menu
@@ -138,5 +143,13 @@ impl VmHost for Host {
             self.img.get(i).copied().unwrap_or(0),
             self.img.get(i + 1).copied().unwrap_or(0),
         ])
+    }
+
+    fn pump_input(&mut self, vm: &mut crate::game::Vm, st: &mut crate::game::State) {
+        self.pump.write(vm, st);
+    }
+
+    fn key_flush(&mut self) {
+        self.pump.flush_keys();
     }
 }

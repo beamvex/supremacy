@@ -11,7 +11,7 @@ use super::cells::{BLINK_B, BLINK_PH, S_CNF_T};
 use super::text;
 use super::vhost::Call;
 use super::vops::Ctx;
-use super::{dialog, dlg_io};
+use super::{dialog, dlg_io, init};
 
 /// `u16` casts for the `ds:` slot constants.
 macro_rules! a {
@@ -37,6 +37,9 @@ pub fn dispatch_action(c: &mut Ctx, t: u16) {
         0x2F95 => dlg_io::act_cancel(c),
         0x2F9B => dialog::confirm(c),
         0x2D86 => blink_reprint(c),
+        // New game — the routine is addressable as `cs:0x305B` in the
+        // template window and `cs:0x9DAB` in the game window.
+        0x305B | 0x9DAB => init::act_newgame(c),
         _ => drop(c.host.svc(Call::Native(t))),
     }
 }

@@ -38,12 +38,14 @@ pub fn set_mach(st: &mut State, i: u16, ty: u8, flags: u8) -> usize {
 pub fn step(st: &mut State, rng: &mut Rng, want: char) -> Tick {
     let mut vm = game::Vm::new();
     let mut host = game::NullHost;
+    let mut files = supremacy::platform::MemFs::new();
     let got = {
         let mut c = game::Ctx {
             vm: &mut vm,
             st,
             rng,
             host: &mut host,
+            files: &mut files,
         };
         game::tick_step(&mut c)
     };

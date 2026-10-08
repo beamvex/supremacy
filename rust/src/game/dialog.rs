@@ -14,7 +14,7 @@ use super::cells::{
 use super::consts::{BUTTONS, FRAME, HOT_COUNT, HOT_LIST, HOT_SEL, SND_ON, UIMODE};
 use super::text;
 use super::vhost::Call;
-use super::vops::Ctx;
+use super::vops::{vsync, Ctx};
 use super::{blink, hover, menu, selrec, seq, ticker};
 
 /// `u16` casts for the `ds:` slot constants.
@@ -84,7 +84,7 @@ pub fn pump(c: &mut Ctx) {
 
 /// One pump iteration (file `0x32FEC`–`0x33024`).
 fn pump_iter(c: &mut Ctx) {
-    c.host.svc(Call::Ui(0x2CA9));
+    vsync(c);
     blink::blink_step(c);
     for _ in 0..3 {
         if c.vm.r8(c.st, a!(BLINK_T)) == 0 {
@@ -121,12 +121,12 @@ pub fn dlg_enter(c: &mut Ctx) {
 /// `cs:0x2E60` — one modal iteration; `true` when `[0x9CDA] & 2`
 /// (file `0x32E60`–`0x32E79`).
 pub fn dlg_step(c: &mut Ctx) -> bool {
-    c.host.svc(Call::Ui(0x2CA9));
+    vsync(c);
     c.host.svc(Call::Native(0xA369));
     menu::service(c);
     hover::hover_check(c);
     seq::seq_step(c);
-    c.host.svc(Call::Native(0x1E2E));
+    let _ = c.host.svc(Call::KeyPop);
     c.vm.r16(c.st, a!(BUTTONS)) & 2 != 0
 }
 
@@ -156,7 +156,7 @@ pub fn confirm(c: &mut Ctx) {
 /// One confirm-loop iteration — vsync, input, menu, oval, seq (file
 /// `0x32FBB`–`0x32FCF`).
 fn cnf_iter(c: &mut Ctx) {
-    c.host.svc(Call::Ui(0x2CA9));
+    vsync(c);
     c.host.svc(Call::Native(0xA369));
     menu::service(c);
     hover::hover_check(c);

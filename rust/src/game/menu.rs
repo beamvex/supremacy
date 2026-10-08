@@ -84,8 +84,9 @@ fn hit(c: &mut Ctx, si: u16, list: u16) {
 }
 
 /// `cs:0xA1CA` — synthetic codes for the mouse path, then the `K`-mode
-/// scancode branch (file `0x2A1CA`–`0x2A2D1`).
-fn keys(c: &mut Ctx) {
+/// scancode branch (file `0x2A1CA`–`0x2A2D1`). Also the `0xA348`
+/// channel-B half of the `0xE66E` line editor (`super::linein`).
+pub(crate) fn keys(c: &mut Ctx) {
     synth(c);
     if c.vm.r8(c.st, a16!(K_MODE)) != 1 {
         return;

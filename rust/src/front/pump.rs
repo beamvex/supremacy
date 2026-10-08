@@ -34,8 +34,15 @@ pub struct Pump {
     pub y_range: (u16, u16),
     /// `K`-mode flag → `[0x9CCD]` (keyboard-emulated mouse).
     pub k_mode: bool,
+    /// int-33h `ax = 0x14` event mask bit 0 — cursor-motion events.
+    /// `0xA3BC` restricts to `0x1E` (buttons only) during line input.
+    pub motion: bool,
     buttons: u8,
     queue: VecDeque<u8>,
+    /// The `cs:0x8B72` channel-A LIFO — every key code the int-9 ISR
+    /// pushes, popped by `0x1E2E` (the `0xE66E` editor's key source).
+    /// Drop-on-full at 10 like the asm.
+    keys: VecDeque<u8>,
 }
 
 impl Pump {
@@ -47,8 +54,10 @@ impl Pump {
             y: 0x64,
             y_range: (0, 0xBC),
             k_mode,
+            motion: true,
             buttons: 0,
             queue: VecDeque::new(),
+            keys: VecDeque::new(),
         }
     }
 
@@ -81,16 +90,38 @@ impl Pump {
         self.buttons = now;
     }
 
-    /// int-9 — latch a scancode (make or break).
+    /// int-9 — latch a scancode (make or break) into both channels:
+    /// the `[0x9CCB]` queue and the `cs:0x8B72` LIFO.
     pub fn key(&mut self, scan: u8) {
         self.queue.push_back(scan);
+        if self.keys.len() < 10 {
+            self.keys.push_back(scan);
+        }
+    }
+
+    /// `0x1E2E` — pop the newest channel-A code (LIFO like the asm).
+    pub fn pop_key(&mut self) -> Option<u8> {
+        self.keys.pop_back()
+    }
+
+    /// The `cs:[0x8B7C] = -1` reset — drop the channel-A stack.
+    pub fn flush_keys(&mut self) {
+        self.keys.clear();
+    }
+
+    /// int-33h `ax = 0x14` — swap the event mask; bit 0 gates whether
+    /// motion still mirrors into the `ds:` cursor cells.
+    pub fn set_handler(&mut self, mask: u16) {
+        self.motion = mask & 1 != 0;
     }
 
     /// Mirror state into the `ds:` cells; drops at most one queued code
     /// per frame into the `[0x9CCB]` latch, only when it's free.
     pub fn write(&mut self, vm: &mut Vm, st: &mut State) {
-        vm.w16(st, u16::try_from(CUR_X).unwrap_or(0), self.x);
-        vm.w16(st, u16::try_from(CUR_Y).unwrap_or(0), self.y);
+        if self.motion {
+            vm.w16(st, u16::try_from(CUR_X).unwrap_or(0), self.x);
+            vm.w16(st, u16::try_from(CUR_Y).unwrap_or(0), self.y);
+        }
         vm.w8(
             st,
             u16::try_from(K_MODE).unwrap_or(0),

@@ -3,9 +3,8 @@
 //!
 //! Loads the unpacked exe, one asset set and the mode palette, builds a
 //! [`supremacy::front::Game`] (fresh galaxy via `select_galaxy` +
-//! `new_game`), then runs the `minifb` loop. `--galaxy` starts in the
-//! galaxy loop instead of the menu shell (the new-game menu actions
-//! aren't decoded yet).
+//! `new_game`), then runs the `minifb` loop. Savegames land in the
+//! game dir (`--galaxy` skips the shell's new-game action).
 
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -63,10 +62,11 @@ fn run(
         img.get(supremacy::palette::DAC_OFS..supremacy::palette::DAC_OFS + 768)
             .unwrap_or(&[]),
     );
-    boot(img, set, pal, &cfg, preset, seed, galaxy)
+    boot(dir, img, set, pal, &cfg, preset, seed, galaxy)
 }
 
 fn boot(
+    dir: PathBuf,
     img: Vec<u8>,
     set: supremacy::assets::AssetSet,
     pal: Palette,
@@ -75,7 +75,17 @@ fn boot(
     seed: u32,
     galaxy: bool,
 ) -> ExitCode {
-    let mut g = Game::new(img, set, pal, cfg.video, cfg.keyboard_mouse, preset, seed);
+    let files = Box::new(supremacy::platform::HostFs::new(dir));
+    let mut g = Game::new(
+        img,
+        set,
+        pal,
+        cfg.video,
+        cfg.keyboard_mouse,
+        preset,
+        seed,
+        files,
+    );
     if galaxy {
         g.enter_galaxy();
     }

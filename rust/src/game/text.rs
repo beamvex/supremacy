@@ -16,7 +16,7 @@
 use super::cells::{OVERLAY_F, TICK_LEFT, TICK_PUT};
 use super::consts::{PANEL_ON, SND_ON, UIMODE};
 use super::vhost::Call;
-use super::vops::Ctx;
+use super::vops::{vsync, Ctx};
 use super::{seq, tick_step};
 
 /// `u16` casts for the `ds:` slot constants.
@@ -93,7 +93,7 @@ fn pace(c: &mut Ctx) {
     }
     seq::seq_step(c);
     let _ = tick_step(c);
-    c.host.svc(Call::Ui(0x2CA9));
+    vsync(c);
     if c.vm.r8(c.st, a!(PANEL_ON)) != 0 && c.vm.r8(c.st, a!(UIMODE)) == 5 {
         c.host.svc(Call::Slot(0x1266, 0x7D39));
     }

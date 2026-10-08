@@ -16,7 +16,7 @@ use super::consts::{
     SND_ON, TYPE_REC, UIMODE,
 };
 use super::vhost::Call;
-use super::vops::Ctx;
+use super::vops::{vsync, Ctx};
 use super::{menu, panel, select, seq, tick_step, Tick};
 
 /// `u16` casts for the `ds:` slot constants.
@@ -38,7 +38,7 @@ pub enum Frame {
 
 /// One frame — `cs:0x395B` through the `test [0x9CDA],2` exit check.
 pub fn frame_step(c: &mut Ctx) -> Frame {
-    c.host.svc(Call::Ui(0x2CA9));
+    vsync(c);
     cond_overlay(c);
     if c.vm.r8(c.st, a!(REDRAW)) != 0 {
         refresh(c);

@@ -104,7 +104,12 @@ fn preset_and_new_game() {
     assert_eq!(st.planets(), 0x0F);
     assert_eq!(st.byte(game::DIFFICULTY), 1);
     let mut rng = Rng::new(0x1111_2222);
-    game::new_game(&mut st, &mut rng);
+    let mut vm = game::Vm::new();
+    // The asm flow snapshots configured state (`0x844B`) before the
+    // `0x8432` restore inside `new_game` — mirror it so the preset
+    // survives.
+    vm.stage_save(&st);
+    game::new_game(&mut vm, &mut st, &mut rng);
     let base = usize::from(st.word(game::REC_BASE));
     // record 0 — fixed block
     assert_eq!(st.dword(base + game::F_CREDITS), 0x1879A);

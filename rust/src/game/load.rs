@@ -6,7 +6,7 @@ use crate::platform::DosFiles;
 /// `close` (`0x3E00`). `false` mirrors the carry-flag error returns.
 impl State {
     /// Replace the block with the contents of savegame `name`.
-    pub fn load<F: DosFiles>(&mut self, fs: &mut F, name: &str) -> bool {
+    pub fn load<F: DosFiles + ?Sized>(&mut self, fs: &mut F, name: &str) -> bool {
         let Some(h) = fs.open(name) else { return false };
         let n = fs.read(h, &mut self.block[..]);
         fs.close(h);

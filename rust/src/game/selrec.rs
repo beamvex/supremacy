@@ -14,6 +14,7 @@ use super::cells::LIST_MAX;
 use super::consts::{
     BUTTONS, CUR_X, CUR_Y, DIFFICULTY, REC_BASE, REC_CUR, REC_STRIDE, SEL_IDX, SEL_REC, SEQ_DELAY,
 };
+use super::dialog;
 use super::status;
 use super::vhost::Call;
 use super::vops::Ctx;
@@ -64,6 +65,23 @@ pub fn select_rec(c: &mut Ctx, i: u16) {
     c.host.svc(Call::PlanetPanel);
     status::sel_name(c);
     c.vm.w16(c.st, a!(SEQ_DELAY), 0);
+}
+
+/// `cs:0x5DD3` — advance to the next record (file `0x35DD3`–`0x35E02`):
+/// the shared sound chirp (`0x8A5B`/`0x8A3B`/`cl=0xA` driver call,
+/// `[0x91D3]`-gated), `0x8386` unmark, then `[0x9164] + 1` wrapping to
+/// 0 at `[0x91C6]` (8-bit compare/increment), falling into `0x5E03`.
+pub fn sel_next(c: &mut Ctx) {
+    dialog::snd_block(c);
+    unmark_sel(c);
+    let i = c.vm.r16(c.st, a!(SEL_IDX));
+    let lo = u8::try_from(i & 0xFF).unwrap_or(0);
+    let n = if lo == c.vm.r8(c.st, a!(LIST_MAX)) {
+        0
+    } else {
+        (i & 0xFF00) | u16::from(lo.wrapping_add(1))
+    };
+    select_rec(c, n);
 }
 
 /// `cs:0x5D52` — on left-button inside the `[0xA9..0xB5)` strip,

@@ -10,7 +10,7 @@ use crate::platform::DosFiles;
 /// as failure. `false` mirrors a carry-flag error return.
 impl State {
     /// Write the whole state block to savegame `name`.
-    pub fn save<F: DosFiles>(&self, fs: &mut F, name: &str) -> bool {
+    pub fn save<F: DosFiles + ?Sized>(&self, fs: &mut F, name: &str) -> bool {
         let Some(created) = fs.create(name) else {
             return false;
         };

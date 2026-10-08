@@ -9,9 +9,10 @@ use super::consts::{FLEET_BASE, FLEET_COUNT, FLEET_STRIDE, REC_COUNT, UIMODE};
 use super::rec::F_KIND;
 use super::rng::Rng;
 use super::state::State;
-use super::vhost::VmHost;
+use super::vhost::{Call, VmHost};
 use super::vm::{Flow, Vm};
 use super::{vdir, vimpl, vmac, vplan};
+use crate::platform::DosFiles;
 
 /// The VM's `ds` scratch registers (inside the save block).
 pub const R_SEL: u16 = 0x81EE;
@@ -26,8 +27,8 @@ pub const R_B: u16 = 0x81F8;
 /// Scratch dword (lo/hi at `+0`/`+2`).
 pub const R_C: u16 = 0x81FA;
 
-/// Borrow bundle handed to every op — the four contexts the asm
-/// touches: VM memory, game state, the PRNG, host services.
+/// Borrow bundle handed to every op — the five contexts the asm
+/// touches: VM memory, game state, the PRNG, host services, files.
 pub struct Ctx<'a> {
     /// Low/high `ds` memory (scripts, tables, menu scratch).
     pub vm: &'a mut Vm,
@@ -37,6 +38,16 @@ pub struct Ctx<'a> {
     pub rng: &'a mut Rng,
     /// Frontend services (print/menu/sound/draw slots).
     pub host: &'a mut dyn VmHost,
+    /// The `int 21h` file layer the save/load routines use.
+    pub files: &'a mut dyn DosFiles,
+}
+
+/// One `0x2CA9` frame boundary inside a loop: the vsync/UI service plus
+/// re-mirroring host input into the `ds:` cells (the asm's int handlers
+/// feed them asynchronously mid-loop).
+pub fn vsync(c: &mut Ctx) {
+    c.host.svc(Call::Ui(0x2CA9));
+    c.host.pump_input(c.vm, c.st);
 }
 
 /// Run event `idx` until a handler suspends — the `cs:0x773D` entry

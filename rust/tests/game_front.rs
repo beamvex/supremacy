@@ -72,11 +72,13 @@ fn pump_latches_synthetic_codes() {
         (1, 0x7E)
     );
     let mut host = NullHost;
+    let mut files = supremacy::platform::MemFs::new();
     let mut c = Ctx {
         vm: &mut vm,
         st: &mut st,
         rng: &mut Rng::new(1),
         host: &mut host,
+        files: &mut files,
     };
     game::menu_service(&mut c); // synth → press(1)
     assert_eq!(c.vm.r16(c.st, BUTTONS as u16), 1);
@@ -92,6 +94,7 @@ fn game_enters_shell_and_galaxy_exits_on_right_click() {
         false,
         3,
         0x42,
+        Box::new(supremacy::platform::MemFs::new()),
     );
     assert_eq!(g.phase, Phase::Shell);
     assert_eq!(g.st.byte(UIMODE), 0);

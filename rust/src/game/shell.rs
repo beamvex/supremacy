@@ -26,7 +26,7 @@ use super::cells::{
 };
 use super::consts::{FRAME, HOT_COUNT, HOT_LIST, HOT_SEL, SND_ON, UIMODE};
 use super::vhost::Call;
-use super::vops::Ctx;
+use super::vops::{vsync, Ctx};
 use super::{blink, hover, menu, selrec, seq, status, tick_step, ticker, Tick};
 
 /// `u16` casts for the `ds:` slot constants.
@@ -92,7 +92,7 @@ fn menu_install(c: &mut Ctx) {
 /// arm that ran. The asm loops forever (`jmp 0x2D5B`); exits happen
 /// via menu-action `jmp`s out of [`menu::service`].
 pub fn shell_step(c: &mut Ctx) -> Tick {
-    c.host.svc(Call::Ui(0x2CA9));
+    vsync(c);
     seq::seq_step(c);
     c.host.svc(Call::Native(0xA369));
     menu::service(c);

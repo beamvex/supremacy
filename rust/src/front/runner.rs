@@ -13,6 +13,7 @@ use crate::game::{
     frame_step, new_game, select_galaxy, shell_enter, shell_step, Ctx, Frame, Rng, State, Vm,
 };
 use crate::palette::Palette;
+use crate::platform::DosFiles;
 use crate::video::Screen;
 
 use super::Host;
@@ -36,14 +37,18 @@ pub struct Game {
     pub rng: Rng,
     /// Screen/input host.
     pub host: Host,
+    /// The `int 21h` file layer — the save/load routines' `C:` drive.
+    pub files: Box<dyn DosFiles>,
     /// Active loop.
     pub phase: Phase,
 }
 
 impl Game {
     /// Fresh game — galaxy `preset` (0..3), PRNG `seed`, `shell_enter`ed
-    /// over a fresh [`Host`] for `video` mode.
+    /// over a fresh [`Host`] for `video` mode, saving/loading through
+    /// `files`.
     #[must_use]
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         img: Vec<u8>,
         set: AssetSet,
@@ -52,16 +57,21 @@ impl Game {
         k_mode: bool,
         preset: usize,
         seed: u32,
+        files: Box<dyn DosFiles>,
     ) -> Self {
         let mut g = Self {
             vm: Vm::from_image(&img),
             st: State::new(),
             rng: Rng::new(seed),
             host: Host::new(Screen::new(video), pal, set, img, k_mode),
+            files,
             phase: Phase::Shell,
         };
         select_galaxy(&mut g.st, preset);
-        new_game(&mut g.st, &mut g.rng);
+        // The asm flow is pick → `0x844B` snapshot → `0x8432` restore
+        // inside `new_game`; snapshot here so the preset survives it.
+        g.vm.stage_save(&g.st);
+        new_game(&mut g.vm, &mut g.st, &mut g.rng);
         let mut c = g.ctx();
         shell_enter(&mut c);
         g
@@ -75,13 +85,13 @@ impl Game {
             st: &mut self.st,
             rng: &mut self.rng,
             host: &mut self.host,
+            files: &mut *self.files,
         }
     }
 
     /// One frame — mirror inputs into `ds:`, then step the active loop.
-    /// `Galaxy → Shell` transitions are internal; `Shell → Galaxy` waits
-    /// on the unported menu-action targets (`Call::Native` — the port
-    /// logs them in [`Host::dropped`][super::Host]).
+    /// `Galaxy → Shell` transitions are internal; `Shell → Galaxy` runs
+    /// through the `0x305B` new-game menu action (`init::act_newgame`).
     pub fn step(&mut self) {
         self.host.pump.write(&mut self.vm, &mut self.st);
         match self.phase {

@@ -37,36 +37,51 @@ fn save_game_ok_prints_saved() {
     r.w8(0x7C2F, 0xFF);
     r.w8(0x7929, b'Z'); // error string stays silent on success
     r.w8(0x792A, 0xFF);
+    r.keys(&[0x14, 0x12, 0x1F, 0x14, 0x1C]); // "TEST" + Enter
     assert!(game::save_game(&mut r.ctx()));
-    assert!(r.host.0.contains(&Call::Native(0x83F3)));
+    let saved = r.files.files.get("TEST").expect("TEST save written");
+    assert_eq!(&saved[..], &r.st.block[..]);
     assert!(r.host.0.contains(&Call::Glyph(b'O', 0x2A, 0xB1)));
     assert!(!r.host.0.contains(&Call::Glyph(b'Z', 0x2A, 0xB1)));
 }
 
 #[test]
+fn save_game_err_prints_error() {
+    let mut r = Rig::new();
+    r.w8(0x7929, b'Z');
+    r.w8(0x792A, 0xFF);
+    r.keys(&[0x1C]); // Enter on an empty name → ""
+    r.files.fail = true; // DOS carry-flag path
+    assert!(!game::save_game(&mut r.ctx()));
+    assert!(r.host.0.contains(&Call::Glyph(b'Z', 0x2A, 0xB1)));
+}
+
+#[test]
 fn load_game_switches_on_91e5() {
     let mut r = Rig::new();
-    r.w16(0x91E5, 2);
+    // A saved block whose `[0x91E5]` post-load switch = 2 → Loaded::C.
+    let mut blk = vec![0u8; 0x1F8B];
+    blk[usize::from(0x91E5u16) - 0x7D39..][..2].copy_from_slice(&2u16.to_le_bytes());
+    r.files.files.insert("S".to_owned(), blk);
+    r.keys(&[0x1F, 0x1C]); // "S" + Enter
     assert_eq!(game::load_game(&mut r.ctx()), Some(Loaded::C));
     assert_eq!(r.r8(0x9CCA), 0); // slot-mode brackets cleared
-    assert!(r.host.0.contains(&Call::Native(0x83CE)));
+    assert_eq!(r.r16(0x91E5), 2); // block loaded into state
     assert!(r.host.0.contains(&Call::PlanetPanel));
 }
 
 #[test]
 fn input_name_sanitises() {
     let mut r = Rig::new();
-    r.w8(0, b'N');
-    r.w8(1, b'[');
-    r.w8(2, b' ');
-    r.w8(3, b'Z');
+    // 'N' (0x31), '\' key → '[' (0x2B), ' ' (0x39), 'Z' (0x2C), Enter.
+    r.keys(&[0x31, 0x2B, 0x39, 0x2C, 0x1C]);
     game::input_name(&mut r.ctx());
     assert_eq!(r.r8(0), b'N');
     assert_eq!(r.r8(1), b'\\'); // '[' remapped
     assert_eq!(r.r8(2), 0); // space terminated
-    assert_eq!(r.r8(3), b'Z');
-    assert_eq!((r.r8(0x4FCB), r.r8(0x4FCC)), (0, 9));
-    assert!(r.host.0.contains(&Call::Native(0xE66E)));
+    assert_eq!((r.r8(0x4FCB), r.r8(0x4FCC)), (4, 9));
+    assert!(r.host.0.contains(&Call::Mouse(0x14, 0x1E, 0)));
+    assert!(r.host.0.contains(&Call::Mouse(0x14, 0x1F, 0)));
 }
 
 #[test]
