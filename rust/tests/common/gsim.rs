@@ -53,8 +53,9 @@ pub fn step(st: &mut State, rng: &mut Rng, want: char) -> Tick {
             | ('p', Tick::Planet(_))
             | ('d', Tick::Defence(_))
             | ('y', Tick::Day)
-            | ('?', Tick::Pending(_))
+            | ('?', Tick::Idle(_))
             | ('s', Tick::Script(_))
+            | ('h', Tick::Ship(_))
     );
     assert!(ok, "expected arm {want}, got {got:?}");
     got

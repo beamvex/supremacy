@@ -15,7 +15,7 @@ fn sequencer_runs_each_arm() {
         step(&mut st, &mut rng, 'm'); // codes 1..0x20 → machines
     }
     for _ in 0x20..0x38u16 {
-        step(&mut st, &mut rng, '?');
+        step(&mut st, &mut rng, 'h'); // codes 0x20..0x37 → ships
     }
     step(&mut st, &mut rng, 'p'); // 0x38 → planet 0
     let n = st.word(game::REC_TOTAL);

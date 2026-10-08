@@ -1,11 +1,13 @@
 use super::battle::Battle;
 use super::consts::{MACH_COUNT, REC_TOTAL, SEQ};
 use super::defence::defence_tick;
+use super::fleet::{ship_tick, ShipOut};
 use super::machine::{machine_tick, MachOut};
 use super::sim::sim_planet;
+use super::vend::{endgame, Ending};
 use super::vm::Flow;
 use super::vops::Ctx;
-use super::{day_tick, vdir, vev, vops, vup};
+use super::{day_tick, vdir, vev, vhud, vops, vord, vup};
 
 /// Which dispatcher arm a `tick_step` ran — mirrors the `bl` switch at
 /// file `0x37619`–`0x376C5`.
@@ -21,6 +23,20 @@ pub enum Tick {
     /// `0x38 + 2N + i` — event slot `i` ran (`cs:0x773D` VM; payload is
     /// the op count before it suspended).
     Script(u16),
+    /// `0x20..0x38` — ship `bl − 0x20` tick (`cs:0x60EE`).
+    Ship(ShipOut),
+    /// `0xA7` — the `cs:0x60A8` selected-object reprint.
+    HudSel,
+    /// `0xAA` — the `cs:0x3738` mark-all-sprites pass.
+    Sprites,
+    /// `0xF9` — the `cs:0x4309` orders popup (payload = window opened).
+    Orders(bool),
+    /// `0xFA` — the `cs:0x82E5` endgame monitor.
+    Endgame(Option<Ending>),
+    /// `0xFC` — the `cs:0x60D4` faction-population reprint.
+    HudPop,
+    /// `0xFD` — the `cs:0x60B6` faction-credits reprint.
+    HudCredits,
     /// `0xA8` — the `cs:0x7E36` jingle selector.
     Jingle,
     /// `0xA9` — the `cs:0x7C62` tribute dole.
@@ -37,10 +53,9 @@ pub enum Tick {
     Uprising,
     /// `0xFF` — day rollover.
     Day,
-    /// `0x20..0x38` (`cs:0x60EE`), `0xA7` (`0x60A8`), `0xAA` (`0x3738`),
-    /// `0xF9` (`0x4309`), `0xFA` (`0x82E5`), `0xFC` (`0x60D4`), `0xFD`
-    /// (`0x60B6`) — decoded ranges not yet ported.
-    Pending(u8),
+    /// Dispatcher codes below `0x20` — the `0x00`/`0x20`-boundary
+    /// fall-through `ret` (`cs:0x76C5`); every named code is ported.
+    Idle(u8),
 }
 
 /// One step of the game's tick — `cs:0x73D9` (file `0x373D9`–`0x376C5`).
@@ -67,13 +82,13 @@ fn sound_flag(c: &mut Ctx) {
 }
 
 /// The `bl` switch (file `0x37619`–`0x376C5`) — record-indexed arms
-/// first, then the point codes; unmapped codes return [`Tick::Pending`]
+/// first, then the point codes; unmapped codes return [`Tick::Idle`]
 /// (the asm `ret`s at `0x76C5`).
 fn dispatch(c: &mut Ctx, bl: u8) -> Tick {
     let n = c.st.word(REC_TOTAL);
     let b = u16::from(bl);
     if b < 0x38 {
-        return Tick::Pending(bl);
+        return ship_or_idle(c, bl);
     }
     if b < 0x38 + n {
         return Tick::Planet(sim_planet(c.st, b - 0x38));
@@ -87,8 +102,30 @@ fn dispatch(c: &mut Ctx, bl: u8) -> Tick {
     specials(c, bl)
 }
 
+/// `bl < 0x38` — codes `0x20..0x37` index the ship array (`jmp 0x60EE`,
+/// `bx = bl − 0x20`); below `0x20` the machines arm already ran.
+fn ship_or_idle(c: &mut Ctx, bl: u8) -> Tick {
+    if bl < 0x20 {
+        return Tick::Idle(bl);
+    }
+    Tick::Ship(ship_tick(c, u16::from(bl - 0x20)))
+}
+
 /// The point codes above `0x56 + 2N` (file `0x37653`–`0x376C2`).
 fn specials(c: &mut Ctx, bl: u8) -> Tick {
+    match bl {
+        0xA7 => hud(c, vhud::hud_ship, Tick::HudSel),
+        0xAA => hud(c, vhud::mark_sprites, Tick::Sprites),
+        0xF9 => Tick::Orders(vord::orders(c)),
+        0xFA => Tick::Endgame(endgame(c)),
+        0xFC => hud(c, vhud::hud_pop, Tick::HudPop),
+        0xFD => hud(c, vhud::hud_credits, Tick::HudCredits),
+        _ => flow_arm(c, bl),
+    }
+}
+
+/// The [`Flow`]-returning point codes (file `0x3765B`–`0x376C2`).
+fn flow_arm(c: &mut Ctx, bl: u8) -> Tick {
     let (f, t): (fn(&mut Ctx) -> Flow, Tick) = match bl {
         0xA8 => (vdir::jingle, Tick::Jingle),
         0xA9 => (vev::tribute, Tick::Tribute),
@@ -98,8 +135,14 @@ fn specials(c: &mut Ctx, bl: u8) -> Tick {
         0xFB => (vev::pirate, Tick::Pirate),
         0xFE => (vup::uprising, Tick::Uprising),
         0xFF => return day(c),
-        _ => return Tick::Pending(bl),
+        _ => return Tick::Idle(bl),
     };
+    f(c);
+    t
+}
+
+/// The `() -> ()` HUD helpers — run and report the arm's tag.
+fn hud(c: &mut Ctx, f: fn(&mut Ctx), t: Tick) -> Tick {
     f(c);
     t
 }

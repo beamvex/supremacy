@@ -36,6 +36,17 @@ pub enum Call {
     Native(u16),
     /// `call 0x2CA9` — UI housekeeping used by several op blocks.
     Ui(u16),
+    /// `call 0x6709` — the `0xFF`-terminated print interpreter at a
+    /// `ds:` string offset with `bx`/`dx` cursor args.
+    Text(u16, u16, u16),
+    /// `call 0x686C`/`0x68E0` — print a `u16`/`u32` number at `bx`/`dx`.
+    Num(u32, u16, u16),
+    /// `call word [0x1262]` — the `ax`/`bx`/`cx`/`dx` box op at
+    /// `cs:0x4309` (window frame before a popup).
+    Rect(u16, u16, u16, u16),
+    /// `jmp 0x8B17`/`0x8C65` — the `0xFA` arm's full-screen sequences
+    /// (`ds` swap + `call far [cs:0x1278]` image load).
+    Screen(u16),
 }
 
 /// Host callback — one method keeps call sites uniform; the return word

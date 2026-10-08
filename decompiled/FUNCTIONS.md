@@ -374,15 +374,76 @@ Per-planet pass (dispatcher codes `0x38 + total + planet_index`):
 loop (file `0x339F0` region). The byte selects the work:
 
 - `1..0x20` → machine `code` tick.
+- `0x20..0x38` → ship `code − 0x20` tick (`cs:0x60EE`, below).
 - `0x38 + i` (`i < total`) → planet `i` simulation.
 - `0x38 + total + i` → planet `i` defence pass.
 - `0x38 + 2·total + i` → event slot `i` (the `cs:0x773D` VM below).
-- `0xA8` jingle selector (`0x7E36`), `0xA9` tribute (`0x7C62`),
-  `0xAB..0xC0` message pass (`0x76DE`), `0xC1..0xF7` sprite redraw
-  (`0x80F0`), `0xF8` message clear (`0x813D`), `0xFB` pirate raid
-  (`0x7C9F`), `0xFE` colony spawn (`0x7EA2`), `0xFF` → day rollover;
-  `0x20..0x38` (`0x60EE`) and `0xA7`/`0xAA`/`0xF9`/`0xFA`/`0xFC`/`0xFD`
-  idle or unported.
+- `0xA7` selected-object reprint (`0x60A8`), `0xA8` jingle selector
+  (`0x7E36`), `0xA9` tribute (`0x7C62`), `0xAA` mark-all-sprites
+  (`0x3738`), `0xAB..0xC0` message pass (`0x76DE`), `0xC1..0xF7` sprite
+  redraw (`0x80F0`), `0xF8` message clear (`0x813D`), `0xF9` orders
+  popup (`0x4309`), `0xFA` endgame monitor (`0x82E5`), `0xFB` pirate
+  raid (`0x7C9F`), `0xFC`/`0xFD` faction pop/credits reprint
+  (`0x60D4`/`0x60B6`), `0xFE` colony spawn (`0x7EA2`), `0xFF` → day
+  rollover. Codes below `0x20` after the machine arm are idle (`ret`).
+
+### Ship tick — `cs:0x60EE` (file `0x360EE`–`0x361E4`)
+
+- `bx = code − 0x20` indexes the `ds:0x9991` fleet array (stride
+  `0xC`; 24 codes, one more than the `0x17` the defence scan uses).
+- `+6` flag bit `0x2` → skip. `+7` crew/experience byte: `+1` plus
+  `+1` for `diff != 2` plus `+1` for `diff == 0` (so `3`/`2`/`1`),
+  clamped `0x64` — the same byte the defence pass weights as
+  `pow·crew/0x48` and reinforcement grows `+7`.
+- UI mode 1 and `si == [0x914C]` (selected): stash `si → [0x9150]`,
+  crew `= 0` when `word[si] == 0`, `[0x91D6] = 9 − crew/16` (`0xFF`
+  when crew `0`), `[0x91DE] = 0xFF` when crew nonzero; print crew at
+  `(0x46,0xC0)` (`0x6886` number print) and the `crew/10`-indexed
+  `0x13`-byte status line from `ds:0x7438` at `(0x3B,0x3F)` (`0x6709`).
+
+### HUD reprints — UI mode 1 only
+
+- `0xA7` (`0x60A8`): `si = [0x914C]`; print `word[si]` at `(0x2C,0xB)`.
+- `0xFD` (`0x60B6`): `si =` faction rec (`0x5E3A`); print credits
+  dword `[si+0x36]` at `(0x45,0x32)` via `0x68E0`.
+- `0xFC` (`0x60D4`): faction `[si+0x2A]` (population) at `(0x49,0xB)`
+  via `0x686C` (space-padded `u16` print, `cmp ax,0x2710` region).
+- `0xAA` (`0x3738`): `or byte,0x80` over the `0xFF`-terminated sprite
+  pending-flag bytes at `ds:0x7562` — marks all sprites dirty for the
+  `0xC1..0xF7` redraw pass (the shipped image's string bytes there are
+  stale workspace, not the live table).
+
+### Orders popup — `0xF9` → `cs:0x4309` (file `0x34309`–`0x3442D`)
+
+Gate: `[0x91F4] != 0 && [0x91CD] == 7 && [0x9198] == 0`. Then: box via
+`[0x1262]` (`0x1C/6/3/0x41`), header print `ds:0x4F50` at `(0x38,0x1E)`,
+pick `bx` from selected record `[0x917C]`: `+0x2E != 0` → `1` (if
+`+0x26 == 0`) or `[0x91AC]+1` wrapped `5 → 2`; else `+0x26 != 0` or
+kind `7` → `0`, kind `0xA` → `1`, other kinds → fallback print
+`ds:0x4F6E` and out. Prints `0x4F8D`/`0x4FA6`, `call 0x2CA9` on the
+`bx`-th `0x1E`-byte entry at `ds:0x4EBA`, clears `[0x91A0]`/`[0x91D7]`,
+`lodsw`-copies word → `[0x9198]` + 12 words → `[0x9255..0x926C]` +
+byte → `[0x91D6]`, refresh `[0x1264]`, `0x7D0` spin, `call 0x5C49`,
+`[0x91F4] = 0`. The `ds:0x4F50`-region strings live in runtime-built
+menu workspace — the shipped bytes there are stale script slots.
+
+### Endgame monitor — `0xFA` → `cs:0x82E5` (file `0x382E5`–`0x38338`)
+
+Order of tests: faction record (`0x5E3A`) kind `7` → **A**; record `0`
+kind `0xA` → **B**; else the `cs:0x37C7` planet scan
+(`bp = #kind-0xA`, `ax = #kind-7` over `[0x91B8]` records): `ax == 0`
+→ **A**, `bp == 0` → **B**, else `ret` (`cs:0x8308` — the `74 01`
+skips it, so contested galaxies stay quiet).
+
+- **A** (`0x8322`): `[0x91F1] = 0xFF`, `[0x9C9A] = 2`, calls
+  `0xA3BC`/`0x21BF`/`0x215B`/`0xA36A`, `jmp 0x8B17`.
+- **B** (`0x8309`): `[0x91F0] = 0xFF`, `[0x9C9A] = 3`, calls
+  `0xA3BC`/`0x20F2`/`0x208E`/`0xA36A`, `jmp 0x8C65`.
+- `0x8B17`/`0x8C65` are full-screen sequences: `0xA3BC` + sound `al`,
+  `mov ds,0x95A` + `call far [cs:0x1278]` image load, palette/present
+  slots. Which ending is victory vs defeat is unverified — the
+  conditions only say A ⇔ (faction kind `7` ∨ no kind-`7` planets),
+  B ⇔ (rec0 kind `0xA` ∨ no kind-`0xA` planets).
 
 ## Event VM — `cs:0x773D` (file `0x3773D`–`0x37C61`)
 
@@ -445,8 +506,10 @@ tests in `rust/tests/game_vm.rs`.
 cleared per step.
 
 Rust port: `game::{tick_step, Tick, sim_planet, machine_tick,
-defence_tick, day_tick, Battle, MachOut}` in `rust/src/game/`; tests in
-`rust/tests/{game_tick,game_planet,game_battle,game_vm}.rs`.
+defence_tick, day_tick, ship_tick, endgame, Battle, MachOut, ShipOut,
+Ending}` in `rust/src/game/` (HUD/popup arms `vhud`/`vord` are
+module-private, reached through `tick_step`); tests in
+`rust/tests/{game_tick,game_planet,game_battle,game_vm,game_hud}.rs`.
 
 ## Still unnamed (next passes)
 
