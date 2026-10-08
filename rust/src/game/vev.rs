@@ -6,6 +6,7 @@
 use super::consts::{DIFFICULTY, REC_BASE, REC_COUNT, TICK};
 use super::mach::{M_FLAGS, M_HOST, M_TYPE};
 use super::rec::{F_ATTACK, F_CASH, F_KIND, F_NAME, F_POP, F_TROOPS};
+use super::text;
 use super::vhost::Call;
 use super::vm::Flow;
 use super::vops::{faction_rec, Ctx};
@@ -87,7 +88,7 @@ fn raid(c: &mut Ctx, r0: u16, v: u16) {
         let b = c.vm.r8(c.st, v + u16::try_from(F_NAME).unwrap_or(0) + k);
         c.vm.w8(c.st, RAID_NAME + k, b);
     }
-    c.host.svc(Call::Print(0x83F6));
+    text::enqueue(c, 0x83F6);
     raid_sfx(c);
 }
 

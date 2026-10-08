@@ -11,6 +11,7 @@ use super::consts::{
     DIFFICULTY, PANEL_ON, REDRAW, SEQ_DELAY, SEQ_PERIOD, SEQ_PHASE, SEQ_PTR, TYPE_BASE, TYPE_REC,
     TYPE_SEL, TYPE_STRIDE,
 };
+use super::text;
 use super::vhost::Call;
 use super::vops::Ctx;
 
@@ -65,7 +66,7 @@ fn draw_panel(c: &mut Ctx, si: u16) {
     }
     c.host.svc(Call::Native(0x89C3));
     c.host.svc(Call::Image(FRAME_IMG));
-    c.host.svc(Call::Text(0x6C43, 0x12, 0x98));
+    text::print_str(c, 0x6C43, 0x12, 0x98);
 }
 
 /// The difficulty-indexed legend at `(0,0xB0)` — `0x6C15`/`0x6BBC`/
@@ -77,5 +78,5 @@ fn legend(c: &mut Ctx) {
         1 => 0x6BBC,
         _ => 0x6B38,
     };
-    c.host.svc(Call::Text(s, 0, 0xB0));
+    text::print_str(c, s, 0, 0xB0);
 }

@@ -2,8 +2,9 @@
 //! selected-ship status refresh (`cs:0x60EE`, file `0x360EE`–`0x361E4`).
 
 use super::consts::{DIFFICULTY, FLEET_BASE, FLEET_STRIDE, LINK_REC};
+use super::num;
 use super::ship::{S_CREW, S_FLAGS, S_POW};
-use super::vhost::Call;
+use super::text;
 use super::vops::{uimode, Ctx};
 
 /// `ds:` slot holding the ship pointer while its panel updates
@@ -76,9 +77,9 @@ fn panel(c: &mut Ctx, si: u16) {
     let rate = if t == 0 { 0xFF } else { 9 - (t >> 4) };
     c.vm.w8(c.st, SHIP_RATE, rate);
     c.vm.w8(c.st, SHIP_ACTIVE, if t == 0 { 0 } else { 0xFF });
-    c.host.svc(Call::Num(u32::from(t), 0x46, 0xC0));
+    num::num_pad(c, u16::from(t), 0x46, 0xC0);
     let row = RATE_TAB + u16::from(t / 0xA) * 0x13;
-    c.host.svc(Call::Text(row, 0x3B, 0x3F));
+    text::print_str(c, row, 0x3B, 0x3F);
 }
 
 fn flag() -> u16 {

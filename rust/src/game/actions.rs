@@ -8,6 +8,7 @@
 //! frontend.
 
 use super::cells::{BLINK_B, BLINK_PH, S_CNF_T};
+use super::text;
 use super::vhost::Call;
 use super::vops::Ctx;
 use super::{dialog, dlg_io};
@@ -51,5 +52,5 @@ fn cnf_reprint(c: &mut Ctx) {
 /// (file `0x32D86`–`0x32D96`).
 fn blink_reprint(c: &mut Ctx) {
     c.vm.w8(c.st, a!(BLINK_PH), 0);
-    c.host.svc(Call::Text(a!(BLINK_B), 0x4D, 0x67));
+    text::print_str(c, a!(BLINK_B), 0x4D, 0x67);
 }

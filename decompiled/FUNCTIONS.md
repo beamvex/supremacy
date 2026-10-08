@@ -280,8 +280,14 @@ the half-word `add`/`adc`/`xchg` sequence independently and matches.
 - Field map (TBD tags until SUPCHT offsets are cracked): `+0x00` word0,
   `+0x0E` name, `+0x22`, `+0x24` owner, `+0x26` diff param, `+0x28`
   serial, `+0x29`, `+0x2A..+0x34` five stock words, `+0x36` credits dword.
-- `file 0x36709` — `print_str`: the `0xFF/0xFD`-terminated string
-  interpreter used by the message region.
+- `file 0x36709` — `print_str`: the `0xFF`-terminated string
+  interpreter used by the message region. Operands: `≥0x20` draws the
+  glyph via `[0x1268]` at `(bx·4px, dx)` then `bx += 1`; `0x01`/`0x02`
+  add the next byte (signed) to `dx`/`bx`; `0x03` reads a `{count,char}`
+  word and repeats (`bx += 1` each); `0x04` is the vertical variant
+  (`dx += 6`); other control bytes end the print. When `[0x91EA] ≠ 0`
+  each direct char also runs the pace block (`0x5C1E` seq, `0x73D9`
+  tick, `0x2CA9` vsync, `0x66F3` overlay once).
 - `file 0x366DE` — `init_planet_names`: 99 × 12-byte records at
   `ds:0x7D39`+… (planet-name table, distinct from the `0x3A` records).
 
@@ -596,6 +602,38 @@ Rust port: `game::{frame_step, Frame, seq_step, select_type,
 menu_service}` plus private `panel`; new `Call::{Slot,Image,Sfx,Mouse}`
 and `VmHost::cs_word`; tests in
 `rust/tests/{game_loop,game_seq,game_menu}.rs`.
+
+## Text layer + frontend — `rust/src/front/`
+
+- `cs:0x68D6` — the `[0x1268]` char put (`al` glyph, `(bx,dx)` cursor);
+  the MCG routine `0x2EECE` takes `bx` in 4-pixel columns, `dx` in
+  pixel rows, 4×6 glyph data indexed `al − 0x20` through the
+  runtime-loaded `ds:0x3009` offset table into `ds:0x30F9` font data
+  (EGA variant `0x2FF33` uses `ds:0x3081`/`0x3699` — all staged by the
+  undecoded `0x1278` load op).
+- `cs:0x686C` — `u16` decimal print space-padded to 5 cells (pads the
+  four leading decades, units forced).
+- `cs:0x698F` — `u16` unpadded print (skips leading decades; `0` still
+  prints `'0'`); sole call site is the `0x6B8F` ticker.
+- `cs:0x68E0` — `bp:ax` `u32` print padded to 8 cells (pads decades
+  ≥ `0x10000`; `1000..1` forced).
+- `cs:0x6B06` — **not** a print: the ticker enqueue. Sound select
+  (`0x8A5B`/`0x8A3B`/`0x127C`, muted on `[0x91D3] == 0xFF`), `[0x91E8]
+  = 0xFF`, appends `{si,0}` at the `[0x9160]` write cursor (`0xFE`
+  wraps to `0x928D`), `[0x91C2] += 1` (cap `0x80`).
+- `[0x125C]` `0x2EB6F` — the `rep stosw` region fill (clear screen,
+  `ax` colour).
+- `[0x1260]` `0x2EDA8` — `int 10/AX=1012` DAC reg 0 from the template
+  `cs:0x1384` triplet (template segment maps `cs:`→file `+0x292B0`,
+  distinct from the game-code `+0x30000`).
+
+Rust port: `game::{text, num}` (`print_str`, `enqueue`, `put`,
+`num_pad`, `num`, `num32`) — all `Call::Text/Print/Num` sites rewired
+to emit real `Call::Glyph`s; `front::{Host, Pump, Game, font}` is the
+concrete `VmHost` (image draws, glyph puts via a debug 4×6 font,
+`0x125C` clear, `0x1260` DAC, int-33 calls) and `front::window`
+(feature `minifb`) presents the buffer + pumps input. `supremacy-run`
+binary drives it; tests in `rust/tests/game_front.rs`.
 
 ## Still unnamed (next passes)
 

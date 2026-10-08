@@ -4,6 +4,7 @@
 
 use super::consts::DIFFICULTY;
 use super::rec::{F_FOOD, F_FUEL};
+use super::text;
 use super::vhost::Call;
 use super::vm::Flow;
 use super::vops::{faction_rec, set_bits, uimode, unlink_ships, Ctx};
@@ -24,7 +25,7 @@ const SPRITES: u16 = 0x7562;
 /// its ships. Suspends (it `ret`s) after running.
 pub fn disaster(c: &mut Ctx) -> Flow {
     c.vm.modal = true;
-    c.host.svc(Call::Print(0x5D7B));
+    text::enqueue(c, 0x5D7B);
     c.host.svc(Call::Menu);
     if c.vm.r8(c.st, QUIET) != 0xFF {
         c.host.svc(Call::Chan(0x8A5B, 0));
@@ -34,7 +35,7 @@ pub fn disaster(c: &mut Ctx) -> Flow {
     c.host.svc(Call::Flash);
     c.host.svc(Call::Present(0));
     c.host.svc(Call::PlanetPanel);
-    c.host.svc(Call::Print(0x5DAE));
+    text::enqueue(c, 0x5DAE);
     let rec = faction_rec(c);
     halve(c, rec + u16::try_from(F_FOOD).unwrap_or(0));
     halve(c, rec + u16::try_from(F_FUEL).unwrap_or(0));

@@ -12,6 +12,13 @@ pub const TICK_X: usize = 0x91C0;
 /// `ds:` slot of the ticker record cursor `[0x915C]` — points into a
 /// stream of 4-byte `{msg-ptr, unused}` records (file `0x36BA3`).
 pub const TICK_PTR: usize = 0x915C;
+/// `ds:` slot of the ticker write cursor `[0x9160]` — the `0x6B06`
+/// enqueue appends `{msg-ptr, 0}` records here (file `0x36B2F`).
+pub const TICK_PUT: usize = 0x9160;
+/// `ds:` slot of the decimal-digit scratch `[0x9CC0]` — the `0x68BD`/
+/// `0x69C6` divisor loops accumulate `'0' + count` here (file
+/// `0x368BD`/`0x369C6`).
+pub const DIGI: usize = 0x9CC0;
 /// `ds:` slot of the ticker record countdown `[0x91C2]` — `0xFF` ops
 /// decrement it; `0` disables the ticker (file `0x36BD4`).
 pub const TICK_LEFT: usize = 0x91C2;

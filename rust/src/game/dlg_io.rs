@@ -13,6 +13,7 @@ use super::cells::{
     S_PROMPT, S_SAVED,
 };
 use super::dialog::dlg_text;
+use super::text;
 use super::vhost::Call;
 use super::vops::Ctx;
 
@@ -130,8 +131,7 @@ fn sanitize(c: &mut Ctx) {
 /// reprint (file `0x32F01`).
 pub fn act_yes(c: &mut Ctx) {
     c.vm.w8(c.st, a!(DLG_FLAG), 1);
-    c.host
-        .svc(Call::Text(a!(super::cells::S_CNF_T), 0x2A, 0xB1));
+    text::print_str(c, a!(super::cells::S_CNF_T), 0x2A, 0xB1);
 }
 
 /// `cs:0x2F08` — confirm "no": `[0x91DA] = 2` (file `0x32F08`).

@@ -75,14 +75,22 @@ fn selected_ship_gets_panel() {
     r.st.set_byte(game::DIFFICULTY, 2);
     r.st.set_word(game::FLEET_BASE + game::S_POW, 1); // crew resets when 0
     r.st.set_byte(game::FLEET_BASE + game::S_CREW, 0x20);
+    let row = usize::from(0x7438u16 + 3 * 0x13);
+    r.vm.low[row] = b'O';
+    r.vm.low[row + 1] = 0xFF;
     assert_eq!(game::ship_tick(&mut r.ctx(), 0), ShipOut::Panel);
     assert_eq!(r.st.byte(0x91D6), 9 - 0x21 / 16); // crew 0x21 → rating
     assert_eq!(r.st.byte(0x91DE), 0xFF);
     assert_eq!(
         r.host.0,
         [
-            Call::Num(0x21, 0x46, 0xC0),
-            Call::Text(0x7438 + 3 * 0x13, 0x3B, 0x3F)
+            // num_pad(0x21) → "   33" across five cells
+            Call::Glyph(0x20, 0x46, 0xC0),
+            Call::Glyph(0x20, 0x47, 0xC0),
+            Call::Glyph(0x20, 0x48, 0xC0),
+            Call::Glyph(b'3', 0x49, 0xC0),
+            Call::Glyph(b'3', 0x4A, 0xC0),
+            Call::Glyph(b'O', 0x3B, 0x3F)
         ]
     );
 }
@@ -98,13 +106,14 @@ fn hud_arms_gate_on_uimode() {
     r.st.set_word(frac + game::F_POP, 0x1234);
     assert_eq!(r.seq(0xFD), Tick::HudCredits);
     assert_eq!(r.seq(0xFC), Tick::HudPop);
-    assert_eq!(
-        r.host.0,
-        [
-            Call::Num(0x1_2345, 0x45, 0x32),
-            Call::Num(0x1234, 0x49, 0x0B)
-        ]
-    );
+    let mut want = vec![];
+    for (i, ch) in "   74565".bytes().enumerate() {
+        want.push(Call::Glyph(ch, 0x45 + i as u16, 0x32));
+    }
+    for (i, ch) in " 4660".bytes().enumerate() {
+        want.push(Call::Glyph(ch, 0x49 + i as u16, 0x0B));
+    }
+    assert_eq!(r.host.0, want);
 }
 
 #[test]

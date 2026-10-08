@@ -9,6 +9,7 @@
 
 use super::cells::{BLINK_A, BLINK_B, BLINK_HOLD, BLINK_PH, BLINK_T};
 use super::consts::FRAME;
+use super::text;
 use super::ticker::ticker_step;
 use super::vhost::Call;
 use super::vops::Ctx;
@@ -50,5 +51,5 @@ fn flash(c: &mut Ctx) {
         0 => a!(BLINK_A),
         _ => return,
     };
-    c.host.svc(Call::Text(s, 0x4D, 0x67));
+    text::print_str(c, s, 0x4D, 0x67);
 }

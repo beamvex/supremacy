@@ -5,6 +5,7 @@
 //! refreshes.
 
 use super::consts::SEL_REC;
+use super::text;
 use super::vhost::Call;
 use super::vops::{uimode, Ctx};
 
@@ -35,13 +36,13 @@ pub fn orders(c: &mut Ctx) -> bool {
         return false;
     }
     c.host.svc(Call::Rect(0x1C, 0x6, 0x3, 0x41));
-    c.host.svc(Call::Text(0x4F50, 0x38, 0x1E));
+    text::print_str(c, 0x4F50, 0x38, 0x1E);
     let Some(bx) = pick(c) else {
-        c.host.svc(Call::Text(0x4F6E, 0x38, 0x1E));
+        text::print_str(c, 0x4F6E, 0x38, 0x1E);
         return true;
     };
-    c.host.svc(Call::Text(0x4F8D, 0x38, 0x1E));
-    c.host.svc(Call::Text(0x4FA6, 0x39, 0x39));
+    text::print_str(c, 0x4F8D, 0x38, 0x1E);
+    text::print_str(c, 0x4FA6, 0x39, 0x39);
     load_entry(c, ORD_TAB + bx * 0x1E);
     c.vm.w8(c.st, ORD_FLAG, 0);
     true

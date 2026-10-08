@@ -4,8 +4,8 @@
 //! pending for the redraw pass.
 
 use super::consts::LINK_REC;
+use super::num;
 use super::rec::{F_CREDITS, F_POP};
-use super::vhost::Call;
 use super::vops::{faction_rec, uimode, Ctx};
 
 /// `ds:` base of the sprite pending-flag bytes — `0x80` = dirty, the
@@ -20,8 +20,7 @@ pub fn hud_ship(c: &mut Ctx) {
         return;
     }
     let si = c.vm.r16(c.st, u16::try_from(LINK_REC).unwrap_or(0));
-    let v = u32::from(c.vm.r16(c.st, si));
-    c.host.svc(Call::Num(v, 0x2C, 0x0B));
+    num::num_pad(c, c.vm.r16(c.st, si), 0x2C, 0x0B);
 }
 
 /// `0xFD` — reprint the faction record's credits dword at `(0x45,0x32)`
@@ -32,7 +31,7 @@ pub fn hud_credits(c: &mut Ctx) {
     }
     let si = faction_rec(c) + u16::try_from(F_CREDITS).unwrap_or(0);
     let v = u32::from(c.vm.r16(c.st, si)) | u32::from(c.vm.r16(c.st, si + 2)) << 16;
-    c.host.svc(Call::Num(v, 0x45, 0x32));
+    num::num32(c, v, 0x45, 0x32);
 }
 
 /// `0xFC` — reprint the faction record's population word at `(0x49,0xB)`
@@ -42,8 +41,7 @@ pub fn hud_pop(c: &mut Ctx) {
         return;
     }
     let si = faction_rec(c) + u16::try_from(F_POP).unwrap_or(0);
-    c.host
-        .svc(Call::Num(u32::from(c.vm.r16(c.st, si)), 0x49, 0x0B));
+    num::num_pad(c, c.vm.r16(c.st, si), 0x49, 0x0B);
 }
 
 /// `0xAA` — set the `0x80` pending bit on every sprite slot up to the

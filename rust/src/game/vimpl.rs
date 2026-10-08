@@ -2,6 +2,7 @@
 //! copy/store/add immediates, countdown delay, menu/dialog host calls.
 
 use super::consts::REC_COUNT;
+use super::text;
 use super::vhost::Call;
 use super::vm::Flow;
 use super::vops::Ctx;
@@ -52,7 +53,7 @@ pub fn print(c: &mut Ctx, si: &mut u16) -> Flow {
 
 /// Print helper shared by the name-print ops.
 pub fn print_at(c: &mut Ctx, addr: u16) -> Flow {
-    c.host.svc(Call::Print(addr));
+    text::enqueue(c, addr);
     Flow::Cont
 }
 

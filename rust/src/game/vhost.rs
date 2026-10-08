@@ -8,8 +8,6 @@
 /// One host-side effect, in the order the asm issues it.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Call {
-    /// `call 0x6B06` — print a `0xFF`-terminated string at `ds:` offset.
-    Print(u16),
     /// `call 0x2FE7` — menu/dialogue service.
     Menu,
     /// The modal dialog block inside `cs:0x79C3` (`0x2CA9`/`0x5C1E`/
@@ -40,11 +38,6 @@ pub enum Call {
     Native(u16),
     /// `call 0x2CA9` — UI housekeeping used by several op blocks.
     Ui(u16),
-    /// `call 0x6709` — the `0xFF`-terminated print interpreter at a
-    /// `ds:` string offset with `bx`/`dx` cursor args.
-    Text(u16, u16, u16),
-    /// `call 0x686C`/`0x68E0` — print a `u16`/`u32` number at `bx`/`dx`.
-    Num(u32, u16, u16),
     /// `call word [0x1262]` — the `ax`/`bx`/`cx`/`dx` box op at
     /// `cs:0x4309` (window frame before a popup).
     Rect(u16, u16, u16, u16),

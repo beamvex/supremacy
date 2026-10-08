@@ -5,6 +5,8 @@
 
 use super::consts::{DIFFICULTY, MACH_BASE, MACH_COUNT, MACH_STRIDE, PANEL_REQ, TYPE_REC};
 use super::mach::M_TYPE;
+use super::num;
+use super::text;
 use super::vhost::Call;
 use super::vops::Ctx;
 
@@ -20,9 +22,9 @@ pub fn info_panel(c: &mut Ctx) {
     c.vm.w8(c.st, a16!(PANEL_REQ), 0);
     let t = c.vm.r16(c.st, a16!(TYPE_REC));
     let n = c.vm.r16(c.st, t + 0x14);
-    c.host.svc(Call::Text(n, 0x19, 0x98));
+    text::print_str(c, n, 0x19, 0x98);
     let d = c.vm.r16(c.st, t + 0x2C);
-    c.host.svc(Call::Text(d, 0x12, 0x92));
+    text::print_str(c, d, 0x12, 0x92);
     for f in [0x3CADu16, 0x3CDB, 0x3CF6] {
         c.host.svc(Call::Native(f));
     }
@@ -42,16 +44,17 @@ fn rows_a(c: &mut Ctx, t: u16) {
     } else {
         0xB3
     };
-    let v = u32::from(c.vm.r16(c.st, t + 6));
-    c.host.svc(Call::Num(v, 0x18, y));
+    num::num_pad(c, c.vm.r16(c.st, t + 6), 0x18, y);
     if diff == 2 {
-        let v = u32::from(c.vm.r16(c.st, t + 0x10));
-        c.host.svc(Call::Num(v, 0x18, 0xB7));
+        num::num_pad(c, c.vm.r16(c.st, t + 0x10), 0x18, 0xB7);
     }
     if diff != 0 {
-        let v = u32::from(c.vm.r16(c.st, t + 0xE));
-        c.host
-            .svc(Call::Num(v, 0x18, if diff == 2 { 0xBE } else { 0xBC }));
+        num::num_pad(
+            c,
+            c.vm.r16(c.st, t + 0xE),
+            0x18,
+            if diff == 2 { 0xBE } else { 0xBC },
+        );
     }
     mid_row(c, t, diff);
 }
@@ -64,9 +67,9 @@ fn mid_row(c: &mut Ctx, t: u16, diff: u8) {
     }
     let cap = c.vm.r16(c.st, t + 0xA);
     if cap == 0xFFFE {
-        c.host.svc(Call::Text(0x7325, 0x2A, 0xB0));
+        text::print_str(c, 0x7325, 0x2A, 0xB0);
     } else {
-        c.host.svc(Call::Num(u32::from(cap), 0x2C, 0xB0));
+        num::num_pad(c, cap, 0x2C, 0xB0);
     }
 }
 
@@ -75,17 +78,16 @@ fn mid_row(c: &mut Ctx, t: u16, diff: u8) {
 fn rows_b(c: &mut Ctx, t: u16) {
     let diff = c.vm.r8(c.st, a16!(DIFFICULTY));
     let y = if diff == 1 { 0xB3 } else { 0xB7 };
-    let v = u32::from(c.vm.r16(c.st, t + 4));
-    c.host.svc(Call::Num(v, 0x29, y));
+    num::num_pad(c, c.vm.r16(c.st, t + 4), 0x29, y);
     if diff == 0 {
         return;
     }
     let dx = if diff == 1 { 0xBC } else { 0xBE };
     let stock = c.vm.r16(c.st, t + 0xC);
     if stock == 0xFFFF {
-        c.host.svc(Call::Text(0x731C, 0x29, dx));
+        text::print_str(c, 0x731C, 0x29, dx);
     } else {
-        c.host.svc(Call::Num(u32::from(stock), 0x29, dx));
+        num::num_pad(c, stock, 0x29, dx);
     }
 }
 
@@ -101,15 +103,14 @@ fn rows_c(c: &mut Ctx, trec: u16) {
     } else {
         0xB3
     };
-    let count = u32::from(count_type(c, kind));
-    c.host.svc(Call::Num(count, 0x3D, row_y));
+    let count = u16::from(count_type(c, kind));
+    num::num_pad(c, count, 0x3D, row_y);
     if diff == 2 {
         total_cost(c, trec);
     }
     if diff != 0 {
-        let v = u32::from(c.vm.r16(c.st, trec + 0x1E));
         let dx = if diff == 1 { 0xBC } else { 0xBE };
-        c.host.svc(Call::Num(v, 0x3B, dx));
+        num::num_pad(c, c.vm.r16(c.st, trec + 0x1E), 0x3B, dx);
     }
 }
 
@@ -118,12 +119,11 @@ fn rows_c(c: &mut Ctx, trec: u16) {
 fn total_cost(c: &mut Ctx, t: u16) {
     let stock = c.vm.r16(c.st, t + 0xC);
     if stock == 0xFFFF {
-        c.host.svc(Call::Text(0x7509, 0x3A, 0xB7));
+        text::print_str(c, 0x7509, 0x3A, 0xB7);
         return;
     }
     let each = u16::from(c.vm.r8(c.st, t + 0x13));
-    let v = u32::from(stock.wrapping_mul(each));
-    c.host.svc(Call::Num(v, 0x3A, 0xB7));
+    num::num_pad(c, stock.wrapping_mul(each), 0x3A, 0xB7);
 }
 
 /// `cs:0x6632` (file `0x36632`) — count machine records whose `M_TYPE`

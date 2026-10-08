@@ -96,8 +96,10 @@ fn blink_flash_strings() {
     r.w8(0x91D1, 1);
     r.w8(0x91F3, 0x11);
     r.w8(game::FRAME, 0xFD); // &7 = 5 → the 0x77E3 string
+    r.w8(0x77E3, b'X');
+    r.w8(0x77E4, 0xFF);
     game::blink_step(&mut r.ctx());
-    assert!(r.host.0.contains(&Call::Text(0x77E3, 0x4D, 0x67)));
+    assert!(r.host.0.contains(&Call::Glyph(b'X', 0x4D, 0x67)));
     assert_eq!(r.r8(0x91D1), 1); // flash arm doesn't decrement
 }
 

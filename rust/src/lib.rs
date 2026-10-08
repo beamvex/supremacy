@@ -35,6 +35,7 @@ pub mod args;
 pub mod assets;
 pub mod audio;
 pub mod exepack;
+pub mod front;
 pub mod game;
 pub mod gph;
 pub mod lzss;

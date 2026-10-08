@@ -33,10 +33,14 @@ fn dlg_step_exits_on_right_click() {
 #[test]
 fn save_game_ok_prints_saved() {
     let mut r = Rig::new();
+    r.w8(0x7C2E, b'O');
+    r.w8(0x7C2F, 0xFF);
+    r.w8(0x7929, b'Z'); // error string stays silent on success
+    r.w8(0x792A, 0xFF);
     assert!(game::save_game(&mut r.ctx()));
     assert!(r.host.0.contains(&Call::Native(0x83F3)));
-    assert!(r.host.0.contains(&Call::Text(0x7C2E, 0x2A, 0xB1)));
-    assert!(!r.host.0.contains(&Call::Text(0x7929, 0x2A, 0xB1)));
+    assert!(r.host.0.contains(&Call::Glyph(b'O', 0x2A, 0xB1)));
+    assert!(!r.host.0.contains(&Call::Glyph(b'Z', 0x2A, 0xB1)));
 }
 
 #[test]
@@ -79,6 +83,8 @@ fn confirm_exits_via_action_dispatch() {
     r.w16(game::CUR_X, 0x10);
     r.w16(game::CUR_Y, 0x10);
     r.w16(game::BUTTONS, 1); // left held
+    r.w8(0x78B8, b'T');
+    r.w8(0x78B9, 0xFF);
     game::confirm(&mut r.ctx());
     assert_eq!(r.r8(0x91DA), 1); // act_yes ran
     assert_eq!(r.r16(game::HOT_LIST), 0xB05C); // dlg list restored
@@ -86,7 +92,7 @@ fn confirm_exits_via_action_dispatch() {
         .host
         .0
         .iter()
-        .filter(|c| matches!(c, Call::Text(0x78B8, 0x2A, 0xB1)))
+        .filter(|c| matches!(c, Call::Glyph(b'T', 0x2A, 0xB1)))
         .count();
     assert!(titles >= 2); // title + post-answer reprint
 }

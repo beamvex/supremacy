@@ -154,9 +154,9 @@ fn delay_counts_down_across_reruns() {
 }
 
 #[test]
-fn print_op_reaches_the_host() {
+fn print_op_enqueues_ticker() {
     let mut r = Rig::new();
-    r.jt(0x40, 0x7774); // print
+    r.jt(0x40, 0x7774); // print → 0x6B06 ticker enqueue
     r.jt(0x44, 0x7768);
     r.event(0, 0x6000);
     r.w16(0x6000, 0x40);
@@ -164,7 +164,13 @@ fn print_op_reaches_the_host() {
     r.w16(0x6004, 0x0FAA);
     r.w16(0x6006, 0x44);
     assert_eq!(r.run(0), 2);
-    assert_eq!(r.host.0, vec![Call::Print(0x5B41)]);
+    assert_eq!(r.host.0[0], Call::Chan(0x8A5B, 0));
+    assert_eq!(r.host.0[1], Call::Chan(0x8A3B, 0x1F));
+    assert_eq!(r.host.0[2], Call::Sound(0xC));
+    let c = r.ctx();
+    assert_eq!(c.vm.r16(c.st, 0x91C2), 1); // record queued
+    assert_eq!(c.vm.r16(c.st, 0), 0x5B41); // {si,0} at the write cursor
+    assert_eq!(c.vm.r8(c.st, 0x91E8), 0xFF);
 }
 
 #[test]
@@ -179,17 +185,15 @@ fn rand_planet_stores_a_record() {
     assert_eq!(r.run(0), 2);
     let c = r.ctx();
     let sel = c.vm.r16(c.st, 0x81EE);
-    let base = c.st.word(game::REC_BASE);
-    let n = c.st.word(game::REC_COUNT);
-    assert_eq!((sel - base) % 0x3A, 0);
-    assert!((sel - base) / 0x3A < n);
+    let (base, n) = (c.st.word(game::REC_BASE), c.st.word(game::REC_COUNT));
+    assert!((sel - base).is_multiple_of(0x3A) && (sel - base) / 0x3A < n);
 }
 
 #[test]
 fn tick_dispatches_script_events() {
     let mut st = common::gsim::galaxy();
-    let n = st.word(game::REC_TOTAL);
-    st.set_byte(game::SEQ, u8::try_from(0x38 + 2 * n - 1).unwrap());
+    let n = u8::try_from(st.word(game::REC_TOTAL)).unwrap();
+    st.set_byte(game::SEQ, 0x38 + 2 * n - 1);
     let tick = common::gsim::step(&mut st, &mut Rng::new(1), 's');
     assert!(matches!(tick, game::Tick::Script(_)));
     assert_eq!(NullHost.svc(Call::Menu), 0); // sink drops host calls

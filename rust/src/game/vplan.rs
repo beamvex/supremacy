@@ -3,6 +3,7 @@
 
 use super::consts::{DIRTY0, DIRTY1, REC_SEL};
 use super::rec::{F_ENERGY, F_FOOD, F_FUEL, F_KIND, F_OWNER, F_POP};
+use super::text;
 use super::vhost::Call;
 use super::vm::Flow;
 use super::vops::{kind_of, set_bits, uimode, unlink_ships, Ctx, R_SEL};
@@ -44,7 +45,7 @@ pub fn wait_kind(c: &mut Ctx, k: u16) -> Flow {
 /// `+0x32`. Sets the `cs:0xE713` modal flag first; suspends after.
 pub fn levy(c: &mut Ctx) -> Flow {
     c.vm.modal = true;
-    c.host.svc(Call::Print(0x5D33));
+    text::enqueue(c, 0x5D33);
     let rec = super::vops::faction_rec(c);
     let food = c.vm.r16(c.st, rec + u16::try_from(F_FOOD).unwrap_or(0));
     let left = food - food.min(0x186);

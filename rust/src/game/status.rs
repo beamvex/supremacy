@@ -14,6 +14,8 @@
 
 use super::cells::ALIEN_NAME;
 use super::consts::{DAY, REC_CUR, TICK, UIMODE};
+use super::num;
+use super::text::{self, put};
 use super::vhost::Call;
 use super::vops::Ctx;
 
@@ -24,16 +26,16 @@ macro_rules! a {
     };
 }
 
-/// `cs:0x6A8E` — the `tick/day` counter print (file `0x36A8E`).
+/// `cs:0x6A8E` — the `tick/day` counter print (file `0x36A8E`):
+/// `[0x91BA]` via `0x6893`, a `0x2F` glyph via `[0x1268]` + `inc bx`,
+/// then `[0x91BC]` via `0x68A8`.
 pub fn tick_day(c: &mut Ctx) {
     let Some((bx, dx)) = pair(c.vm.r8(c.st, a!(UIMODE))) else {
         return;
     };
-    let t = u32::from(c.vm.r16(c.st, a!(TICK)));
-    c.host.svc(Call::Num(t, bx, dx));
-    c.host.svc(Call::Glyph(0x2F, bx, dx));
-    let d = u32::from(c.vm.r16(c.st, a!(DAY)));
-    c.host.svc(Call::Num(d, bx + 1, dx));
+    let x = num::num(c, c.vm.r16(c.st, a!(TICK)), bx, dx);
+    put(c, 0x2F, x, dx);
+    num::num(c, c.vm.r16(c.st, a!(DAY)), x.wrapping_add(1), dx);
 }
 
 /// `uimode → (x, y)` for the counter (file `0x36A93`–`0x36AB8`).
@@ -54,9 +56,9 @@ pub fn sel_name(c: &mut Ctx) {
     }
     let rec = c.vm.r16(c.st, a!(REC_CUR));
     if c.vm.r16(c.st, rec + 0xC) == 1 {
-        c.host.svc(Call::Text(a!(ALIEN_NAME), 0x33, 0x4A));
+        text::print_str(c, a!(ALIEN_NAME), 0x33, 0x4A);
         return;
     }
     c.host.svc(Call::Glyph(0x3E, 0x33, 0x4A));
-    c.host.svc(Call::Text(rec + 0xE, 0x34, 0x4A));
+    text::print_str(c, rec + 0xE, 0x34, 0x4A);
 }

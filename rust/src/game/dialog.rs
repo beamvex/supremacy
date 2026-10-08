@@ -12,6 +12,7 @@ use super::cells::{
     MENU_COUNT, MENU_LIST, MENU_SEL, S_CNF_B, S_CNF_T, TICK_LEFT,
 };
 use super::consts::{BUTTONS, FRAME, HOT_COUNT, HOT_LIST, HOT_SEL, SND_ON, UIMODE};
+use super::text;
 use super::vhost::Call;
 use super::vops::Ctx;
 use super::{blink, hover, menu, selrec, seq, ticker};
@@ -37,7 +38,7 @@ pub fn snd_block(c: &mut Ctx) {
 /// `cs:0x2F24` — print a `ds:` script-string at `(0x2A,0xB1)` via
 /// `0x6709` (file `0x32F24`–`0x32F2C`).
 pub fn dlg_text(c: &mut Ctx, s: u16) {
-    c.host.svc(Call::Text(s, 0x2A, 0xB1));
+    text::print_str(c, s, 0x2A, 0xB1);
 }
 
 /// `cs:0x2FD7` — the dialog frame box, `jmp [0x1262]` with
@@ -102,7 +103,7 @@ fn pump_iter(c: &mut Ctx) {
 fn pump_tail(c: &mut Ctx) {
     c.vm.w8(c.st, a!(BLINK_PH), 0);
     if c.vm.r8(c.st, a!(UIMODE)) == 0 {
-        c.host.svc(Call::Text(a!(BLINK_B), 0x4D, 0x67));
+        text::print_str(c, a!(BLINK_B), 0x4D, 0x67);
     }
 }
 
@@ -141,14 +142,14 @@ pub fn dlg_close(c: &mut Ctx) {
 /// `0x2F01`/`0x2F08`/`0x2F95` actions; closes back into `0x2EEE`
 /// (file `0x32F9B`–`0x32FD6`).
 pub fn confirm(c: &mut Ctx) {
-    c.host.svc(Call::Text(a!(S_CNF_T), 0x2A, 0xB1));
+    text::print_str(c, a!(S_CNF_T), 0x2A, 0xB1);
     dlg_text(c, a!(S_CNF_B));
     install(c, a!(CNF_SEL), a!(CNF_LIST), 2);
     c.vm.w8(c.st, a!(DLG_FLAG), 0);
     while c.vm.r8(c.st, a!(DLG_FLAG)) == 0 {
         cnf_iter(c);
     }
-    c.host.svc(Call::Text(a!(S_CNF_T), 0x2A, 0xB1));
+    text::print_str(c, a!(S_CNF_T), 0x2A, 0xB1);
     dlg_list(c);
 }
 

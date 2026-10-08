@@ -4,3 +4,14 @@ version = "0.1.0"
 edition = "2021"
 description = "Rust rewrite of reverse-engineered routines from Supremacy: Your Will Be Done (Probe Software, 1991) GAME.EXE"
 publish = false
+
+[dependencies]
+minifb = { version = "0.28", optional = true }
+
+[features]
+minifb = ["dep:minifb"]
+
+[[bin]]
+name = "supremacy-run"
+path = "src/bin/run.rs"
+required-features = ["minifb"]

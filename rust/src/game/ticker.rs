@@ -16,6 +16,7 @@
 //! - else — print the char at `([0x91C0]++,0xB8)` through `[0x1268]`.
 
 use super::cells::{BLINK_T, TICK_BASE, TICK_FLAG, TICK_LEFT, TICK_PTR, TICK_WAIT, TICK_X};
+use super::num;
 use super::vhost::Call;
 use super::vops::Ctx;
 
@@ -61,7 +62,7 @@ fn dispatch(c: &mut Ctx, op: u8, di: u16, bp: u16) {
             c.vm.w16(c.st, bp - 4, di);
             c.vm.w16(c.st, a!(TICK_X), LINE_X);
         }
-        0xFB => num(c, di, bp),
+        0xFB => num_op(c, di, bp),
         0xFF => end_rec(c, bp),
         ch => {
             c.vm.w16(c.st, bp - 4, di);
@@ -75,25 +76,12 @@ fn dispatch(c: &mut Ctx, op: u8, di: u16, bp: u16) {
 /// `0xFB` — end-of-record step then print the word at `di` via
 /// `0x698F` (its `bx` advances one column per decimal digit, file
 /// `0x3698F`–`0x369E5`).
-fn num(c: &mut Ctx, di: u16, bp: u16) {
+fn num_op(c: &mut Ctx, di: u16, bp: u16) {
     end_rec(c, bp);
     let v = c.vm.r16(c.st, di);
     let x = c.vm.r16(c.st, a!(TICK_X));
-    c.host.svc(Call::Num(u32::from(v), x, ROW));
-    c.vm.w16(c.st, a!(TICK_X), x + u16::from(digits(v)));
-}
-
-/// Decimal digit count of `v` as `0x698F` prints it (min 1).
-fn digits(v: u16) -> u8 {
-    let mut n = 0u8;
-    let mut v = v;
-    loop {
-        n += 1;
-        v /= 10;
-        if v == 0 {
-            return n;
-        }
-    }
+    let x = num::num(c, v, x, ROW);
+    c.vm.w16(c.st, a!(TICK_X), x);
 }
 
 /// `cs:0x6BC4` — end-of-record: clear the tick flag, wrap the record
