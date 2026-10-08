@@ -99,3 +99,75 @@ pub const MSG_BUILD: usize = 0x8314;
 /// `ds:` slot of the mining message scratch (`[0x8318]`, file
 /// `0x3757D`).
 pub const MSG_MINE: usize = 0x8318;
+/// Frame counter `[0x91D4]` — incremented once per main-loop pass
+/// (file `0x339FE`).
+pub const FRAME: usize = 0x91D4;
+/// Redraw-request flag `[0x91EE]` — gates the refresh block (file
+/// `0x33961`).
+pub const REDRAW: usize = 0x91EE;
+/// Info-panel request flag `[0x91EF]` (file `0x33997`).
+pub const PANEL_REQ: usize = 0x91EF;
+/// Selected machine-type index `[0x91ED]` — `ds:0x9B12` stride `0x30`
+/// (file `0x33A5A`).
+pub const TYPE_SEL: usize = 0x91ED;
+/// Selected machine-type record pointer `[0x9154]` (file `0x33A7E`).
+pub const TYPE_REC: usize = 0x9154;
+/// Panel-visible flag `[0x91DB]` set from the type record (file
+/// `0x33AA4`).
+pub const PANEL_ON: usize = 0x91DB;
+/// Sequencer delay countdown `[0x91A0]` (file `0x35C1E`).
+pub const SEQ_DELAY: usize = 0x91A0;
+/// Sequencer phase counter `[0x91D7]` (file `0x35C32`).
+pub const SEQ_PHASE: usize = 0x91D7;
+/// Sequencer period `[0x91D6]` — `0xFF` disables (file `0x35C2B`).
+pub const SEQ_PERIOD: usize = 0x91D6;
+/// Sequencer command-list cursor `[0x9198]` — a `cs:` pointer (file
+/// `0x35C49`).
+pub const SEQ_PTR: usize = 0x9198;
+/// Sequencer aux pointer cleared on stream end `[0x919A]` (file
+/// `0x35C90`).
+pub const SEQ_AUX: usize = 0x919A;
+/// Sound-enable sentinel `[0x91D3]` — `0xFF` mutes the driver (file
+/// `0x38579`).
+pub const SND_ON: usize = 0x91D3;
+/// Mouse-buttons word `[0x9CDA]` — bit 0 left, bit 1 right (file
+/// `0x2A119`).
+pub const BUTTONS: usize = 0x9CDA;
+/// Cursor x `[0x9CD6]` (file `0x2A128`).
+pub const CUR_X: usize = 0x9CD6;
+/// Cursor y `[0x9CD8]` (file `0x2A12C`).
+pub const CUR_Y: usize = 0x9CD8;
+/// Hotspot-list pointer `[0x9194]`, `0x14`-byte records (file
+/// `0x2A130`).
+pub const HOT_LIST: usize = 0x9194;
+/// Hotspot entry count `[0x91A8]` (file `0x2A134`).
+pub const HOT_COUNT: usize = 0x91A8;
+/// Selected hotspot index `[0x9CC8]` (file `0x2A20E`).
+pub const HOT_SEL: usize = 0x9CC8;
+/// Button-press debounce latch `[0x91CA]` (file `0x2A121`).
+pub const ARMED: usize = 0x91CA;
+/// Pressed-state image index of the hit hotspot `[0x9188]` (file
+/// `0x2A14E`).
+pub const HOT_IMG: usize = 0x9188;
+/// Pending-keystroke flag `[0x9CCB]` / code cell `[0x9CCC]` (file
+/// `0x2A19C`).
+pub const KEY_PEND: usize = 0x9CCB;
+/// The latched scancode/synthetic code `[0x9CCC]` (file `0x2A1A1`).
+pub const KEY_CODE: usize = 0x9CCC;
+/// `K` keyboard-emulation flag `[0x9CCD]` (file `0x2A18E`).
+pub const K_MODE: usize = 0x9CCD;
+/// Tandy extra-nav flag `[0x9CC6]` (file `0x2A225`).
+pub const TANDY: usize = 0x9CC6;
+/// Menu suppress/drag flag `[0x91D5]` (file `0x2A112`).
+pub const DRAG: usize = 0x91D5;
+/// Selection stash on loop exit `[0xA81A]` (file `0x33A41`).
+pub const SEL_SAVE: usize = 0xA81A;
+/// Machine-type table base `ds:0x9B12`, stride `0x30` (file `0x33A78`).
+pub const TYPE_BASE: usize = 0x9B12;
+/// Machine-type record stride (file `0x33A5E`).
+pub const TYPE_STRIDE: usize = 0x30;
+/// Dirty-flag service snapshots `[0x9CBC]`/`[0x9CBE]` (file
+/// `0x33C70`/`0x33C76`).
+pub const SNAP0: usize = 0x9CBC;
+/// Snapshot of `DIRTY1` (file `0x33C76`).
+pub const SNAP1: usize = 0x9CBE;

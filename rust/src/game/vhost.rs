@@ -47,6 +47,20 @@ pub enum Call {
     /// `jmp 0x8B17`/`0x8C65` — the `0xFA` arm's full-screen sequences
     /// (`ds` swap + `call far [cs:0x1278]` image load).
     Screen(u16),
+    /// `call word near [slot]` — an indirect `cs:0x12xx` template
+    /// dispatch the port doesn't specialise (arg in `di`/`dx`).
+    Slot(u16, u16),
+    /// `call word near [0x125A]` — the mode's draw-image-by-index
+    /// routine, `dx` = image index (file `0x33A96`/`0x2A159`).
+    Image(u16),
+    /// `call 0x8577` — the sound-command wrapper: `ax` = command word,
+    /// `cl` + 1 = driver function via `call far [cs:0x127C]` (file
+    /// `0x38577`; gated on `[0x91D3] != 0xFF` inside the asm — the port
+    /// applies the gate before emitting).
+    Sfx(u16, u8),
+    /// `int 0x33` — mouse driver call (`ax`/`cx`/`dx`; `ax = 8` sets
+    /// the vertical range, `ax = 4` sets the cursor position).
+    Mouse(u16, u16, u16),
 }
 
 /// Host callback — one method keeps call sites uniform; the return word
@@ -54,6 +68,12 @@ pub enum Call {
 pub trait VmHost {
     /// Perform one host-side effect; return the `ax`/`bl` answer word.
     fn svc(&mut self, call: Call) -> u16;
+    /// Fetch a word from the code segment — the `cs:[si]` reads the
+    /// draw sequencer at `cs:0x5C1E` makes. The shell maps `cs:` to
+    /// file offsets (`+0x30000` for the game-code segment).
+    fn cs_word(&mut self, _ofs: u16) -> u16 {
+        0
+    }
 }
 
 /// A sink that drops every call — used when no frontend is attached.

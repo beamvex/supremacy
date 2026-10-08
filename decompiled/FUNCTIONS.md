@@ -511,6 +511,92 @@ Ending}` in `rust/src/game/` (HUD/popup arms `vhud`/`vord` are
 module-private, reached through `tick_step`); tests in
 `rust/tests/{game_tick,game_planet,game_battle,game_vm,game_hud}.rs`.
 
+## Main loop — `cs:0x395B` (file `0x3395B`–`0x33A44`)
+
+The galaxy-screen frame loop (entered via `jmp 0x395B`, exits
+`jmp 0x2CC5` to the UI shell on `[0x9CDA] & 2`). One iteration:
+
+1. `0x2CA9` — vsync wait (polls `[es:0x63]+6`, waits for the `0x3DA`
+   bit-3 edge).
+2. `0x66F3` — `[0x91DB] && uimode==5` → `di=0x7D39; call [0x1266]`.
+3. `[0x91EE]` redraw block: `call [0x1260]`, `call [0x125C]`,
+   `int 33/ax=8 cx=0x90 dx=0xBC` (clamp mouse-y), `0x3A47` type select,
+   `call [0x125E]` `dx=5`.
+4. `[0x91EF]` → `0x3AE9` info panel (below).
+5. Ambient-sound select on the frame counter `[0x91D4]` and the
+   selected type's `+0x12` byte — type 7: every 32 frames `0x26/0x0E`;
+   3: every 64 `0x29/0x0D`; 4: every 64 `0x0C/0x0C`; 6: `0x2A/0x0A` on
+   frame 0 and `0x21/0x13` on frame `0x80`. All via `cs:0x8577` — the
+   `call far [cs:0x127C]` wrapper (`cl+1` to the driver) gated on
+   `[0x91D3] != 0xFF`.
+6. `[0x91D4] += 1`; `call 0x73D9` (tick_step); `call 0x5C1E` (sequencer);
+   `call 0xA369` + `call 0xA10F` — **low-segment** (`cs:0 ↔ file
+   0x20000`) input + menu services; `call 0x3C6D` dirty flags.
+7. `[0x9CDA] & 2` → exit: `[0x91EA]=0`, `int33 ax=8 cx=0 dx=0xBC`,
+   `[0xA81A]=[0x9CC8]`, `jmp 0x2CC5`.
+
+### Draw sequencer — `cs:0x5C1E` (file `0x35C1E`–`0x35C96`)
+
+Per-machine-type animation. `[0x91A0]` delay countdown runs out first;
+`[0x91D6]` is the period (`0xFF` disables) and `[0x91D7]` the phase —
+commands fire only when the phase wraps to 0. `[0x9198]` is a `cs:`
+cursor into a stream of 4-byte `{op, pad}` records:
+
+- `0xFFFF` — end (`0x5C8A`): clears `[0x9198]`/`[0x919A]`.
+- `0x01F4` — delay: the *next* record's op word → `[0x91A0]`; both
+  records consumed.
+- `0x0000` — link: `si = cs:[si]` (next record's op = new stream `cs:`
+  ptr); fetch continues without suspending.
+- else — image index → `call [0x125A]` (draw). One command per period.
+
+`0x5C97` is the reset/setup entry (clears all four cells; uimode≠0
+tail-jumps to `0x5D51`).
+
+### Type select + info panel — `cs:0x3A47`/`cs:0x3AE9`
+
+`0x3A47` (file `0x33A47`): resets the sequencer, indexes the
+machine-type table `ds:0x9B12 + [0x91ED]·0x30` into `[0x9154]`, copies
+`+6`→`[0x91BE]`, `+0x18`→`[0x9198]` (seq list), `+0x1C`→`[0x91D6]`
+(period), draws `[si]` via `[0x125A]`, sets `[0x91DB]` from `+0x1D`
+(calling `0x66DE` when set), `0x89C3`, frame image `0x56`, caption
+`ds:0x6C43` at `(0x12,0x98)`, difficulty legend `0x6C15/0x6BBC/0x6B38`
+at `(0,0xB0)`.
+
+`0x3AE9` (file `0x33AE9`): the full stat reprint — `+0x14`/`+0x2C`
+name lines, the three `0x3CAD`/`0x3CDB`/`0x3CF6` deferred services,
+then `+6`, `+0x10` (mode 2), `+0xE` (mode≠0), `+0xA` (`0xFFFE` →
+`ds:0x7325` "none"), `+4`, `+0xC` (`0xFFFF` → `ds:0x731C`), owned-count
+via `0x6632` (scans `ds:0x9491` counting `M_TYPE` matches), `+0xC·+0x13`
+total (mode 2, `0xFFFF` → `ds:0x7509`), `+0x1E` (mode≠0). Row y-coords
+vary by `[0x91E4]`.
+
+### Menu service — `cs:0xA10F` (file `0x2A10F`–`0x2A2D1`)
+
+Per-frame: `0xA1CA` key path (synthetic `0x7E/0x7D/0xFE/0xFD` codes when
+`K` off; `K` mode: Enter `0x1C`/Esc `0x01` press, `0x81`/`0x9C` release,
+else arrow nav over `+0x10..0x13` links with Tandy `0x29/0x4A/0x2B/0x4E`
+alternates; no pending key → `0xA2D2` cursor-snap easing ⅛ toward the
+hotspot centre, `y ≤ 0xBC`). Then `[0x91D5]&1` suppresses; debounce via
+`[0x91CA]`; hit-test `x1≤cx≤x2, y1≤dy≤y2` over `[0x91A8]` records at
+`[0x9194]`; on hit: `[0x9188]=+8`, draw `+8` if nonzero, arm, stash
+`[0x9CC8]` at `[list−2]`, `jmp [si+0xC]`.
+
+`0x2A369` (the loop's `call 0xA369` target in the low segment) is a
+`ret` stub — the real install routine starts at `0xA36A` (`cli`,
+`[0x9CCE]=1`, `int33 ax=4` set cursor pos, `call [0x1288]`/`[0x128A]`
+cursor off/on, `int33 ax=0xC cx=0x1F es:dx=286B:0x1143` event-handler
+install, `sti`).
+
+`0x3C6D` — dirty-flag service: snapshots `[0x9144]`/`[0x9146]` to
+`[0x9CBC]`/`[0x9CBE]`, services at most one bit per frame — `0x9144` bit
+2 → `0x3CAD` (faction credits reprint), bit 15 → `0x3CDB`, `0x9146` bit
+1 → `0x3CF6` — and clears the bit in the live word.
+
+Rust port: `game::{frame_step, Frame, seq_step, select_type,
+menu_service}` plus private `panel`; new `Call::{Slot,Image,Sfx,Mouse}`
+and `VmHost::cs_word`; tests in
+`rust/tests/{game_loop,game_seq,game_menu}.rs`.
+
 ## Still unnamed (next passes)
 
 - `call 0xA479` after every draw (file 0x33729) — screen present / region
