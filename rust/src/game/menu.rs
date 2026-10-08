@@ -80,7 +80,7 @@ fn hit(c: &mut Ctx, si: u16, list: u16) {
     let sel = c.vm.r16(c.st, a16!(HOT_SEL));
     c.vm.w16(c.st, list.wrapping_sub(2), sel);
     let action = c.vm.r16(c.st, si + 0xC);
-    c.host.svc(Call::Native(action));
+    super::actions::dispatch_action(c, action);
 }
 
 /// `cs:0xA1CA` — synthetic codes for the mouse path, then the `K`-mode

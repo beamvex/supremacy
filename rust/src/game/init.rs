@@ -1,4 +1,4 @@
-use super::consts::{DIFFICULTY, DIFF_PACE, REC_BASE, REC_STRIDE};
+use super::consts::{DIFFICULTY, REC_BASE, REC_STRIDE, SEL_IDX};
 use super::rec::{
     F_29, F_CREDITS, F_DEFENCE, F_ENERGY, F_FOOD, F_FUEL, F_MINERALS, F_NAME, F_OWNER, F_POP,
     F_SERIAL, F_TROOPS, F_WORD0,
@@ -8,8 +8,9 @@ use super::{Rng, State};
 /// Per-difficulty `F_TROOPS` parameter — `[0x91E4]` = 0/1/2 → these
 /// words (file `0x330A4`–`0x330CE`).
 const DIFF_PARAM: [u16; 3] = [0x1F77, 0x3A2F, 0x5811];
-/// Per-difficulty `[0x9164]` countdown — 6/14/30 for 0/1/2.
-const DIFF_PACING: [u16; 3] = [0x06, 0x0E, 0x1E];
+/// Per-difficulty `[0x9164]` initial selected-record index — 6/14/30
+/// for 0/1/2.
+const SEL_INIT: [u16; 3] = [0x06, 0x0E, 0x1E];
 /// `LIFELESS!` — the 9-byte name stamped on uninhabited planets
 /// (file `0x3315C`–`0x33170`).
 const LIFELESS: [u8; 9] = *b"LIFELESS!";
@@ -54,7 +55,7 @@ fn rec_stride() -> u16 {
 fn home_planet(st: &mut State, base: u16, diff: usize) {
     let r = usize::from(base);
     st.set_word(r + F_TROOPS, DIFF_PARAM[diff.min(2)]);
-    st.set_word(DIFF_PACE, DIFF_PACING[diff.min(2)]);
+    st.set_word(SEL_IDX, SEL_INIT[diff.min(2)]);
     st.set_dword(r + F_CREDITS, 0x1_879A);
     st.set_word(r + F_FOOD, 0x2AF8);
     st.set_word(r + F_MINERALS, 0x1128);

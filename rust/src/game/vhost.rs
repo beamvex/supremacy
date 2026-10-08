@@ -32,6 +32,10 @@ pub enum Call {
     PlanetPanel,
     /// `call word [0x1268]` — template slot (blit sprite) with `bx/dx`.
     Blit(u16, u16),
+    /// `call/jmp word near [0x1268]` — the char-put slot where `ax`
+    /// carries the glyph/attr byte (`0x6A8E` prints `0x2F`, `0x6AD2`
+    /// prints `0x3E`, the `0x6B8F` ticker prints its stream).
+    Glyph(u8, u16, u16),
     /// A near call the port doesn't model yet (`cs:` target).
     Native(u16),
     /// `call 0x2CA9` — UI housekeeping used by several op blocks.

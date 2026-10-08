@@ -23,8 +23,11 @@ pub const REC_SEL: usize = 0x917C;
 pub const REC_CUR: usize = 0x9184;
 /// `ds:` slot the preset also mirrors the record base into (`[0x9178]`).
 pub const REC_ALT: usize = 0x9178;
-/// `ds:` slot of the per-difficulty countdown (`[0x9164]`: 6/14/30).
-pub const DIFF_PACE: usize = 0x9164;
+/// `ds:` slot of the selected/paced record index (`[0x9164]` —
+/// initialised 6/14/30 by the presets; the `0x5D52` row-click updates
+/// it and `0x5E03` derives `[0x9184]`/`[0x917C]` from it, files
+/// `0x383AA`/`0x35E03`).
+pub const SEL_IDX: usize = 0x9164;
 /// Byte stride of a planet/faction record (`[0x9CB6] = 0x3A`, file
 /// `0x35E41`).
 pub const REC_STRIDE: usize = 0x3A;
