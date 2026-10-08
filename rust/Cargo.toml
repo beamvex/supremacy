@@ -1,0 +1,6 @@
+[package]
+name = "supremacy"
+version = "0.1.0"
+edition = "2021"
+description = "Rust rewrite of reverse-engineered routines from Supremacy: Your Will Be Done (Probe Software, 1991) GAME.EXE"
+publish = false
