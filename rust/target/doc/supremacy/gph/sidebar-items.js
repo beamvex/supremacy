@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["RECORD_LEN"],"fn":["fix_up","parse_index"],"struct":["Record"]};

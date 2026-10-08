@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["Kind"],"fn":["decode","decode_at","decode_planes","draw"],"struct":["Blit","Decoder","Frame"],"trait":["Emit"]};
