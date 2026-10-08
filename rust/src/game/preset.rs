@@ -9,7 +9,7 @@ pub struct Preset {
     pub base: u16,
     /// Total records `ax` → `[0x91B6]`; planets = `ax − 1` → `[0x91B8]`.
     pub total: u16,
-    /// Difficulty byte `bl` → `[0x91E4]` (drives the `F_DIFF` write).
+    /// Difficulty byte `bl` → `[0x91E4]` (drives the `F_TROOPS` write).
     pub difficulty: u8,
     /// The 5-byte banner written to the `ds:0x582B` scratch string
     /// (preset name in the game's charset — `RORN `/`KRART`/`SMINE`/

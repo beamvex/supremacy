@@ -123,9 +123,9 @@ fn preset_and_new_game() {
     let credits = st.dword(f + game::F_CREDITS);
     assert!((0xC350..=0xC350 + 0x4E20).contains(&credits));
     assert_eq!(st.byte(f + game::F_OWNER), 2);
-    let r1 = st.word(f + game::F_STOCK1);
-    let r2 = st.word(f + game::F_STOCK2);
-    let r3 = st.word(f + game::F_STOCK3);
-    let r4 = st.word(f + game::F_STOCK4);
+    let r1 = st.word(f + game::F_FOOD);
+    let r2 = st.word(f + game::F_MINERALS);
+    let r3 = st.word(f + game::F_FUEL);
+    let r4 = st.word(f + game::F_ENERGY);
     assert!(r2 - r1 == r3 - r2 && r3 - r2 == r4 - r3); // arithmetic series
 }

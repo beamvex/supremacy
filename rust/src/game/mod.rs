@@ -9,7 +9,7 @@
 //!   real `ds:` addresses the asm uses.
 //! - [`Rng`]: the `cs:0x55B2` PRNG (file `0x2E862`) — a 32-bit LCG
 //!   `s = 13·s + 7` returning `hi16((b+1)·(lo^hi))`.
-//! - [`rec`]: the `0x3A`-byte planet/faction record layout — base pointer
+//! - `rec`: the `0x3A`-byte planet/faction record layout — base pointer
 //!   `[0x9158]`, planet count / player index `[0x91B8]`, total `[0x91B6]`.
 //! - [`new_game`]: `cs:0x9DAB` (file `0x3305B`) — fills the record array,
 //!   names planets `LIFELESS!`, rolls the player faction's resources.
@@ -17,18 +17,35 @@
 //!   `0x36792`/`0x367B2`/`0x367CD`/`0x367E8`) that anchor the record array
 //!   and set `[0x91B6]`/`[0x91B8]`/`[0x91E4]`.
 
+mod battle;
 mod consts;
+mod day;
+mod defence;
 mod init;
 mod load;
+mod mach;
+mod machine;
+mod mine;
 mod preset;
 mod rec;
 mod rng;
 mod save;
+mod ship;
+mod sim;
 mod state;
+mod tick;
 
+pub use battle::Battle;
 pub use consts::*;
+pub use day::day_tick;
+pub use defence::defence_tick;
 pub use init::new_game;
+pub use mach::*;
+pub use machine::{machine_tick, MachOut};
 pub use preset::{select_galaxy, Preset, PRESETS};
 pub use rec::*;
 pub use rng::Rng;
+pub use ship::*;
+pub use sim::sim_planet;
 pub use state::State;
+pub use tick::{tick_step, Tick};

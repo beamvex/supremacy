@@ -8,6 +8,8 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+pub mod gsim;
+
 /// Repo root (crate lives in `<root>/rust`).
 pub fn root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("..")

@@ -285,6 +285,110 @@ the half-word `add`/`adc`/`xchg` sequence independently and matches.
 - `file 0x366DE` — `init_planet_names`: 99 × 12-byte records at
   `ds:0x7D39`+… (planet-name table, distinct from the `0x3A` records).
 
+## Record fields — decoded via the stat display + FORMAT REPORT
+
+The stat-report strings (`FOOD`, `MINERALS`, `FUELS`, `ENERGY`,
+`CIVILIANS` — `ds:0x653A` region, file `0x171DA`+) pin the stock words;
+the sim/display routines pin the rest:
+
+- `+0x00` word/status, `+0x0C` kind (`0xA` = colonised planet, `7` =
+  fallen), `+0x0E` name, `+0x12` station type, `+0x13` rate byte,
+- `+0x18`/`+0x1C`/`+0x20` pending-event timers A/B/C,
+- `+0x1D` growth score (`cover/3`), `+0x1E` tax slider,
+  `+0x1F` food-coverage gauge, `+0x21` decline score
+  (`(100−cover)/4 + tax/4`), `+0x22` defence strength,
+- `+0x24` owner, `+0x26` troops (regen `+1/+3/+4` for owner −/5/4, cap
+  `0x3095`), `+0x28` serial, `+0x29` weapon/aux byte (`F_29`),
+- `+0x2A` population (cap `0x7530`), `+0x2C` food, `+0x2E` attack sum
+  (Σ raw ship power), `+0x30` minerals, `+0x32` fuel,
+  `+0x34` energy, `+0x36/+0x38` credits dword.
+
+## Planet simulation — `cs:0x3D1E` (file `0x33D1E`–`0x33F17`)
+
+Per-tick update for kind-`0xA` records, reached from the dispatcher
+(`0x38 + planet_index`):
+
+- Consumption: `need = pop/0xF0`; `food = max(0, food − need)`; shortfall
+  zeroes the coverage gauge and warns every 16th tick (`tick & 0xF == 0`).
+- Coverage `+0x1F` tracks `100 − tax` by ±1; growth score `= cover/3`,
+  decline `= (100−cover)/4 + tax/4`.
+- Population: `net = growth − decline`; `±(|net|·pop/400 + 1)` (decline
+  clamped to `pop`), growth skipped under 2, cap `0x7530`, wrapping add.
+- Income (odd ticks): `pop·tax / (owner ∈ {1,2} ? 125 : 200)` added to
+  the credits dword.
+- Delayed depopulation: `[0x8220]`/`[0x821F]` armed + record match →
+  `pop = 0`.
+- Dirty flags `[0x9144]`/`[0x9146]` mark fields for redraw (`0x20` pop,
+  `0x40` warn, `0xC0` cover, `0x4000` food, …).
+
+## Machine/station array — `ds:0x9491`, stride `0x28`, 32 entries
+
+Fields: `M_TYPE` kind byte (`0` = free, `3` solar, `6` core-miner, `7`
+horticultural, `5`+ colony/other), `M_FLAGS` (`0x1` building, `0x4`
+offline-mask, `0x8` mining, `0x10` destroyed-keep, `0x20` online),
+`M_HOST` host-planet index, `M_LINK` linked record, `M_OPS` ops left,
+`M_TIMER` countdown, `M_BUILD` colonise countdown, `M_DEPOSIT` mineral
+deposit. Machine-type table at `ds:0x9B12` stride `0x30` (`+0xC` =
+`0xFFFF` = no drain).
+
+Tick — `cs:0x742C` (file `0x37423`–`0x37616`), dispatched on codes
+`1..0x20`:
+
+- `M_TIMER` decrements, dirty `0x800`.
+- Miner (online): minerals `+2 (+7 tech, +5 owner 5)`, fuel
+  `+7 (+0x19 tech, +0xF owner 5)`; farm: burns 1 energy (else goes
+  offline), food `+0xC (+0x19 tech, +0x1C owner 4)`; solar: energy
+  `+6 (+7 owner 3)` — all under the `0x7530` stock ceiling.
+- Mining flag `0x8`: drains `M_DEPOSIT` by `0x19`/`0x32` (deep-mine
+  tech), `M_OPS−1`; on completion relinks `M_HOST` from the linked
+  record's `+0x28` and clears flag `0x8` (or re-arms `0x11`).
+- `M_BUILD` hitting 0 colonises `QUEUED_REC`: kind `0xA`, owner rolled
+  from `{1,3,4,5}` (`rand & 7` rejected otherwise), pop `rand(0x3E8)`,
+  food `0x12C + rand(0x4B0)`, stocks `0x14/0x96/0x23`, credits 0.
+
+## Fleet / defence — `cs:0x4434` (file `0x34434`–`0x34973`)
+
+Ship records: `ds:0x9991`, stride `0xC`, 23 entries — `S_POW` power,
+`S_LINK` docked record offset, `S_FLAGS` (`0x2` = armed, `0x8` mask),
+`S_GUNS`, `S_LOAD`, `S_CREW`.
+
+Per-planet pass (dispatcher codes `0x38 + total + planet_index`):
+
+- Scan: `F_ATTACK` = Σ `pow`, `F_DEFENCE` = Σ `pow + (pow·crew/0x48 &
+  0xFFFF)·(guns + load + F_29 + 1) & 0xFFFF` — the asm's `mul`/`div`
+  keep `ax`, so both stages truncate to 16 bits.
+- Troops 0 + defence → reinforcement: crews of armed linked ships `+7`
+  (cap `0x5D`); troops 0 + no defence → quiet.
+- Regen `+4/+3/+1` (owner 4/5/other, cap `0x3095`), then
+  `eff = troops·(2 + F_29)/100` min 1 vs `F_DEFENCE`:
+  - `def > eff` → repelled: each linked armed ship's `pow` scaled by
+    `100·eff/def`% (0 unlink+dirty `0x8`), `F_ATTACK` = Σ result, troops
+    `− def·2/100` (underflow → reinforcement).
+  - `def ≤ eff` → overrun: linked armed ships zeroed (8 bytes), bound
+    machines + their ships destroyed, matching planet timers cleared,
+    kind `7`, message `MSG_REC`, dirty `0x8`/`0x18`.
+
+## Tick dispatcher — `cs:0x73D9` (file `0x373D9`–`0x376C5`)
+
+`[0x91CE]` is a per-tick sequencer incremented each call from the main
+loop (file `0x339F0` region). The byte selects the work:
+
+- `1..0x20` → machine `code` tick.
+- `0x38 + i` (`i < total`) → planet `i` simulation.
+- `0x38 + total + i` → planet `i` defence pass.
+- higher ranges → scripted-event ops (`0x3773D` region; jump table
+  `+0x50E3`), `0xFF` → day rollover; other codes idle.
+
+## Day rollover — file `0x36A7B` region
+
+`[0x91BA]` tick counter `+1`, wraps `0x41 → 1` while `[0x91BC]` day
+`+1`; then day-level UI/resource work. Sound-service flag `[0x91B0]`
+cleared per step.
+
+Rust port: `game::{tick_step, Tick, sim_planet, machine_tick,
+defence_tick, day_tick, Battle, MachOut}` in `rust/src/game/`; tests in
+`rust/tests/{game_tick,game_planet,game_battle}.rs`.
+
 ## Still unnamed (next passes)
 
 - `call 0xA479` after every draw (file 0x33729) — screen present / region
