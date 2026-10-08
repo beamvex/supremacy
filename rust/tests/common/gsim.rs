@@ -36,7 +36,17 @@ pub fn set_mach(st: &mut State, i: u16, ty: u8, flags: u8) -> usize {
 
 /// One `tick_step` that must dispatch to arm `want`.
 pub fn step(st: &mut State, rng: &mut Rng, want: char) -> Tick {
-    let got = game::tick_step(st, rng);
+    let mut vm = game::Vm::new();
+    let mut host = game::NullHost;
+    let got = {
+        let mut c = game::Ctx {
+            vm: &mut vm,
+            st,
+            rng,
+            host: &mut host,
+        };
+        game::tick_step(&mut c)
+    };
     let ok = matches!(
         (want, &got),
         ('m', Tick::Machine(_))

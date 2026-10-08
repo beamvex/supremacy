@@ -376,8 +376,67 @@ loop (file `0x339F0` region). The byte selects the work:
 - `1..0x20` → machine `code` tick.
 - `0x38 + i` (`i < total`) → planet `i` simulation.
 - `0x38 + total + i` → planet `i` defence pass.
-- higher ranges → scripted-event ops (`0x3773D` region; jump table
-  `+0x50E3`), `0xFF` → day rollover; other codes idle.
+- `0x38 + 2·total + i` → event slot `i` (the `cs:0x773D` VM below).
+- `0xA8` jingle selector (`0x7E36`), `0xA9` tribute (`0x7C62`),
+  `0xAB..0xC0` message pass (`0x76DE`), `0xC1..0xF7` sprite redraw
+  (`0x80F0`), `0xF8` message clear (`0x813D`), `0xFB` pirate raid
+  (`0x7C9F`), `0xFE` colony spawn (`0x7EA2`), `0xFF` → day rollover;
+  `0x20..0x38` (`0x60EE`) and `0xA7`/`0xAA`/`0xF9`/`0xFA`/`0xFC`/`0xFD`
+  idle or unported.
+
+## Event VM — `cs:0x773D` (file `0x3773D`–`0x37C61`)
+
+Tick codes `0x38+2N .. 0x56+2N` index a 4-byte event table at
+`ds:0x5183`; word 0 is the script `si`. Fetch loop `cs:0x7758`:
+`bx = [si]; jmp word [bx + 0x50E3]` — the `ds:0x50E3` op table maps
+script words to the inline handlers `cs:0x7768..0x7C61` (the table is
+runtime-initialised; the shipped image holds unrelated script bytes
+there — its words look like `{ptr, 0x0FAA}` slots). Handlers either
+`jmp 0x7758` (continue) or `ret` (suspend the event). **`si` is never
+written back** — a suspended event re-runs from its table entry next
+tick, so scripts are guard+action rules; persistence lives in `ds`
+flag cells (`0x82xx`), not the instruction pointer.
+
+Operand encodings: bare `u16` immediate (`si += 2`), or a 4-byte slot
+`{ptr16, tag}` (`si += 4`; the shipped tag is `0x0FAA`, consumed but
+semantically unused).
+
+| handler | op |
+|---|---|
+| `0x7768`/`0x7AF0` | bare suspend (`ret`) |
+| `0x7769`/`0x78C7` | wait `byte[p] != 0` / `== 0` |
+| `0x7774` | print `0xFF`-terminated string at slot (`call 0x6B06`) |
+| `0x7782`/`0x778C` | `byte[p] = 0xFF` / `0` |
+| `0x7796` | wait `byte[p] == imm8` |
+| `0x77A5`/`0x77B4` | wait `word[p] == imm16` (wide = slot operand) |
+| `0x77C3`/`0x77E1`/`0x7BE8` | print name of current/selected/found record (`+0xE`) |
+| `0x77F0` | `[0x81EE]` = random planet record |
+| `0x7811`/`0x7825`/`0x7839` | indirect load 1/2/4 bytes → `0x81F7`/`0x81F8`/`0x81FA` |
+| `0x7853`/`0x7866`/`0x7879` | copy 1/2/4 bytes slot→slot |
+| `0x7893`/`0x78A2`/`0x78B1` | `+imm` on byte/word/dword at slot (`adc` carry) |
+| `0x78D5`/`0x78E4`/`0x78F3` | store byte/word/dword immediate at slot |
+| `0x7908` | `jmp word [si]` — escape to a `cs:` routine; suspends |
+| `0x790A` | destroy selected planet (`0x81EE`): unlink ships, kind 4 |
+| `0x7980`/`0x798E`/`0x799C` | wait selected record kind `0xA`/`7`/`4` |
+| `0x79AA` | countdown cell: suspend decrementing while nonzero |
+| `0x79BB`/`0x79C3` | menu service / modal dialog block (`cs:0xE713` flag) |
+| `0x7A11` | levy: pull food to `0x186`, dump excess-`0x384` into `+0x32` |
+| `0x7A45` | disaster fanfare: modal print, `0x924D` flash loop, halve food+fuel |
+| `0x7ADD` | clear flag `0x20` on all `0x20` machines |
+| `0x7AF1` | raze machines on selected planet + matching tail timers |
+| `0x7BAB` | wait: find derelict (type 7, flags `0x30`) off current planet |
+| `0x7BF4`/`0x7C05` | depopulate selected (`+0x2A=0`) / charge (`+0x34=0x74CC`) |
+| `0x7C16` | zero all machine build timers `+0x0C` |
+| `0x7C30` | wait: harvest ripe farm (type 5, flag `0x4`, `+0x0A ≥ 0x4B0`) |
+
+The tick-direct events (`0x7C62` tribute, `0x7C9F` pirate + `0x7D5A`
+victim picker, `0x7EA2` colony spawn + `0x7FA5` name generator, and
+the `0x76DE`/`0x80F0`/`0x813D`/`0x7E36` UI/sound passes) share the
+same `ret` contract — they suspend the slot after firing.
+
+Rust port: `game::{Vm, Ctx, run, VmHost, Call, NullHost}` across
+`rust/src/game/{vm,vhost,vops,vimpl,vplan,vmac,vdir,vev,vup}.rs`;
+tests in `rust/tests/game_vm.rs`.
 
 ## Day rollover — file `0x36A7B` region
 
@@ -387,7 +446,7 @@ cleared per step.
 
 Rust port: `game::{tick_step, Tick, sim_planet, machine_tick,
 defence_tick, day_tick, Battle, MachOut}` in `rust/src/game/`; tests in
-`rust/tests/{game_tick,game_planet,game_battle}.rs`.
+`rust/tests/{game_tick,game_planet,game_battle,game_vm}.rs`.
 
 ## Still unnamed (next passes)
 

@@ -49,6 +49,11 @@ pub const F_OWNER: usize = 0x24;
 /// incoming fleet as `troops·(2+F_29)/100` (file `0x34591`). Difficulty
 /// scales the home planet's start (file `0x330A4`).
 pub const F_TROOPS: usize = 0x26;
+/// Same offset on the faction record holds liquid credits — the
+/// tribute (`cs:0x7C62`), pirate raid (`cs:0x7C9F`) and colony-spawn
+/// (`cs:0x7EA2`) routines all read/write `rec0+0x26` as money, and the
+/// `cs:0x8149` report copies it to the `0x83F4` stat slot.
+pub const F_CASH: usize = F_TROOPS;
 /// Planet serial index stamped at init (file `0x33185`).
 pub const F_SERIAL: usize = 0x28;
 /// Byte cleared with the serial (file `0x33188`); also fed into the

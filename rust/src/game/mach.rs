@@ -8,6 +8,9 @@ pub const M_TIMER: usize = 0x0C;
 /// Mining ops remaining — when `0` the mining flag clears and the
 /// machine relinks to `[M_LINK]+0x28` (file `0x37537`–`0x3759A`).
 pub const M_OPS: usize = 0x18;
+/// Produce accumulator — counts toward the `0x4B0` harvest threshold
+/// the `cs:0x7C30` event op waits for (file `0x37C42`).
+pub const M_ACC: usize = 0x0A;
 /// Linked record pointer — resolved via the machine-type table when
 /// mining completes (file `0x37591`).
 pub const M_LINK: usize = 0x1A;
