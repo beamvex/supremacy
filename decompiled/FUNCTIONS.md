@@ -220,6 +220,71 @@ file 0x2900) holds the hardware driver installed during init:
   soft-interrupt slots for sound service + chained-vector calls, ends
   `out 0x20,0x20; iret`. `[0x155]=0..4` = PC/Tandy/AdLib/Roland.
 
+## Save / load — the state block
+
+The savegame is a **raw memory dump**, not a structured format: the same
+`0x1F8B`-byte region `ds:0x7D39..0x9CC4` is written and read whole.
+
+- file `0x383CE` — `load_state`: `int 21/AH=3D00` open read-only →
+  `AH=3F00` `cx=0x1F8B` `dx=0x7D39` read into the state block → `AH=3E00`
+  close. Carry-flag error → `false`.
+- file `0x383F3` — `save_state`: `int 21/AH=3C00` create/truncate (handle
+  leaked), `AH=3D01` open write-only → `AH=4000` `cx=0x1F8B` `dx=0x7D39`
+  write → `AH=3E00` close.
+- file `0x38432` / `0x3844B` — staging copies `ds:0x7D39` ↔ an allocated
+  loader-heap segment (the save/load UI round-trips through it).
+- Callers live in the save/load dialog flow `cs:0x9BF0–0x9DED` (file
+  `0x32EA0` region): "PLEASE ENTER YOUR FILENAME?" (ds:0x7F85),
+  "PLEASE WAIT - LOADING/SAVING ...." (0x7EA8/0x7EC5), "GAME WAS
+  SUCCESSFULLY SAVED!" (0x82CE), "GAME HAS LOADED SUCCESSFULLY!" (0x82F0)
+  — reached via a 12-entry near-pointer table at file `0x4708`.
+- The block is a mixed workspace: `0xFD`-separated message strings first
+  ("  \xFDFORMAT COMPLETE.\xFD...", planet names like STARNAM29), then
+  the `0x3A`-stride record array (anchored by the galaxy preset), scalars
+  and menu state. Initial contents ship in the image at file
+  `0x189D9`–`0x1A963` (file ofs = `ds:` + `0x10CA0`).
+
+## PRNG — `cs:0x55B2` (file `0x2E862`–`0x2E93B`)
+
+`rand(b)` in `bx` → result in `ax`:
+
+- 32-bit LCG over `[0x55A2]:[0x55A4]` — scramble is sequenced on 16-bit
+  halves: `p = s + 7`; `a = s·4`; `m = a`; `a = a·2 + p + m` →
+  `s' = 13·s + 7` (mod 2³²).
+- Fold: `r = lo16(s') ^ hi16(s')` (both `[0x55A6]` and `[0x55A8]` end up
+  equal to `r` via the `xchg`+xor pair).
+- `dx:ax = (b+1) · r`; returns `dx` = `hi16((b+1)·r)` — i.e. a `0..=b`
+  value scaled through the 16-bit product's high word.
+
+Rust port: `game::Rng`; the test model (`tests/game_state.rs`) replays
+the half-word `add`/`adc`/`xchg` sequence independently and matches.
+
+## Records / new-game init — `cs:0x9DAB` (file `0x3305B`–`0x331C2`)
+
+- Record array: base `[0x9158]`, stride `0x3A` (58) bytes — accessor
+  `cs:0x5E3A` (file `0x35E3A`): `ax = idx·0x3A + [0x9158]`.
+  `[0x91B6]` = total records, `[0x91B8]` = planet count = index of the
+  appended player-faction record, planet-count byte `[0x91C6]`,
+  difficulty `[0x91E4]`.
+- Galaxy preset picker (file `0x36792`–`0x3681F`), four branches; three
+  confirmed — `(base, total, diff)` = `(0x8486,0x20,2)`, `(0x8BC6,0x10,1)`,
+  `(0x8F66,0x08,0)`; each stores a 2-word banner (little-endian bytes read
+  `RORN `/`KRART`/`SMINE`/`WOTOK` — display encoding unverified).
+- `cs:0x9DAB` new-game init: rec 0 fixed block (difficulty-scaled word
+  `+0x26` = `0x1F77/0x3A2F/0x5811`, `[0x9164]` pacing 6/14/30, credits
+  dword `+0x36` = `0x1879A`, stocks `+0x2A..+0x34`, owner `+0x24` = 2);
+  rec `[0x91B8]` rolled block (credits `0xC350 + rand(0x4E20)`, stocks
+  `0x9C4 + k·rand(0x3E8)` arithmetic series, `0x5DC + rand(0x1F4)`);
+  recs `1..n−1` named `LIFELESS!` (`+0x0E`, `0x21`-terminated); all
+  `0..=n` records get serial `+0x28` = index, `+0x29` = 0, `+0x00` = 0.
+- Field map (TBD tags until SUPCHT offsets are cracked): `+0x00` word0,
+  `+0x0E` name, `+0x22`, `+0x24` owner, `+0x26` diff param, `+0x28`
+  serial, `+0x29`, `+0x2A..+0x34` five stock words, `+0x36` credits dword.
+- `file 0x36709` — `print_str`: the `0xFF/0xFD`-terminated string
+  interpreter used by the message region.
+- `file 0x366DE` — `init_planet_names`: 99 × 12-byte records at
+  `ds:0x7D39`+… (planet-name table, distinct from the `0x3A` records).
+
 ## Still unnamed (next passes)
 
 - `call 0xA479` after every draw (file 0x33729) — screen present / region

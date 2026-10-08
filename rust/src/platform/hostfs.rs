@@ -1,7 +1,7 @@
 use super::DosFiles;
 use std::collections::HashMap;
 use std::fs::File;
-use std::io::Read;
+use std::io::{Read, Write};
 use std::path::PathBuf;
 
 /// `DosFiles` over the host filesystem — a root directory plays the role of
@@ -32,6 +32,13 @@ impl HostFs {
             .or_else(|_| File::open(self.root.join(name.to_uppercase())))
             .ok()
     }
+
+    fn register(&mut self, f: File) -> u16 {
+        let h = self.next;
+        self.next = self.next.wrapping_add(1);
+        self.handles.insert(h, f);
+        h
+    }
 }
 
 impl DosFiles for HostFs {
@@ -41,10 +48,27 @@ impl DosFiles for HostFs {
 
     fn open(&mut self, name: &str) -> Option<u16> {
         let f = self.open_file(name)?;
-        let h = self.next;
-        self.next = self.next.wrapping_add(1);
-        self.handles.insert(h, f);
-        Some(h)
+        Some(self.register(f))
+    }
+
+    fn create(&mut self, name: &str) -> Option<u16> {
+        let f = File::create(self.root.join(name)).ok()?;
+        Some(self.register(f))
+    }
+
+    fn open_write(&mut self, name: &str) -> Option<u16> {
+        let f = File::options()
+            .write(true)
+            .open(self.root.join(name))
+            .ok()?;
+        Some(self.register(f))
+    }
+
+    fn write(&mut self, handle: u16, buf: &[u8]) -> usize {
+        self.handles
+            .get_mut(&handle)
+            .and_then(|f| f.write(buf).ok())
+            .unwrap_or(0)
     }
 
     fn read(&mut self, handle: u16, buf: &mut [u8]) -> usize {

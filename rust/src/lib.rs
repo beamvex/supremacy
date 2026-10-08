@@ -23,6 +23,9 @@
 //! - [`video`]: per-mode parameters, the VRAM [`video::Screen`], and the
 //!   draw-image-by-index path (`ds:[0x125A]`; routines at file `0x2EB8A`,
 //!   `0x2FB36`, `0x30620`, `0x310CE`).
+//! - [`game`]: the `0x1F8B`-byte saveable state block (`ds:0x7D39`),
+//!   save/load (`0x383CE`/`0x383F3`), the `cs:0x55B2` LCG, the `0x3A`-byte
+//!   record layout, galaxy presets and the `cs:0x9DAB` new-game init.
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
@@ -32,6 +35,7 @@ pub mod args;
 pub mod assets;
 pub mod audio;
 pub mod exepack;
+pub mod game;
 pub mod gph;
 pub mod lzss;
 pub mod palette;
