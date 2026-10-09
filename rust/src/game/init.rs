@@ -6,7 +6,7 @@ use super::rec::{
 use super::vhost::Call;
 use super::vm::Vm;
 use super::vops::{vsync, Ctx};
-use super::{selrec, Rng, State};
+use super::{selrec, shell, text, Rng, State};
 
 /// Per-difficulty `F_TROOPS` parameter — `[0x91E4]` = 0/1/2 → these
 /// words (file `0x330A4`–`0x330CE`).
@@ -59,7 +59,8 @@ pub fn new_game(vm: &mut Vm, st: &mut State, rng: &mut Rng) {
 /// `0x331C4`–`0x331E6` — `0xA3BC` input restrict (int-33 `ax=0x14`,
 /// mask `0x1E`), `0x83AA` mark, `0x5DD3` select-next, a `0x32`-frame
 /// `{0x2CA9, [cs:0x127C]}` wait, `0x2FD7`, `[0x1278]` reload, `0xA36A`
-/// input reinstall — before `jmp 0x2D27` re-enters the shell loop.
+/// input reinstall, the `0x6E30` ticker message — before `jmp 0x2D27`
+/// re-enters the shell setup tail.
 pub fn act_newgame(c: &mut Ctx) {
     new_game(c.vm, c.st, c.rng);
     c.host.svc(Call::Mouse(0x14, 0x1E, 0));
@@ -72,6 +73,8 @@ pub fn act_newgame(c: &mut Ctx) {
     c.host.svc(Call::Native(0x2FD7));
     c.host.svc(Call::Slot(0x1278, 0));
     c.host.svc(Call::Mouse(0x14, 0x1F, 0));
+    text::enqueue(c, 0x6E30);
+    shell::re_enter(c);
 }
 
 /// `i·0x3A` as `u16` — the stride the asm multiplies by.

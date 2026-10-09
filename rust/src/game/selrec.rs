@@ -17,7 +17,7 @@ use super::consts::{
 use super::dialog;
 use super::status;
 use super::vhost::Call;
-use super::vops::Ctx;
+use super::vops::{faction_rec, Ctx};
 
 /// `u16` casts for the `ds:` slot constants.
 macro_rules! a {
@@ -65,6 +65,52 @@ pub fn select_rec(c: &mut Ctx, i: u16) {
     c.host.svc(Call::PlanetPanel);
     status::sel_name(c);
     c.vm.w16(c.st, a!(SEQ_DELAY), 0);
+}
+
+/// `cs:0x5EE6` — resync the selection index from the selected-record
+/// pointer (file `0x35EE6`–`0x35F11`): no-op while `[0x917C]` is 0,
+/// else unmark, mirror `[0x917C]` into `[0x9184]`, recompute
+/// `[0x9164] = ([0x917C] − [0x9158]) / 0x3A` (8-bit result), re-mark.
+pub fn sync_sel(c: &mut Ctx) {
+    let rec = c.vm.r16(c.st, a!(SEL_REC));
+    if rec == 0 {
+        return;
+    }
+    unmark_sel(c);
+    c.vm.w16(c.st, a!(REC_CUR), rec);
+    let off = rec.wrapping_sub(c.vm.r16(c.st, a!(REC_BASE)));
+    let i = off.wrapping_div(a!(REC_STRIDE)) & 0xFF;
+    c.vm.w16(c.st, a!(SEL_IDX), i);
+    mark_sel(c);
+}
+
+/// `cs:0x5E5A` — select the faction record itself (file
+/// `0x35E5A`–`0x35E82`): the shared sound block, `0x5E3A` resolves
+/// `bx` to the `[0x91B8]`-indexed record, `[0x917C] = bx`, `0x5EE6`
+/// resyncs the index, `jmp 0x5C97` redraws the panel.
+pub fn sel_faction(c: &mut Ctx) {
+    dialog::snd_block(c);
+    let rec = faction_rec(c);
+    c.vm.w16(c.st, a!(SEL_REC), rec);
+    sync_sel(c);
+    c.host.svc(Call::PlanetPanel);
+}
+
+/// `cs:0x5DA1` — step back to the previous record (file
+/// `0x35DA1`–`0x35DD2`): the shared sound chirp, `0x8386` unmark,
+/// then `[0x9164] − 1` wrapping to `[0x91C6]` at 0 (8-bit
+/// compare/decrement), falling into `0x5E03`.
+pub fn sel_prev(c: &mut Ctx) {
+    dialog::snd_block(c);
+    unmark_sel(c);
+    let i = c.vm.r16(c.st, a!(SEL_IDX));
+    let lo = u8::try_from(i & 0xFF).unwrap_or(0);
+    let n = if lo == 0 {
+        (i & 0xFF00) | u16::from(c.vm.r8(c.st, a!(LIST_MAX)))
+    } else {
+        (i & 0xFF00) | u16::from(lo.wrapping_sub(1))
+    };
+    select_rec(c, n);
 }
 
 /// `cs:0x5DD3` — advance to the next record (file `0x35DD3`–`0x35E02`):

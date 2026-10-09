@@ -10,7 +10,8 @@
 use crate::args::Video;
 use crate::assets::AssetSet;
 use crate::game::{
-    frame_step, new_game, select_galaxy, shell_enter, shell_step, Ctx, Frame, Rng, State, Vm,
+    dispatch_action, frame_step, new_game, select_galaxy, shell_enter, shell_step, Ctx, Frame, Rng,
+    State, Vm, UIMODE,
 };
 use crate::palette::Palette;
 use crate::platform::DosFiles;
@@ -90,8 +91,9 @@ impl Game {
     }
 
     /// One frame — mirror inputs into `ds:`, then step the active loop.
-    /// `Galaxy → Shell` transitions are internal; `Shell → Galaxy` runs
-    /// through the `0x305B` new-game menu action (`init::act_newgame`).
+    /// Transitions are action-driven: a shell menu action sets
+    /// `uimode = 5` (`cs:0x3906`) to hand the runner the galaxy loop;
+    /// the galaxy exit edge `jmp 0x2CC5`s — [`shell_enter`] — back.
     pub fn step(&mut self) {
         self.host.pump.write(&mut self.vm, &mut self.st);
         match self.phase {
@@ -101,15 +103,31 @@ impl Game {
             }
             Phase::Galaxy => {
                 if let Frame::Shell = frame_step(&mut self.ctx()) {
-                    self.phase = Phase::Shell;
+                    let mut c = self.ctx();
+                    shell_enter(&mut c);
                 }
             }
         }
+        self.sync_phase();
     }
 
-    /// Force the galaxy loop — the new-game menu actions that `jmp
-    /// 0x395B` aren't decoded yet; this jumps the port ahead for testing.
+    /// Track the phase off `[0x91CD]` — the menu actions set `uimode`
+    /// before `jmp`ing into their loop, so `5` means the galaxy loop
+    /// is live and anything else is (or has returned to) the shell.
+    fn sync_phase(&mut self) {
+        let uimode = self.st.byte(UIMODE);
+        self.phase = if uimode == 5 {
+            Phase::Galaxy
+        } else {
+            Phase::Shell
+        };
+    }
+
+    /// Enter the galaxy loop through the ported `cs:0x3906` menu
+    /// action — the record-driven path the shell's hotspot list takes.
     pub fn enter_galaxy(&mut self) {
-        self.phase = Phase::Galaxy;
+        let mut c = self.ctx();
+        dispatch_action(&mut c, 0x3906);
+        self.sync_phase();
     }
 }

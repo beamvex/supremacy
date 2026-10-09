@@ -634,6 +634,54 @@ menu_service}` plus private `panel`; new `Call::{Slot,Image,Sfx,Mouse}`
 and `VmHost::cs_word`; tests in
 `rust/tests/{game_loop,game_seq,game_menu}.rs`.
 
+## Menu-action targets — the `+0xC` record words
+
+Hotspot records store their action as a **far** `0x286B:` pointer at
+`+0xC`/`+0xE` (the shipped templates live inside the save-block image,
+file `0x1A3E2`–`0x1B784`; the live lists are runtime-built copies).
+Two code windows reference the same routines: record value `V` ⇄
+game-window `cs` `V − 0x6D50` ⇄ file `V + 0x292B0`. Screen entries
+share the `pop ax` idiom (the `jmp [si+0xC]` abandons the caller's
+return address) and end `jmp 0x2CC5`/`0x2D27` back into the shell; the
+`N+3` variant runs `call word [0x1274]` first. Named so far:
+
+- Screen entries: `0x3906`/`0x3909` galaxy (`uimode 5` — hands the
+  runner `Phase::Galaxy`), `0x2426`/`0x2429`/`0x247F` detail (`uimode
+  2`; `0x2426` resyncs via `0x5EE6` first), `0x243D` machine-detail
+  variant (host via `0x5085`, header `0x29D9`, body `0x8E10`),
+  `0x31F2`/`0x31F5` orders (u3), `0x4BA7`/`0x4BAA` build (u4),
+  `0x5F12`/`0x5F15` fleet (u1), `0x5867`/`0x587A` status (u6),
+  `0x4036` surface (u7 — kind/`+0x18|1C|20`/`+0x2E` guard,
+  `0x6AD6` message / `0x2434` refuse).
+- Standalone: `0x23C2` minimap click, `0x2D97` status report,
+  `0x305B` new game (tail `0x331C4` → `jmp 0x2D27`), `0x8427`/
+  `0x8430` restart (`0x2F91` stage + `jmp 0x30A0`), `0x854A` sound
+  toggle, `0x8544`/`0x8539` grid stubs (`[0x91CA]` clear / key-synth
+  `0x1C`), `0x80D2..0x80EA` mode-cell setters `1..5` → `[0x91DC]`,
+  `0xF294`/`0xF289` record forms of the two stubs.
+- Selection nav: `0x5DA1`/`0x5DD3` prev/next (`[0x9164] ± 1` wrapping
+  `[0x91C6]`, `0x8386`/`0x5E03`), `0x5E5A` faction select
+  (`0x5E3A` rec → `[0x917C]` → `0x5EE6` → `jmp 0x5C97`),
+  `0x5EE6` `sync_sel` helper (`[0x917C]` → `[0x9184]`/`[0x9164]`).
+- Dialog list (already dispatched): `0x9B71` enter, `0x9BE4` load,
+  `0x9C22` save, `0x9C51`/`0x9C58` yes/no, `0x9CE5` cancel,
+  `0x9CEB` confirm, `0xF177` restart.
+- Still `Call::Native`: the per-screen gameplay actions — the
+  detail-list resource transfers (`0x265F`/`0x269C`/`0x26D9`/`0x2719`
+  planet→machine via `0x262C` capacity check; `0x2AF7`/`0x2B20`/
+  `0x2B49`/`0x2B72` machine→planet, cap `0x7530`; `0x297E`/`0x2ADD`/
+  `0x2AEA` machine-cell selects; `0x2B9B` confirm-and-scuttle;
+  `0x4DBB`/`0x4E0A` transfer-all), the fleet-launch flow `0x71E3`,
+  and the build/orders/fleet inner actions (`0x36BD`–`0x380E` and
+  `0x3F18`–`0x71E3` families in the record table). These are game
+  logic, tracked under GAM-8.
+
+Rust port: `game::dispatch_action` splits at
+`game::screens::dispatch` — `screens/{galaxy,detail,machd,orders,
+build,fleet,status,surface,misc}.rs` per family, `selrec::sync_sel`/
+`sel_prev`/`sel_next`/`sel_faction`, `shell::re_enter` for the
+`0x2D27` tail. Tests in `rust/tests/game_actions.rs`.
+
 ## Text layer + frontend — `rust/src/front/`
 
 - `cs:0x68D6` — the `[0x1268]` char put (`al` glyph, `(bx,dx)` cursor;

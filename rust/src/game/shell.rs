@@ -57,8 +57,9 @@ fn snd_block(c: &mut Ctx) {
     c.host.svc(Call::Sound(0xA));
 }
 
-/// The `0x2D0A`–`0x2D5A` setup tail — slots, backdrop, hotspot list,
-/// panel, mark, status, image load, input install.
+/// The `0x2D0A`–`0x2D26` setup head — template slots, CGA border,
+/// backdrop image, palette, the `0x1272` template slot — then falls
+/// into [`re_enter`].
 fn setup(c: &mut Ctx) {
     c.host.svc(Call::Slot(0x1260, 0));
     c.host.svc(Call::Slot(0x125C, 0));
@@ -66,6 +67,15 @@ fn setup(c: &mut Ctx) {
     c.host.svc(Call::Image(0));
     c.host.svc(Call::Present(0));
     c.host.svc(Call::Slot(0x1272, 0));
+    re_enter(c);
+}
+
+/// `cs:0x2D27`–`0x2D5A` — the shell re-entry tail a menu action
+/// `jmp`s to when it leaves a screen but keeps the shell's backdrop:
+/// `[0x928B] = [0x91A6]`, refresh, the `0xA0AA`/`0xA0AC` hotspot
+/// install, panel, mark, status, `0xA3BC`, `0x1278` image load,
+/// `0xA36A` input install (file `0x32D27`–`0x32D58`).
+pub fn re_enter(c: &mut Ctx) {
     c.vm.w16(c.st, a!(SHELL_A6), c.vm.r16(c.st, a!(SHELL_SRC)));
     c.host.svc(Call::Refresh);
     menu_install(c);

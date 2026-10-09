@@ -173,8 +173,11 @@ fn game_enters_shell_and_galaxy_exits_on_right_click() {
     g.step();
     assert_ne!(g.st.byte(game::FRAME), f0);
 
-    g.enter_galaxy();
+    g.enter_galaxy(); // dispatch 0x3906 — uimode 5 drives the phase
+    assert_eq!(g.phase, Phase::Galaxy);
+    assert_eq!(g.st.byte(UIMODE), 5);
     g.host.pump.set_buttons(false, true);
-    g.step(); // 0x7D → press(2) → frame exit
+    g.step(); // 0x7D → press(2) → frame exit → shell_enter
     assert_eq!(g.phase, Phase::Shell);
+    assert_eq!(g.st.byte(UIMODE), 0);
 }
