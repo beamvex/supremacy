@@ -1,6 +1,6 @@
 use super::battle::{overrun, reinforce, repelled, Battle};
 use super::consts::{DIRTY0, DIRTY1, FLEET_BASE, FLEET_COUNT, FLEET_STRIDE, SCAN_REC, SEL_REC};
-use super::rec::{F_29, F_ATTACK, F_DEFENCE, F_OWNER, F_TROOPS};
+use super::rec::{F_ATTACK, F_DEFENCE, F_DEFLVL, F_OWNER, F_TROOPS};
 use super::ship::{S_CREW, S_FLAGS, S_GUNS, S_LINK, S_LOAD, S_POW};
 use super::State;
 
@@ -40,7 +40,7 @@ fn fleet_scan(st: &mut State, r: usize) {
             // `mul`/`div` keep `ax` — both stages truncate to 16 bits.
             let w = (u32::from(pow) * crew / CREW_DIV) & 0xFFFF;
             let guns = u32::from(st.word(s + S_GUNS)) + u32::from(st.word(s + S_LOAD));
-            let wt = guns + u32::from(st.byte(r + F_29)) + 1;
+            let wt = guns + u32::from(st.byte(r + F_DEFLVL)) + 1;
             let add = u16::try_from((w * wt) & 0xFFFF).unwrap_or(0);
             def = def.wrapping_add(pow).wrapping_add(add);
         }
@@ -74,7 +74,7 @@ fn resolve(st: &mut State, r: usize) -> Battle {
     if def == 0 {
         return overrun(st, r);
     }
-    let eff = (u32::from(troops) * (2 + u32::from(st.byte(r + F_29))) / 100).max(1);
+    let eff = (u32::from(troops) * (2 + u32::from(st.byte(r + F_DEFLVL))) / 100).max(1);
     if u32::from(def) > eff {
         return repelled(st, r, eff);
     }

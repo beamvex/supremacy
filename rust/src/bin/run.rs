@@ -62,6 +62,7 @@ fn run(
     boot(dir, img, set, pal, &cfg, preset, seed, galaxy)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn boot(
     dir: PathBuf,
     img: Vec<u8>,

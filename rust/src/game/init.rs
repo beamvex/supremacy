@@ -1,6 +1,6 @@
 use super::consts::{DIFFICULTY, REC_BASE, REC_STRIDE, SEL_IDX};
 use super::rec::{
-    F_29, F_CREDITS, F_DEFENCE, F_ENERGY, F_FOOD, F_FUEL, F_MINERALS, F_NAME, F_OWNER, F_POP,
+    F_CREDITS, F_DEFENCE, F_DEFLVL, F_ENERGY, F_FOOD, F_FUEL, F_MINERALS, F_NAME, F_OWNER, F_POP,
     F_SERIAL, F_TROOPS, F_WORD0,
 };
 use super::vhost::Call;
@@ -120,5 +120,5 @@ fn name_record(st: &mut State, base: u16, i: u16, name: &[u8; 9]) {
 fn serial(st: &mut State, base: u16, i: u16) {
     let r = usize::from(base.wrapping_add(i.wrapping_mul(rec_stride())));
     st.set_byte(r + F_SERIAL, u8::try_from(i).unwrap_or(0));
-    st.set_byte(r + F_29, 0);
+    st.set_byte(r + F_DEFLVL, 0);
 }

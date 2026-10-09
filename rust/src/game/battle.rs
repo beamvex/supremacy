@@ -4,7 +4,7 @@ use super::consts::{
 };
 use super::mach::{M_FLAGS, M_HOST, M_TYPE};
 use super::rec::F_SERIAL;
-use super::rec::{F_ATTACK, F_DEFENCE, F_KIND, F_TIMER_A, F_TIMER_B, F_TIMER_C, F_TROOPS};
+use super::rec::{F_ATTACK, F_DEFENCE, F_KIND, F_LINK_A, F_LINK_B, F_LINK_C, F_TROOPS};
 use super::ship::{S_CREW, S_FLAGS, S_LINK, S_POW};
 use super::State;
 
@@ -113,7 +113,8 @@ fn gate(st: &State, r: usize) -> bool {
 }
 
 /// Machines bound to the planet's serial are destroyed with their
-/// docked ships; matching planet timers clear (file `0x3467E`–`0x3475E`).
+/// docked ships; matching planet link slots clear (file
+/// `0x3467E`–`0x3475E`).
 fn kill_machines(st: &mut State, r: usize) {
     let serial = st.word(r + F_SERIAL);
     for i in 1..=u32::from(MACH_COUNT) {
@@ -127,15 +128,15 @@ fn kill_machines(st: &mut State, r: usize) {
         }
         destroy_ships(st, m);
         st.set_byte(m + M_TYPE, 0);
-        clear_timer(st, r, i);
+        clear_link(st, r, i);
     }
 }
 
-/// Clear a planet timer matching machine index `i` (file `0x346F7`–
-/// `0x34726`).
-fn clear_timer(st: &mut State, r: usize, i: u32) {
+/// Clear the planet machine-link slot holding index `i` (file
+/// `0x346F7`–`0x34726`).
+fn clear_link(st: &mut State, r: usize, i: u32) {
     let idx = u8::try_from(i).unwrap_or(0);
-    for f in [F_TIMER_A, F_TIMER_B, F_TIMER_C] {
+    for f in [F_LINK_A, F_LINK_B, F_LINK_C] {
         if st.byte(r + f) == idx {
             st.set_byte(r + f, 0);
             return;

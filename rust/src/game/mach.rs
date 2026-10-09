@@ -36,3 +36,29 @@ pub const TYPE_SOLAR: u8 = 3;
 pub const TYPE_MINER: u8 = 6;
 /// Horticultural station.
 pub const TYPE_FARM: u8 = 7;
+
+// Machine-type preset table — `ds:0x9B12`, stride `0x30`; `[0x9154]`
+// holds the selected entry. Fields recovered from the machine-spawn
+// copy (file `0x36590`/`0x38085`) and the purchase-cost deduction
+// (file `0x365BE`–`0x365ED`).
+/// Credits cost — deducted from the faction `+0x36`/`+0x38` dword.
+pub const T_CREDITS: usize = 0x06;
+/// Build/timer seed — copied to machine `M_TIMER` (`+0x0C`).
+pub const T_BUILD: usize = 0x08;
+/// Copied to machine `+0x14`.
+pub const T_14: usize = 0x0A;
+/// Deposit/capacity seed — scaled by `cs:0xE862` into machine
+/// `M_DEPOSIT`/`+0x26`.
+pub const T_DEPOSIT: usize = 0x0C;
+/// Energy cost — deducted from faction `+0x34` (difficulty `≠0` only).
+pub const T_ENERGY: usize = 0x0E;
+/// Minerals cost — deducted from faction `+0x30` (difficulty `≥2`
+/// only).
+pub const T_MINERALS: usize = 0x10;
+/// Type id — copied to machine `M_TYPE`; the value (`3`/`4`/`6`/`7`)
+/// also drives the periodic-SFX selector (file `0x339A9`–`0x339EF`,
+/// reads `[0x9154]+0x12`, not the planet record).
+pub const T_TYPE: usize = 0x12;
+/// Aux/rate byte — copied to machine `+0x20`; multiplied by the type id
+/// for the display rate (file `0x33C3B`, again via `[0x9154]`).
+pub const T_RATE: usize = 0x13;

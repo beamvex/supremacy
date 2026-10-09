@@ -23,8 +23,8 @@ pub fn unhide(c: &mut Ctx) -> Flow {
 }
 
 /// `cs:0x7AF1` — raze every machine on the selected planet: unlink its
-/// ships, clear its type, and clear the matching post-fleet timer
-/// bytes. Suspends when the selection is the current record or a
+/// ships, clear its type, and clear the matching post-fleet machine-
+/// link bytes. Suspends when the selection is the current record or a
 /// UI-mode-1/selected-machine abort hits.
 pub fn raze(c: &mut Ctx) -> Flow {
     let sel = c.vm.r16(c.st, R_SEL);
@@ -60,8 +60,9 @@ fn raze_one(c: &mut Ctx, m: u16, serial: u8, idx: u16) -> bool {
 }
 
 /// The post-loop compare at `0x37B77`: `bp` has run past the fleet
-/// array, so it tests the byte `idx` against three cells inside the
-/// tail — the matching planet's timer slots.
+/// array, so it tests the byte `idx` (1-based machine index) against
+/// three cells inside the tail — machine-link slots laid out like the
+/// record's `+0x18`/`+0x1C`/`+0x20`.
 fn clear_tail(c: &mut Ctx, idx: u16) {
     let tail = u16::try_from(FLEET_BASE + usize::from(FLEET_COUNT) * FLEET_STRIDE).unwrap_or(0);
     for ofs in [0x18, 0x1C, 0x20] {

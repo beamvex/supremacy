@@ -277,9 +277,11 @@ the half-word `add`/`adc`/`xchg` sequence independently and matches.
   `0x9C4 + k·rand(0x3E8)` arithmetic series, `0x5DC + rand(0x1F4)`);
   recs `1..n−1` named `LIFELESS!` (`+0x0E`, `0x21`-terminated); all
   `0..=n` records get serial `+0x28` = index, `+0x29` = 0, `+0x00` = 0.
-- Field map (TBD tags until SUPCHT offsets are cracked): `+0x00` word0,
-  `+0x0E` name, `+0x22`, `+0x24` owner, `+0x26` diff param, `+0x28`
-  serial, `+0x29`, `+0x2A..+0x34` five stock words, `+0x36` credits dword.
+- Field map (TBD tags until SUPCHT offsets are cracked): `+0x00`
+  reserved word (zeroed at init, no runtime accesses found), `+0x0E`
+  name, `+0x22`, `+0x24` owner, `+0x26` diff param, `+0x28`
+  serial, `+0x29`, `+0x2A..+0x34` five stock words, `+0x36` credits
+  dword.
 - `file 0x36709` — `print_str`: the `0xFF`-terminated string
   interpreter used by the message region. Operands: `≥0x20` draws the
   glyph via `[0x1268]` at `(bx·4px, dx)` then `bx += 1`; `0x01`/`0x02`
@@ -297,17 +299,37 @@ The stat-report strings (`FOOD`, `MINERALS`, `FUELS`, `ENERGY`,
 `CIVILIANS` — `ds:0x653A` region, file `0x171DA`+) pin the stock words;
 the sim/display routines pin the rest:
 
-- `+0x00` word/status, `+0x0C` kind (`0xA` = colonised planet, `7` =
-  fallen), `+0x0E` name, `+0x12` station type, `+0x13` rate byte,
-- `+0x18`/`+0x1C`/`+0x20` pending-event timers A/B/C,
+- `+0x00` reserved word (zeroed at init), `+0x0C` kind (`0xA` =
+  colonised planet, `7` = fallen, `4` = unclaimed candidate, `1` =
+  colonisation en route — file `0x37F7A`/`0x37F8B`), `+0x0E` name
+  (9 bytes; `+0x12`/`+0x13` are inside it — the "station type"/"rate"
+  reads at file `0x339A9`/`0x33C3B` go through the machine-type record
+  `[0x9154]`, stride `0x30`, not this record),
+- `+0x18`/`+0x1C`/`+0x20` machine-link slots A/B/C — bytes holding a
+  1-based index into the machine array at `ds:0x9491` (stride `0x28`),
+  `0` = empty; nonzero resolves `(v−1)·0x28 + 0x9491` (file
+  `0x3297E`/`0x351B3`), feeds the orders alert `or` test (file
+  `0x33F76`), and is cleared when the matching machine is razed (file
+  `0x346F7`, VM op `0x7AF1` does the same on the fleet-tail copy),
+- `+0x1A` distance/travel word — `/0xFA` → transit days at colony
+  launch (file `0x3724A`) and `/0xFA + 0xB` → colonise countdown
+  `[0x91C7]` (file `0x37F90`),
 - `+0x1D` growth score (`cover/3`), `+0x1E` tax slider,
   `+0x1F` food-coverage gauge, `+0x21` decline score
   (`(100−cover)/4 + tax/4`), `+0x22` defence strength,
 - `+0x24` owner, `+0x26` troops (regen `+1/+3/+4` for owner −/5/4, cap
-  `0x3095`), `+0x28` serial, `+0x29` weapon/aux byte (`F_29`),
+  `0x3095`; liquid cash on the faction record), `+0x28` serial,
+  `+0x29` defence-system upgrade level `0..=3` — panel buttons step it
+  with icon `0x58`/`0x59`/`0x5A` redraws + SFX (file `0x34A0C`/
+  `0x34A4D`); weights `guns+load+F_29+1` (file `0x344F3`) and
+  `troops·(2+F_29)/100` (file `0x34597`),
 - `+0x2A` population (cap `0x7530`), `+0x2C` food, `+0x2E` attack sum
   (Σ raw ship power), `+0x30` minerals, `+0x32` fuel,
-  `+0x34` energy, `+0x36/+0x38` credits dword.
+  `+0x34` energy, `+0x36/+0x38` credits dword — pinned by the spy-menu
+  charge routine `cs:0x82BE` (file `0x382BE`) which `sub`/`sbb`s the
+  menu price (`1000`/`1520`/`2200`/`4720`, file `0x38238`) from the
+  dword, and by machine builds deducting the type-table `+0x06` cost
+  (file `0x365CD`).
 
 ## Planet simulation — `cs:0x3D1E` (file `0x33D1E`–`0x33F17`)
 
@@ -335,7 +357,15 @@ offline-mask, `0x8` mining, `0x10` destroyed-keep, `0x20` online),
 `M_HOST` host-planet index, `M_LINK` linked record, `M_OPS` ops left,
 `M_TIMER` countdown, `M_BUILD` colonise countdown, `M_DEPOSIT` mineral
 deposit. Machine-type table at `ds:0x9B12` stride `0x30` (`+0xC` =
-`0xFFFF` = no drain).
+`0xFFFF` = no drain) — fields from the spawn copy (file `0x36590`/
+`0x38085`) and the purchase deduction (file `0x365BE`–`0x365ED`):
+`+0x06` credits cost (vs faction `+0x36`/`+0x38`), `+0x08` build seed
+→ `M_TIMER`, `+0x0A` → machine `+0x14`, `+0x0C` deposit seed → scaled
+into `M_DEPOSIT`, `+0x0E` energy cost (vs faction `+0x34`, difficulty
+`≠0`), `+0x10` minerals cost (vs faction `+0x30`, difficulty `≥2`),
+`+0x12` type id → `M_TYPE` (also the SFX selector input at file
+`0x339A9`), `+0x13` aux/rate byte → machine `+0x20` (the `0x33C3B`
+rate multiply).
 
 Tick — `cs:0x742C` (file `0x37423`–`0x37616`), dispatched on codes
 `1..0x20`:
@@ -371,7 +401,8 @@ Per-planet pass (dispatcher codes `0x38 + total + planet_index`):
     `100·eff/def`% (0 unlink+dirty `0x8`), `F_ATTACK` = Σ result, troops
     `− def·2/100` (underflow → reinforcement).
   - `def ≤ eff` → overrun: linked armed ships zeroed (8 bytes), bound
-    machines + their ships destroyed, matching planet timers cleared,
+    machines + their ships destroyed, matching planet link slots
+    (`+0x18`/`+0x1C`/`+0x20` holding the machine index) cleared,
     kind `7`, message `MSG_REC`, dirty `0x8`/`0x18`.
 
 ## Tick dispatcher — `cs:0x73D9` (file `0x373D9`–`0x376C5`)
@@ -490,7 +521,7 @@ semantically unused).
 | `0x7A11` | levy: pull food to `0x186`, dump excess-`0x384` into `+0x32` |
 | `0x7A45` | disaster fanfare: modal print, `0x924D` flash loop, halve food+fuel |
 | `0x7ADD` | clear flag `0x20` on all `0x20` machines |
-| `0x7AF1` | raze machines on selected planet + matching tail timers |
+| `0x7AF1` | raze machines on selected planet + matching tail machine-link slots |
 | `0x7BAB` | wait: find derelict (type 7, flags `0x30`) off current planet |
 | `0x7BF4`/`0x7C05` | depopulate selected (`+0x2A=0`) / charge (`+0x34=0x74CC`) |
 | `0x7C16` | zero all machine build timers `+0x0C` |
