@@ -11,8 +11,11 @@ reads (`ds:0x3009`/`ds:0x30F9`, file `0x2EECE`); the real table is
 staged by the undecoded `0x1278` load op. `GLYPHS` is a sorted
 `code → [u8; 6]` table (six rows, low nibble = 4 px left→right, bit 3 =
 leftmost); `glyph()` binary-searches with uppercase folding and falls
-back to `BOX`. `draw()` blits at pixel origin — MCGA only; other modes
-no-op until their bitplane writers land.
+back to `BOX`. `draw()` blits at pixel origin through
+`Screen::put_pixel`, so the same single-ink approximation works in
+every mode (the real routines write opaque 4×6 cells — nibble merges
+on EGA, packed bytes on CGA/TGA — with the colour baked into the font
+data; the debug font only sets lit pixels).
 
 ## `Pump` (`pump.rs`) — input mirror
 
@@ -44,17 +47,24 @@ a `dropped` counter for unmodelled calls. `cs:` reads map through
 
 `svc` dispatch:
 
-- `Call::Image(i)` → `Screen::draw_image` (the `[0x125A]` slot).
-- `Call::Glyph(ch, bx, dx)` → `font::draw` at `bx*4` px.
+- `Call::Image(i)` → `Screen::draw_image` (the `[0x125A]` slot) — the
+  mode's own decoder: MCG linear, EGA four plane streams, CGA/TGA
+  banked row advance (`video::{ega,banked}`).
+- `Call::Glyph(ch, bx, dx)` → `font::draw` at `bx*4` px — all modes via
+  `Screen::put_pixel` (the mode-layout pixel write in `video::put`).
 - `Call::Rect(a,b,c,d)` → `[0x1262]` popup frame: opposing corners in
   4-px-col/row units, normalised, drawn as a 1-px outline in `ink`
-  (approximation of `0x2EDCE`; MCGA only).
+  through `put_pixel` (approximation of `0x2EDCE` — the asm fills
+  black; same outline in every mode).
 - `Call::Mouse(ax,cx,dx)` — int-33h: `4` set position, `8` y range,
   `0x14` event mask (`0x1E` buttons-only vs `0x1F` full).
 - `Call::KeyPop` → `pump.pop_key()`, `0` when empty.
 - `Call::Slot(0x125C)` → clear `scr.buf` (the `0x2EB6F` `rep stosw`);
   `Call::Slot(0x1260)` → `dac0()`: program DAC reg 0 from the
-  `cs:0x1384` template triplet (`TPL_OFS + 0x1384`, 6-bit → 8-bit).
+  `cs:0x1384` template triplet (`TPL_OFS + 0x1384`, 6-bit → 8-bit) —
+  MCGA only; the EGA/TGA slots are `int 10/AX=1002` palette-register
+  writes and CGA's `AH=5` page select, all no-ops under the fixed
+  `Palette::{ega16,cga}` model.
 - `pump_input` → `pump.write`; `key_flush` → `pump.flush_keys`.
 - Menu/Dialog/Refresh/Present/Flash/PlanetPanel/Blit/Screen/other
   `Slot`/`Native`/`Ui`/`Draw`/`Sound`/`Chan`/`Sfx` → `dropped += 1`

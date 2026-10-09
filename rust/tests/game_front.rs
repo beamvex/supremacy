@@ -26,6 +26,19 @@ fn host() -> Host {
     Host::new(Screen::new(Video::Mcga), pal, set, i, false)
 }
 
+/// A host for `mode` with its matching asset stem and palette model —
+/// the `run.rs` palette selection.
+fn mode_host(mode: Video) -> Host {
+    let i = img();
+    let set = load_set(&game_dir(), mode.stem(), heap_segment()).unwrap();
+    let pal = match mode {
+        Video::Mcga => from_dac(&i[DAC_OFS..DAC_OFS + 768]),
+        Video::Cga => supremacy::palette::Palette::cga(),
+        Video::Ega | Video::Tga => supremacy::palette::Palette::ega16(),
+    };
+    Host::new(Screen::new(mode), pal, set, i, false)
+}
+
 #[test]
 fn image_and_glyph_reach_the_framebuffer() {
     let mut h = host();
@@ -34,6 +47,53 @@ fn image_and_glyph_reach_the_framebuffer() {
     h.svc(Call::Glyph(b'A', 0, 0));
     // 'A' row 0 = 0x6 → columns 1..=2 lit at ink 0x0F.
     assert_eq!((h.scr.buf[0], h.scr.buf[1], h.scr.buf[2]), (0, 0x0F, 0x0F));
+}
+
+/// 'A' row 0 = `0x6` — pixels 1,2 of the 4-column glyph. Every check
+/// reads the mode's packed/planar layout straight out of `scr.buf`.
+#[test]
+fn glyph_put_lands_in_every_mode() {
+    // EGA: ink 0x0F sets bit 7-(x&7) in all four planes → 0x60 each.
+    let mut h = mode_host(Video::Ega);
+    h.svc(Call::Glyph(b'A', 0, 0));
+    for p in 0..4 {
+        assert_eq!(h.scr.buf[p * 0x1F40], 0x60, "EGA plane {p}");
+    }
+    assert_eq!(h.scr.pixels()[1], 0x0F);
+
+    // CGA: colour 3 at pixels 1,2 → 0x3C in bank 0 row 0; glyph row 1
+    // (`0x9` = pixels 0,3) lands at y=1 → bank 1 → 0xC3 at `0x2000`;
+    // row 3 (`0xF`) at y=3 → bank 1, next `0x50` row → 0xFF.
+    let mut h = mode_host(Video::Cga);
+    h.svc(Call::Glyph(b'A', 0, 0));
+    assert_eq!(h.scr.buf[0], 0x3C);
+    assert_eq!(h.scr.buf[0x2000], 0xC3);
+    assert_eq!(h.scr.buf[0x2050], 0xFF);
+
+    // TGA: colour 0xF at pixels 1,2 → nibbles 0x0F/0xF0 across two
+    // bytes of bank 0.
+    let mut h = mode_host(Video::Tga);
+    h.svc(Call::Glyph(b'A', 0, 0));
+    assert_eq!((h.scr.buf[0], h.scr.buf[1]), (0x0F, 0xF0));
+}
+
+#[test]
+fn image_blit_reaches_every_mode() {
+    for mode in [Video::Ega, Video::Cga, Video::Tga] {
+        let mut h = mode_host(mode);
+        h.svc(Call::Image(0));
+        assert!(h.scr.buf.iter().any(|&b| b != 0), "{mode:?}");
+        assert!(h.scr.pixels().iter().any(|&p| p != 0), "{mode:?}");
+    }
+}
+
+#[test]
+fn rect_outlines_in_every_mode() {
+    for mode in [Video::Ega, Video::Cga, Video::Tga] {
+        let mut h = mode_host(mode);
+        h.svc(Call::Rect(0, 0, 1, 1));
+        assert!(h.scr.buf.iter().any(|&b| b != 0), "{mode:?}");
+    }
 }
 
 #[test]

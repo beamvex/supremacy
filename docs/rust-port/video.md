@@ -58,3 +58,12 @@ the inverse of each mode's packing (same mapping as
 - CGA — `(y>>1)*0x50 + (y&1)*0x2000 + x>>2`, 2 bits per pixel from
   MSB down.
 - TGA — `(y>>2)*0xA0 + (y&3)*0x2000 + x>>1`, hi nibble for even `x`.
+
+## `put_pixel()` (`put.rs`)
+
+The write-side inverse of `pixel_at` — merge one pixel into `buf` in
+the mode's layout (GAM-36): direct store on MCG, per-plane bit set/clear
+on EGA (the map-mask write the `[0x1268]`/`[0x1262]` routines do via
+`call 0x8498`), packed 2-bit/4-bit merges on CGA/TGA. The frontend's
+glyph put and popup frame draw through it, so those paths work in
+every mode.

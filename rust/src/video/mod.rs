@@ -22,6 +22,7 @@ mod draw;
 mod ega;
 mod int10;
 mod pixels;
+mod put;
 mod screen;
 mod vram;
 

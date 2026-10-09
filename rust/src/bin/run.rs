@@ -58,10 +58,7 @@ fn run(
         Ok(s) => s,
         Err(e) => return fail(&stem, e),
     };
-    let pal = from_dac(
-        img.get(supremacy::palette::DAC_OFS..supremacy::palette::DAC_OFS + 768)
-            .unwrap_or(&[]),
-    );
+    let pal = palette(&img, cfg.video);
     boot(dir, img, set, pal, &cfg, preset, seed, galaxy)
 }
 
@@ -92,6 +89,21 @@ fn boot(
     match window::run(&mut g) {
         Ok(()) => ExitCode::SUCCESS,
         Err(e) => fail("minifb", std::io::Error::other(e)),
+    }
+}
+
+/// Palette for the mode — MCGA reads the master DAC table out of the
+/// unpacked exe, EGA/Tandy use the stock 16-colour set, CGA palette 1
+/// (same selection as `supremacy.rs::palette`).
+fn palette(img: &[u8], v: supremacy::args::Video) -> Palette {
+    use supremacy::args::Video;
+    match v {
+        Video::Mcga => from_dac(
+            img.get(supremacy::palette::DAC_OFS..supremacy::palette::DAC_OFS + 768)
+                .unwrap_or(&[]),
+        ),
+        Video::Cga => Palette::cga(),
+        Video::Ega | Video::Tga => Palette::ega16(),
     }
 }
 

@@ -7,7 +7,6 @@
 //! (bit 3 = leftmost). Lowercase maps to upper — the game's charset is
 //! all-caps anyway.
 
-use crate::args::Video;
 use crate::video::Screen;
 
 const W: usize = 320;
@@ -89,12 +88,10 @@ fn glyph(ch: u8) -> &'static [u8; 6] {
         .map_or(&BOX, |i| &GLYPHS[i].1)
 }
 
-/// Blit glyph `ch` at pixel origin `(x, y)` — MCGA only; other modes
-/// fall back to nothing until their bitplane writers land (GAM-9).
+/// Blit glyph `ch` at pixel origin `(x, y)` — the set pixels go
+/// through [`Screen::put_pixel`], so the mode's layout decides where
+/// they land (linear byte, EGA plane bit, banked packed bits).
 pub fn draw(scr: &mut Screen, ch: u8, x: u16, y: u16, color: u8) {
-    if scr.mode != Video::Mcga {
-        return;
-    }
     for (dy, &bits) in glyph(ch).iter().enumerate() {
         let py = usize::from(y) + dy;
         if py >= H {
@@ -108,7 +105,7 @@ pub fn draw(scr: &mut Screen, ch: u8, x: u16, y: u16, color: u8) {
 fn row(scr: &mut Screen, bits: u8, x: usize, y: usize, color: u8) {
     for dx in 0..4usize {
         if bits & (8 >> dx) != 0 && x + dx < W {
-            scr.buf[y * W + x + dx] = color;
+            scr.put_pixel(x + dx, y, color);
         }
     }
 }

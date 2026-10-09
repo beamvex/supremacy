@@ -4,10 +4,16 @@
 //!
 //! Decoded template slots (MCGA column of `dispatch_tables.txt`):
 //!
-//! - `[0x125A]` `0x2EB8A` → [`Screen::draw_image`] (the `Image` call).
+//! - `[0x125A]` `0x2EB8A` → [`Screen::draw_image`] (the `Image` call) —
+//!   all four mode variants (MCG linear, EGA plane streams, CGA/TGA
+//!   banked) live in [`crate::video`].
 //! - `[0x125C]` `0x2EB6F` → the `rep stosw` region fill — clears `es`.
-//! - `[0x1260]` `0x2EDA8` → `int 10/AX=1012` DAC reg 0 from `cs:0x1384`.
-//! - `[0x1268]` `0x2EECE` → glyph put — the debug [`font`].
+//! - `[0x1260]` `0x2EDA8` → `int 10/AX=1012` DAC reg 0 from `cs:0x1384`
+//!   (MCGA only — the other modes' slots are `int 10/AX=1002` palette
+//!   writes and the CGA `AH=5` page select, no-ops under the fixed
+//!   `Palette::{ega16,cga}` model).
+//! - `[0x1262]`/`[0x1268]` → the popup frame / glyph put through
+//!   [`Screen::put_pixel`], which writes in the mode's layout.
 //! - `[0x1264]`/`[0x125E]`/`[0x1266]` and the sound calls stay stubs —
 //!   the refresh-list copy and palette flushes are presentation details
 //!   the window's per-frame blit supersedes (GAM-7/GAM-9).
@@ -67,20 +73,18 @@ impl Host {
 
     /// The `[0x1262]` popup frame — `(ax,bx)`/`(cx,dx)` are the opposing
     /// corners in `(4px-col, row)` units, order unspecified; normalised
-    /// and drawn as a 1px outline (approximation of `0x2EDCE`).
+    /// and drawn as a 1px outline (approximation of `0x2EDCE`; the asm
+    /// fills black, the outline keeps the bordered look in every mode).
     fn rect(&mut self, ax: u16, bx: u16, cx: u16, dx: u16) {
-        if self.scr.mode != crate::args::Video::Mcga {
-            return;
-        }
         let (l, r) = (ax.min(cx).min(79) * 4, ax.max(cx).min(79) * 4 + 3);
         let (t, bot) = (bx.min(dx).min(199), bx.max(dx).min(199));
         for x in usize::from(l)..=usize::from(r) {
-            self.scr.buf[usize::from(t) * 320 + x] = self.ink;
-            self.scr.buf[usize::from(bot) * 320 + x] = self.ink;
+            self.scr.put_pixel(x, usize::from(t), self.ink);
+            self.scr.put_pixel(x, usize::from(bot), self.ink);
         }
         for y in usize::from(t)..=usize::from(bot) {
-            self.scr.buf[y * 320 + usize::from(l)] = self.ink;
-            self.scr.buf[y * 320 + usize::from(r)] = self.ink;
+            self.scr.put_pixel(usize::from(l), y, self.ink);
+            self.scr.put_pixel(usize::from(r), y, self.ink);
         }
     }
 
@@ -98,6 +102,9 @@ impl Host {
     }
 
     /// The `0x2EDA8` DAC write — template `cs:0x1384` triplet, 6-bit→8.
+    /// MCGA-only: the EGA/TGA slots are `int 10/AX=1002` palette-register
+    /// writes (`0x30038`/`0x31AF8`, covered by the fixed palettes) and
+    /// CGA's is `int 10/AH=5 AL=1` page select (`0x3081E`, one buffer).
     fn dac0(&mut self) {
         let c = self.img.get(DAC0..DAC0 + 3).unwrap_or(&[]);
         for (k, &v) in c.iter().enumerate() {
@@ -117,7 +124,11 @@ impl VmHost for Host {
             Call::Mouse(ax, cx, dx) => self.int33(ax, cx, dx),
             Call::KeyPop => return u16::from(self.pump.pop_key().unwrap_or(0)),
             Call::Slot(0x125C, _) => self.scr.buf.fill(0),
-            Call::Slot(0x1260, _) => self.dac0(),
+            Call::Slot(0x1260, _) => {
+                if self.scr.mode.programs_palette() {
+                    self.dac0();
+                }
+            }
             Call::Menu
             | Call::Dialog
             | Call::Refresh
