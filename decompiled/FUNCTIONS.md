@@ -797,14 +797,144 @@ int-33 calls) and `front::window`
 (feature `minifb`) presents the buffer + pumps input. `supremacy-run`
 binary drives it; tests in `rust/tests/game_front.rs`.
 
+## Low code segment — `cs:0` ↔ file `0x20000` (GAM-28)
+
+Bulk naming sweep of `disasm/functions.txt`'s low-segment routines (all
+sit inside the `entry0`/`fcn.0000fb45` blobs — rizin never split them).
+All game code runs under CS `0x286B`; ndisasm displays every near
+`call`/`jmp` target as `(site+3+disp)&0xFFFF`, so a displayed target
+`T ≥ 0x92B0` lands in the low window `file = 0x20000 + T` while
+`T < 0x92B0` lands in the upper window `file = 0x30000 + T` (0x92B0 is
+the CS base in displayed space). Region `0x20000`–`0x2A0DD` is data
+(protection prompts `0x20020`+, credits scroll `0x25305`+, ending text);
+`0x2A51C`–`0x2E651` is data too (hotspot templates, tile/font bitmaps —
+the `00 C0 …` blocks are bitmaps, not code). Code islands: `0x2A0DE`–
+`0x2A51B`, `0x2E652`–`0x2EB6E`, then mode code `0x2EB6F`–`0x2FFFF`.
+
+### Input / menu block — file `0x2A0DE`–`0x2A51B`
+
+| file | name | role |
+|---|---|---|
+| `0x2A0DE` | `int33_swap` | `cli`; when `[0x9CCD]==1` (`K` arg) swaps the int-`0x33` IVT pair against `ds:[0x14D]`/`[0x14F]`; `sti; ret`. (Entry is `0x2A0DE` — the `cli` precedes the documented `0x2A0DF` body.) |
+| `0x2A10F` | `menu_service` | per-frame hotspot service (see "Menu service" above); 16 call sites |
+| `0x2A177` | *(label)* | release tail: `[0x91CA]=0` debounce clear + pressed-image `dx=[0x9188]` check |
+| `0x2A18E` | `key_synth` | real-driver path (`[0x9CCD]`==0): `[0x9CCC]` synthetic codes `0x7E/0x7D` press left/right, `0xFE/0xFD` release — jumps into the `ev_*` records below |
+| `0x2A1CA` | `key_poll` | `call key_synth`; `[0x9CCD]`!=1 → `ret`. K-mode: no pending key → `jmp cursor_ease`; Enter `0x1C`→`ev_left`, Esc `0x01`→`ev_right`, `0x9C`/`0x81` breaks→`ev_release`; else nav — record `si=[0x9CC8]*0x14+[0x9194]`, link field `+0x10..+0x13` via `bx`, arrows `0x48/0x50/0x4B/0x4D` (Tandy `0x29/0x4A/0x2B/0x4E` alternates when `[0x9CC6]`==1) → `nav_sel`. `ret` tail `0x2A282` |
+| `0x2A283` | `ev_left` | `[0x9CDA]=1` + `cx/dx` pos + `bp=[0x9CC8]` (synthetic left-press record) |
+| `0x2A299` | `ev_right` | same, `[0x9CDA]=2` |
+| `0x2A2BC` | `ev_release` | same, `[0x9CDA]=0` (shared by left+right break codes) |
+| `0x2A2AF` | `nav_sel` | `[bx+si]` nav link byte → `[0x9CC8]` (record index; `0xFF` = stay) |
+| `0x2A2D2` | `cursor_ease` | `K`-mode cursor: hotspot centre `(x1+x2)/2,(y1+y2)/2`, `y≤0xBC`, eases `[0x9CD6]`/`[0x9CD8]` by `(Δ>>3)|1`, then `bx=0` + `call ev_inject` (`0x2A497`) |
+| `0x2A348` | `key_aux` | pusha wrapper over `key_poll`; `al = 0x1C` when `[0x9CDA]==2` (right-press) else `0` — the editor's mouse fallback |
+| `0x2A369` | `noop_ret` | bare `ret`; `call`ed by every per-frame loop for symmetry |
+| `0x2A36A` | `input_install` | `cli`; `[0x9CCE]=1` (ISR region-clamp on); `int33 ax=4` cursor pos (`cx=[0x9CD6]<<1`); `[0x1288]`+`[0x128A]` save+draw cursor; `int33 ax=0xC cx=0x1F es:dx=286B:0x1143`; `sti` |
+| `0x2A3BC` | `mouse_hook` | `cli`; `[0x9CCE]=0` (clamp off); `call [0x1286]` cursor erase at `[0x9CD6]`/`[0x9CD8]`; reinstalls the same handler with mask `0x1E` (motion bit cleared) — the steady-state re-hook used at screen transitions (14 sites incl. entry + endgame) |
+| `0x2A3F3` | `mouse_isr` | int-`0x33` event callback (`286B:0x1143`), `cli`, `ds=0xFAA`. `[0x9CCE]`==0 → store-only (`bx`→`[0x9CDA]`, `sti`, `retf`). Clamp on + rect armed (`[0x9CE2]≠0xFFFF`): events whose cursor box intersects the `[0x1298]`-armed rect `[0x9CDC..0x9CE2]` collapse to store-only; outside → full path `0x2A431`: stash old pos `[0x9CD2]`/`[0x9CD4]`, `cx>>=1` (mickey→px), store new pos + `bx`, cursor trio `[0x1286]`→`[0x1288]`→`[0x128A]`; `retf` |
+| `0x2A478` | `iret_stub` | single `iret`; the two `286B:0x11C8` fillers in every mode template |
+| `0x2A479` | `draw_unlock` | `dec byte [0x4C94]` — the closing half of the `[0x1298]` draw guard; at zero: when `[0x9CD0]==1` re-runs `input_install` and `sti`, then `[0x9CD0]=0`, `[0x9CE2]=0xFFFF`. Called after every draw-image-by-index (53 sites) |
+| `0x2A497` | `ev_inject` | near-call variant of the ISR body: same clamp/`[0x9CDA]=bx` store plus `[0x9CC8]=bp` (record index — used by `cursor_ease` with `bx=0`); `cx` stored raw (already px) |
+
+`[0x1298]` refinement (MCG body file `0x2F5D4`): `cli; inc [0x4C94]`;
+on the outermost call it *stores* the draw rect (`ax→[0x9CDE]`,
+`bx→[0x9CE0]`, `cx→[0x9CE2]`, `dx→[0x9CDC]`) and, when the rect
+intersects the cursor zone (±`0x10`), calls `mouse_hook` and arms
+`[0x9CD0]=1` for `draw_unlock`'s re-install. The `cli`/`sti` pair
+freezes `mouse_isr` while a draw batch holds the cursor region.
+
+### Line-edit / text-input family — file `0x2E652`–`0x2E851`
+
+Shared cells: `ds:0x4FCB` length, `ds:0x4FCC` max length,
+`ds:0x4FCA` debounce, `ds:0x4FCF` done flag, `ds:0x9136` the default-name
+scratch. `[0x9CC5]` suppresses the per-frame game services while nested.
+
+| file | name | role |
+|---|---|---|
+| `0x2E652` | `edit_seed` | writes `"UN-NAMED!"` (9 bytes) into `[si]`; `len=0`; falls through — `si` = edit buffer, `bp` = width, `bx` = echo col (rename dialog `0x3385C`/`0x35746`, protection `0x2EB0F`) |
+| `0x2E66E` | `edit_run` | editor entry: `[0x9CDA]=0`, `done=0`, `debounce=0`, `cs:[0x8B7C]=0xFFFF` (kbd LIFO reset), then falls into `edit_loop`. Called directly where no prefill is needed (save-name `0x32F54` brackets it `mouse_hook`/`input_install`) |
+| `0x2E685` | `edit_loop` | the line editor: `di=ds:0x7CBD` `0x3E` scancode→char pairs; `call 0x31E2E` (kbd pop), fall back to `key_aux`; char `0` → `done=0xFF; ret`, `2` → space-pad to `max`/`bp` then `ret`, `1` → backspace (writes `' '`, erases glyph via `[0x1268]`, `len--`, `bp++`), else `[si]=al`, echo via `[0x1268]`, `len++`, `bp--`. `[0x4FCA]` debounces repeats. Each pass runs `edit_frame` |
+| `0x2E6AE` | `edit_frame` | per-iteration block inside `edit_loop`: pusha; `call 0x2CA9` (vsync); `[0x9CC5]==0` → `0x5C1E` seq, `0x66F3` overlay, `0x73D9` tick, `[0x91CD]==0` → `call [0x1278]` map blit; `[0x91D4]++` |
+| `0x2E77D` | `edit_named` | prints `ds:0x9136` (default name), copies it into the edit line, `serial_bump`s it, `len=max` (0x4FCC), `bx+=9`/`bp-=9`, then `edit_run` under `[0x9CC5]` (planet rename `0x372BF`) |
+| `0x2E7CD` | `edit_typed` | same prefill from `[0x9154]+0x22` (selected machine-type name), `len=9`; after `edit_run`, when `done!=0xFF` (pad-key exit) applies `serial_bump` (`0x3652C`, machine naming) |
+| `0x2E82D` | `serial_bump` | increments the 2-char field `[di-1]`/`[di]`: units `'9'→'0'` carries into tens; tens cycles `'9'→'.'→'0'` — auto-numbers names |
+
+### PRNG second entry + draw-sequencer helpers — file `0x2E862`–`0x2EB6E`
+
+- `0x2E93C` `rand16` — same `13·s+7` scramble + `xchg`/`xor` fold as
+  `rand` (`0x2E862`) but returns the raw folded `u16` in `bx` instead of
+  scaling by the bound (`mov bx,0xffff` head is vestigial; `rand`
+  returns `(folded·b)>>16`). 35 sites — colour/index picks everywhere.
+- `0x2EA12` `seq_push` — copies `{cur,next}` → `{saved,saved_next}` over
+  the six 8-byte channel records at `cs:0x8EE` (file `0x29B9E`).
+- `0x2EA2E` `seq_mix` — every 4th frame (`[0x91D4]&3==0`): `[0x91D6]=1`,
+  then walks the 6 channel records `{cur,next,saved,saved_next}`
+  (`cs:0x8EE`, 8-byte stride; the cs words at `saved` are the seq streams)
+  against the live-flag table `ds:0x5017` (4-byte stride). Per channel:
+  `saved==cur` and flag dead → skip; otherwise resume `[0x9198]` at
+  `saved` and step `0x35C49` (seq fetch), storing the advanced head into
+  `saved`; a channel whose stream terminated (`cs:[saved]==0`) with a
+  dead flag first re-syncs `saved→cur` and steps once. Exits
+  `[0x9198]`/`[0x919A]=0`. Multiplexes the single-cursor sequencer over
+  6 streams — the screens that animate several machines (`0x3593B`
+  detail loop, `0x36F46` uimode-6 tail).
+- `0x2EACD` `protect_check` — the manual-word copy protection: once per
+  run (`[0x9CC7]` gate → increments, `!=0` rets). Prints `ds:0xF658`
+  (title) at `(0x28,0x64)`, picks `ds:0xF6DB[rand16()&0x1F]` (runtime-
+  filled dword table of prompt records — the `"PAGE x, Nth PARAGRAPH
+  Mth WORD"` text at file `0x20020`+), prints it at `(0x2A,0x8C)`, runs
+  `edit_seed` on `ds:0xFC44` (`bp=8`) under `[0x9CC5]`. Check: record
+  byte 0 = expected length; each typed char must satisfy
+  `rec[i] == typed[i]·0x7B&0x1F+0x40`; typing `12` (`cmp word
+  [si],0x3231`) auto-passes. Mismatch → `0x2EB3D` flashes
+  `ds:0xF6C7`/`ds:0xF6D7` at `(0x32,0xAA)` 0x33 rounds with vsync,
+  `[0xFC4E]++` (its `cmp 3` is dead — the `jmp 0xEAD8` retry is
+  unconditional, re-prompting a new word each round). No direct call
+  site — entry via a runtime-built hotspot action or the intro chain.
+
+### Mode-code call targets in the segment (MCG `0x2EB6F`–`0x2F691`, EGA head `0x2F692`–`0x3001E`)
+
+Newly identified dispatch slots and helpers:
+
+| ds slot | file | name | role |
+|---|---|---|---|
+| `[0x1278]` | `0x2F2C5` | `map_draw` (MCG) | calls `0x2F440` route init, then walks `[0x9158]`×`[0x91B8]` records through `0x2F2D5`: per record compute the map cell `bx` (position words scaled via `cs:[bx+0x1284]` constants), add kind byte `+0xC` (blink variant `^0xD` when `[0x91D4]&0xF≥8`), write into `es:` map. `[0x91D0]+=2` scroll phase. EGA twin `0x2F89E` w/ `xlatb` LUT `ds:0x12A9` |
+| `[0x1284]` | `0x2F1CF` | `pal_adj` (MCG) | adds `[0x9CA1]` to the `ds:0x4095` colour table (clamp `0x3F`), programs DAC `0x20..0xFF` (`int10/AX=0x1012`) — palette offset for shading |
+| `[0x1286]` | `0x2F242` | `cur_erase` (MCG) | restores the saved 8w×0x10 under-block `ds:0x12C2` → `A000` VRAM |
+| `[0x1288]` | `0x2F206` | `cur_save` (MCG) | VRAM → `ds:0x12C2` under-block save (called before `cur_draw`) |
+| `[0x128A]` | `0x2F27E` | `cur_draw` (MCG) | writes the `ds:0x17E5` 16×16 cursor sprite (`0xFF` transparent) |
+| `[0x128E]` | `0x2F540` | `pal_fade` (MCG) | loads `0x60` colours to `cs:[bx+8]`, loops `{vsync, DAC 0x00..0x1F, dec nonzero}` to black, then `pal_adj` — screen fade |
+| `[0x1290]`/`[0x1292]` | `0x2F599`/`0x2F59A` | `ret` stubs | MCG fills (non-MCG modes point these at `0xF723`) |
+| `[0x1294]` | `0x2F59B` | `mark_toggle` (MCG) | `cx&3` clamp≥1 → `bp`; toggles two `es:` cells at `cs:[si]`/`cs:[si+4]` (route markers) |
+| `[0x1296]` | `0x2F629` | `menu_text` (MCG) | resumes the `ss:` byte stream at `cs:0xF672`, stashes 2 bytes to `cs:0xFB14/5`, enters the glyph loop `0x2F640`: `0x20`→`tile_clear`, `0xF0`→newline (`si+=0x1F40`), `0x00`→`[0x9CCB]=0xFF` end, `0xFF`→save+ret, else `bl−0x41`→`tile_blit` — the 16px menu font printer (`0x2F4E3` 16×24 blit from `cs:[idx*0x180+0x21C4]`, `0x2F519` blank) |
+
+Other internals: `0x2EBE1` draw tail (`call draw_unlock` after the
+decoder), `0x2EC0C`/`0x2ECA9` LZSS flag-refill heads of the MCG
+opaque/XOR decoders, `0x2F440`/`0x2F457` the route-overlay pair
+(saves cell bytes + paints the `ds:0x4C95` 18-record route into the
+map), `0x2F398` `map_draw` alt entry (`bx=0x130`), `0x2F498` minimap
+hotspot-grid builder, `0x2F803` EGA starfield plotter (per-sprite
+`0xC`-records, plane-masked bits), `0x2F95F`/`0x2F992` EGA `map_cell`
+blink tail, `0x2FD16` EGA-XOR refill head.
+
+Entry stub (file `0x31D17` for the record): `int21/AH=1A` (set DTA),
+`0x3207E`, `0x31FF8`, `install_drivers` (`0x31E8E`), `int9_swap`
+(`0x31E64`), `int33_swap` (`0x2A0DE`), `int24_swap` (`0x38E3C`),
+`es=[0x147]`, `[0x9C9A]=0`, `call [0x125E]`, `mouse_hook`, `call [0x1258]`,
+`0x32359`, `0x322F5`, `call [0x125C]`, `call [0x125E]`, `input_install`,
+`0x385B1`, `[0x9C9A]=1`, `mouse_hook`, `0x3228C`, `0x32228`,
+`input_install`, `jmp 0x3305B` (new-game init).
+
 ## Still unnamed (next passes)
 
-- `call 0xA479` after every draw (file 0x33729) — screen present / region
-  flush?
 - word[2] of the template (0x9000 MCG / 0x8000 others) — likely a VRAM or
   aperture parameter.
 - The remaining ~29 dispatch slots per mode (`disasm/dispatch_tables.txt`)
   — region boundaries give each a candidate family; naming needs call-site
-  xrefs.
+  xrefs. GAM-28 named the MCG slots `[0x1278]/[0x1284]/[0x1286..0x129A]`
+  (see "Mode-code call targets"); the other modes' equivalents sit at
+  their own file offsets.
+- `protect_check` (`0x2EACD`) entry path — reached through a runtime-built
+  hotspot action or the intro chain, not a direct near call.
 - `fcn.*` map from `disasm/functions.txt` (image-offset space; entry0 =
-  file 0x31D17) — bulk naming still ahead.
+  file 0x31D17) — GAM-28 covered the low segment (`0x2A0DE`–`0x2EB6E` +
+  the mode-code blocks that live there); upper-window `fcn.*` entries
+  still ahead.
