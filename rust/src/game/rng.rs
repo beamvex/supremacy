@@ -33,6 +33,19 @@ impl Rng {
         self.step()
     }
 
+    /// Current LCG state — the `cs:0x55A4:0x55A2` pair the difftest
+    /// harness reads back out of a DOS memory dump.
+    #[must_use]
+    pub fn state(&self) -> u32 {
+        self.s
+    }
+
+    /// Replace the LCG state — difftest checkpoint boot from a
+    /// `drv:0x55A2` dump.
+    pub fn set_state(&mut self, s: u32) {
+        self.s = s;
+    }
+
     /// The `s = 13·s + 7` scramble + `lo^hi` fold (file `0x2E863`–`0x2E92F`).
     fn step(&mut self) -> u16 {
         let a = self.s;

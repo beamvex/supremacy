@@ -34,6 +34,7 @@
 pub mod args;
 pub mod assets;
 pub mod audio;
+pub mod difftest;
 pub mod exepack;
 pub mod front;
 pub mod game;
