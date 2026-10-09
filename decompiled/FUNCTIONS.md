@@ -545,8 +545,12 @@ skips it, so contested galaxies stay quiet).
 - **B** (`0x8309`): `[0x91F0] = 0xFF`, `[0x9C9A] = 3`, calls
   `0xA3BC`/`0x20F2`/`0x208E`/`0xA36A`, `jmp 0x8C65`.
 - `0x8B17`/`0x8C65` are full-screen sequences: `0xA3BC` + sound `al`,
-  `mov ds,0x95A` + `call far [cs:0x1278]` image load, palette/present
-  slots. Which ending is victory vs defeat is unverified — the
+  then the music-swap idiom — `call far [cs:0x1280]` (driver reset),
+  `mov ds,0x95A`/`0x5B7` + `si=0` + `call far [cs:0x1278]` (**load_song**
+  export, not an image load — see "`0x1278` is two tables"), `cl=0` +
+  `call far [cs:0x127C]` (select_sound) — then the palette/present
+  slots draw the ending frames from the already-loaded `.BIN` set.
+  Which ending is victory vs defeat is unverified — the
   conditions only say A ⇔ (faction kind `7` ∨ no kind-`7` planets),
   B ⇔ (rec0 kind `0xA` ∨ no kind-`0xA` planets).
 
@@ -914,6 +918,57 @@ map), `0x2F398` `map_draw` alt entry (`bx=0x130`), `0x2F498` minimap
 hotspot-grid builder, `0x2F803` EGA starfield plotter (per-sprite
 `0xC`-records, plane-masked bits), `0x2F95F`/`0x2F992` EGA `map_cell`
 blink tail, `0x2FD16` EGA-XOR refill head.
+
+### `0x1278` is two different tables — there is no asset-load op
+
+The offset is overloaded; the two uses are unrelated (GAM-27):
+
+- `call/jmp word near [0x1278]` (`FF 16 7812`, ds) — the **mode dispatch
+  slot** = `map_draw` (MCG `0x2F2C5`, see table above; EGA `0x2F89E`,
+  CGA `0x30CFE`, TGA `0x31824`). It only repaints the star map from the
+  `[0x9158]` record array — no file I/O, no decompression.
+- `call word far [cs:0x1278]` (`2E FF 1E 7812`, cs) — entry 3 of the
+  **sound-driver far table** `cs:0x126C`–`0x1282` (six `01D0:` exports
+  of the A/R driver's `jmp` table, or `286B:FBD4` `retf` stubs when
+  `[0x155] ≤ 2`; seeded by `install_drivers` `0x31EF7`). Export 3
+  (`jmp`-table `+9` → module `0x381`) is **load_song**: `ds:si` → a song
+  record, copies its `0x118` header + `0x200` block table into the
+  driver workspace (`cs:0x1673`/`0x178C`). Every call site is the same
+  music-swap idiom — `call far [cs:0x1280]` (export `0x0F` → module
+  `0x17C`, stop/reset) → `ds=<song seg>`, `si=0`,
+  `call far [cs:0x1278]` → `cl=0`, `call far [cs:0x127C]` (export `0x0C`
+  = `select_sound`, starts track 0): file `0x3306A` (`ds=0xC3E`,
+  new-game init), `0x385E6` (`ds=0x3D7`, title init), `0x38B2E` and
+  `0x38C7C` (`ds=0x95A`/`0x5B7`, endgame A/B). The actual image loads in
+  those sequences are the separate `[0x125A]`/`[0x125E]` near calls —
+  the `.BIN` + LZSS path documented in ANALYSIS.md.
+
+All the data this slot was suspected of staging **ships in the image**:
+
+- font pointer/glyph tables — `ds:0x3009`/`0x30F9` MCG, `ds:0x3081`/
+  `0x3699` EGA, `ds:0x2F19`/`0x3C51` CGA, `ds:0x2F91`/`0x3DB9` TGA
+  (see "Text layer"); `rust/src/front/font/` already reads them
+  (GAM-35).
+- planet-window half-width mask `ds:0xA8`–`0xE7` — 64 bytes, file
+  `0x10748`–`0x10787`: `0x0D` at index 0 rising with flat steps to
+  `0x46` at indices `0x38..0x3F` (a quantized ellipse profile; the
+  `ds:0x97`–`0xA7` prefix is separate zeroed scratch). Read only by
+  `map_gate` `cs:0x8DC6` (file `0x38DC6`),
+  called once per frame in the map-screen loops (`0x32D73`, `0x32E69`,
+  `0x32FC4`, `0x33013`, `0x379E3`, `0x381BC`): `bx` = cursor row
+  `[0x9CD8]` folded — `y<0x40` → `bx=y`; `0x40≤y≤0x50` → `bx=0x3F`;
+  `0x50<y<0x9B` → `bx=0x90−y` (rows `0x91..0x9A` wrap `bx` negative
+  into the zeroed `ds:0x9E..0xA7`); `y≥0x9B` → outside.
+  `hw = [bx+0xA8]`; cursor `x=[0x9CD6]` is inside the planet ellipse
+  iff `x ≤ 0x50+hw` and `x+8 ≥ 0x50−hw`. Inside → `ret` (cursor is over
+  the planet window); outside → `jmp [0x1278]` = `map_draw` repaint.
+  The mask is a ~144-row ellipse centred on `y≈0x48`, up to `0x46`
+  half-width about `x=0x50`. (`ds:0xE8`+ holds a different small table
+  of `1..3` values.)
+- hotspot records — templates ship in the save-block image
+  (`file 0x1A3E2`–`0x1B784`); live lists are runtime copies built by
+  the screen-entry code (`0x2F498` builds the minimap grid), not by any
+  `[0x1278]` call.
 
 Entry stub (file `0x31D17` for the record): `int21/AH=1A` (set DTA),
 `0x3207E`, `0x31FF8`, `install_drivers` (`0x31E8E`), `int9_swap`

@@ -69,8 +69,9 @@ push ax / retf` at the entry point).
   live inside it. Template bases (dgroup offsets): MCG 0xB0EC,
   EGA 0xC247, CGA 0xD3A2, TGA 0xE4FD (files 0x1B78C/0x1C8E7/0x1DA42/
   0x1EB9D — four consecutive blocks). A separate far table at
-  ds:0x126C–0x1282 (6 entries) defaults to `0x286B:0xFBD4` = `retf`
-  stubs, filled later for specific modes.
+  cs:0x126C–0x1282 (6 entries — the AdLib/Roland driver's exports,
+  `01D0:0000/…/000F`) is `0x286B:0xFBD4` = `retf`
+  stubs when the PC/Tandy sound driver is selected (see FUNCTIONS.md).
   Key MCG entries: `[0x125A]`=draw-image-by-index (0x58DA), the LZSS
   decode/blit routine.
 
