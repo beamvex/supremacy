@@ -12,8 +12,9 @@
 //!   (MCGA only — the other modes' slots are `int 10/AX=1002` palette
 //!   writes and the CGA `AH=5` page select, no-ops under the fixed
 //!   `Palette::{ega16,cga}` model).
-//! - `[0x1262]`/`[0x1268]` → the popup frame / glyph put through
-//!   [`Screen::put_pixel`], which writes in the mode's layout.
+//! - `[0x1262]`/`[0x1268]` → the popup frame through
+//!   [`Screen::put_pixel`] / the glyph put via `font::draw`, which
+//!   replays the mode's packed/planar record merge byte-for-byte.
 //! - `[0x1264]`/`[0x125E]`/`[0x1266]` and the sound calls stay stubs —
 //!   the refresh-list copy and palette flushes are presentation details
 //!   the window's per-frame blit supersedes (GAM-7/GAM-9).
@@ -48,9 +49,10 @@ pub struct Host {
     pub pump: Pump,
     /// The decoded image set `[0x125A]` indexes.
     pub set: AssetSet,
-    /// Unpacked `GAME.EXE` bytes — source for `cs_word`.
+    /// Unpacked `GAME.EXE` bytes — source for `cs_word` and the `ds:`
+    /// font tables `font::draw` slices.
     pub img: Vec<u8>,
-    /// Text colour for the debug font.
+    /// Ink for the `[0x1262]` popup-frame outline.
     pub ink: u8,
     /// Calls dropped because the port doesn't model them yet.
     pub dropped: usize,
@@ -117,9 +119,7 @@ impl VmHost for Host {
     fn svc(&mut self, call: Call) -> u16 {
         match call {
             Call::Image(i) => self.scr.draw_image(&self.set, usize::from(i)),
-            Call::Glyph(ch, bx, dx) => {
-                font::draw(&mut self.scr, ch, bx.wrapping_mul(4), dx, self.ink);
-            }
+            Call::Glyph(ch, bx, dx) => font::draw(&mut self.scr, &self.img, ch, bx, dx),
             Call::Rect(a, b, x, d) => self.rect(a, b, x, d),
             Call::Mouse(ax, cx, dx) => self.int33(ax, cx, dx),
             Call::KeyPop => return u16::from(self.pump.pop_key().unwrap_or(0)),

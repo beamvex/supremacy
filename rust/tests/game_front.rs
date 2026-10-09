@@ -45,36 +45,45 @@ fn image_and_glyph_reach_the_framebuffer() {
     h.svc(Call::Image(0));
     assert!(h.scr.buf.iter().any(|&b| b != 0)); // backdrop painted
     h.svc(Call::Glyph(b'A', 0, 0));
-    // 'A' row 0 = 0x6 → columns 1..=2 lit at ink 0x0F.
-    assert_eq!((h.scr.buf[0], h.scr.buf[1], h.scr.buf[2]), (0, 0x0F, 0x0F));
+    // Real font: 'A' row 0 = `[3, 1, 3, 0]` baked pixels (ds:0x30F9+0x318).
+    assert_eq!(&h.scr.buf[0..4], &[3, 1, 3, 0]);
+    assert_eq!(&h.scr.buf[0x140..0x144], &[1, 0, 2, 0]);
 }
 
-/// 'A' row 0 = `0x6` — pixels 1,2 of the 4-column glyph. Every check
-/// reads the mode's packed/planar layout straight out of `scr.buf`.
+/// The shipped 'A' record in each mode's packed layout — colours are
+/// baked into the font data, so every check reads raw bytes out of
+/// `scr.buf` (MCG above).
 #[test]
 fn glyph_put_lands_in_every_mode() {
-    // EGA: ink 0x0F sets bit 7-(x&7) in all four planes → 0x60 each.
+    // EGA `0x2FF33`: four plane records `44 AA EE AA AA 00` /
+    // `00 55 33 55 77 00` / `CC 22 44 00 44 00` / `00…` merged into the
+    // high nibble (even `x4`) — pixel (1,0) = planes 0+2 → colour 5.
     let mut h = mode_host(Video::Ega);
     h.svc(Call::Glyph(b'A', 0, 0));
-    for p in 0..4 {
-        assert_eq!(h.scr.buf[p * 0x1F40], 0x60, "EGA plane {p}");
-    }
-    assert_eq!(h.scr.pixels()[1], 0x0F);
+    assert_eq!(h.scr.buf[0], 0x40);
+    assert_eq!(h.scr.buf[0x28], 0xA0);
+    assert_eq!(h.scr.buf[0x1F40 + 0x28], 0x50);
+    assert_eq!(h.scr.buf[0x3E80], 0xC0);
+    assert_eq!(h.scr.pixels()[1], 5);
 
-    // CGA: colour 3 at pixels 1,2 → 0x3C in bank 0 row 0; glyph row 1
-    // (`0x9` = pixels 0,3) lands at y=1 → bank 1 → 0xC3 at `0x2000`;
-    // row 3 (`0xF`) at y=3 → bank 1, next `0x50` row → 0xFF.
+    // CGA `0x30887`: 2bpp record `DC 4C 7C CC CC 00` — bank 0 rows
+    // 0/2/4 at `0`/`0x50`/`0xA0`, bank 1 rows 1/3/5 at `0x2000`/`0x2050`.
     let mut h = mode_host(Video::Cga);
     h.svc(Call::Glyph(b'A', 0, 0));
-    assert_eq!(h.scr.buf[0], 0x3C);
-    assert_eq!(h.scr.buf[0x2000], 0xC3);
-    assert_eq!(h.scr.buf[0x2050], 0xFF);
+    assert_eq!(h.scr.buf[0], 0xDC);
+    assert_eq!(h.scr.buf[0x2000], 0x4C);
+    assert_eq!(h.scr.buf[0x50], 0x7C);
+    assert_eq!(h.scr.buf[0x2050], 0xCC);
+    assert_eq!(h.scr.buf[0xA0], 0xCC);
 
-    // TGA: colour 0xF at pixels 1,2 → nibbles 0x0F/0xF0 across two
-    // bytes of bank 0.
+    // TGA `0x3133B`: 4bpp record `85 80 50 70 57 70 70 70 70 70 00 00`
+    // — `movsw` per row across the four `0x2000` banks.
     let mut h = mode_host(Video::Tga);
     h.svc(Call::Glyph(b'A', 0, 0));
-    assert_eq!((h.scr.buf[0], h.scr.buf[1]), (0x0F, 0xF0));
+    assert_eq!(&h.scr.buf[0..2], &[0x85, 0x80]);
+    assert_eq!(&h.scr.buf[0x2000..0x2002], &[0x50, 0x70]);
+    assert_eq!(&h.scr.buf[0x4000..0x4002], &[0x57, 0x70]);
+    assert_eq!(&h.scr.buf[0xA0..0xA2], &[0x70, 0x70]);
 }
 
 #[test]

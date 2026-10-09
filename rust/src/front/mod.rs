@@ -3,8 +3,8 @@
 //! and asset set, plus the input pump that mirrors window events into
 //! the `ds:` latch cells.
 //!
-//! - `font`: a debug 4×6 font for the `[0x1268]` glyph slot (the real
-//!   table is runtime-loaded by the undecoded `0x1278` op).
+//! - `font`: the shipped 4×6 font — the `[0x1268]` slot's per-mode
+//!   `ds:` pointer tables and packed records, read from the exe image.
 //! - [`Pump`]: int-9/int-33h input state → `[0x9CD6..0x9CCD]` cells.
 //! - [`Host`]: `VmHost` impl — `Image` draws, `Glyph` puts, the
 //!   `0x125C` clear, `0x1260` DAC write, `int 33` calls; everything else

@@ -4,18 +4,28 @@ A concrete `VmHost` that replays the game's service calls against a real
 framebuffer, palette and asset set, plus the input pump that mirrors
 window events into the `ds:` latch cells.
 
-## `font.rs` — debug 4×6 font
+## `font/` — the shipped 4×6 font
 
-Stands in for the runtime-loaded glyph data the `[0x1268]` glyph slot
-reads (`ds:0x3009`/`ds:0x30F9`, file `0x2EECE`); the real table is
-staged by the undecoded `0x1278` load op. `GLYPHS` is a sorted
-`code → [u8; 6]` table (six rows, low nibble = 4 px left→right, bit 3 =
-leftmost); `glyph()` binary-searches with uppercase folding and falls
-back to `BOX`. `draw()` blits at pixel origin through
-`Screen::put_pixel`, so the same single-ink approximation works in
-every mode (the real routines write opaque 4×6 cells — nibble merges
-on EGA, packed bytes on CGA/TGA — with the colour baked into the font
-data; the debug font only sets lit pixels).
+Replays each mode's `[0x1268]` put byte-for-byte out of `Host::img`:
+the pointer tables and packed records ship in the image's data segment
+(`ds:` = file `0x106A0 + ofs`, dgroup `0xFAA`), 60 glyphs covering
+codes `0x20..=0x5B` with colours baked in — the puts take no ink
+argument, so `Host::ink` only feeds the popup frame.
+
+| file | put | table → records | draw |
+|---|---|---|---|
+| `mcg.rs` | `0x2EECE` | `ds:0x3009` → `ds:0x30F9` | opaque 4 B × 6 rows, `di += 0x13C` |
+| `ega.rs` | `0x2FF33` | `ds:0x3081` → `ds:0x3699` | 6 B × 4 plane blocks (`+0x168`), nibble merge — high for even `x4`, low for odd |
+| `cga.rs` | `0x30887` | `ds:0x2F19` → `ds:0x3C51` | opaque 2bpp byte per row, `0x2000`-bank interleave |
+| `tga.rs` | `0x3133B` | `ds:0x2F91` → `ds:0x3DB9` | opaque 4bpp `movsw` per row, 4-bank `0x2000` step |
+
+The asm reads its `es:di` row bases from shipped `u16` tables
+(`ds:0x28D9`/`0x2A69`/`0x2BF9`/`0x2D89`) whose values equal
+`Video::di_at`, so each mode computes rows through that. `mod.rs` owns
+the `DS` mapping plus the shared `sub al,0x20` index/read helpers;
+codes past `0x5B` draw the same table-bleed garbage as DOS (the index
+keeps reading the next mode's bytes out of `img`), and only reads
+landing past `img`'s end are skipped.
 
 ## `Pump` (`pump.rs`) — input mirror
 

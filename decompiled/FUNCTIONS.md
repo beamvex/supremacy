@@ -605,12 +605,26 @@ and `VmHost::cs_word`; tests in
 
 ## Text layer + frontend — `rust/src/front/`
 
-- `cs:0x68D6` — the `[0x1268]` char put (`al` glyph, `(bx,dx)` cursor);
-  the MCG routine `0x2EECE` takes `bx` in 4-pixel columns, `dx` in
-  pixel rows, 4×6 glyph data indexed `al − 0x20` through the
-  runtime-loaded `ds:0x3009` offset table into `ds:0x30F9` font data
-  (EGA variant `0x2FF33` uses `ds:0x3081`/`0x3699` — all staged by the
-  undecoded `0x1278` load op).
+- `cs:0x68D6` — the `[0x1268]` char put (`al` glyph, `(bx,dx)` cursor;
+  `bx` in 4-pixel columns, `dx` in pixel rows). All four variants index
+  `al − 0x20` through a 60-entry `u16` pointer table into packed glyph
+  records — the tables **ship in the image's data segment** (`ds:` =
+  file `0x106A0 + ofs`; dgroup `0xFAA`), not staged by `0x1278`:
+  `ds:0x2F19`/`0x2F91`/`0x3009`/`0x3081` are the CGA/TGA/MCG/EGA
+  pointer tables (back-to-back, 60×`u16` each — the `0x3009` "120-entry
+  table" is really the MCG+EGA pair), then the records: `ds:0x30F9`
+  MCG 24-byte opaque 8bpp cells (4 B/row, `di += 0x13C`), `ds:0x3699`
+  EGA four `0x168`-byte plane blocks (glyph `i` plane `p` at
+  `p*0x168 + i*6`, 6 rows nibble-merged — high nibble for even `bx`,
+  low for odd), `ds:0x3C51` CGA 6-byte 2bpp records (`movsb` + the
+  `0x2000`-bank toggle), `ds:0x3DB9` TGA 12-byte 4bpp records
+  (`movsw` + `+0x2000`/wrap-`0x8000` advance). Colours are baked in —
+  the puts take no ink argument. Row start tables `ds:0x28D9`/`0x2A69`/
+  `0x2BF9`/`0x2D89` (CGA/TGA/MCG/EGA, 200×`u16`) hold each mode's
+  `di(y)` — `y*0x140`, `y*0x28`, `(y>>1)*0x50+(y&1)*0x2000`,
+  `(y>>2)*0xA0+(y&3)*0x2000`. Codes `≥ 0x5C` run off the table into
+  the next mode's pointers (garbage glyphs — the game only prints
+  `0x20..0x5B`).
 - `cs:0x686C` — `u16` decimal print space-padded to 5 cells (pads the
   four leading decades, units forced).
 - `cs:0x698F` — `u16` unpadded print (skips leading decades; `0` still
@@ -630,8 +644,9 @@ and `VmHost::cs_word`; tests in
 Rust port: `game::{text, num}` (`print_str`, `enqueue`, `put`,
 `num_pad`, `num`, `num32`) — all `Call::Text/Print/Num` sites rewired
 to emit real `Call::Glyph`s; `front::{Host, Pump, Game, font}` is the
-concrete `VmHost` (image draws, glyph puts via a debug 4×6 font,
-`0x125C` clear, `0x1260` DAC, int-33 calls) and `front::window`
+concrete `VmHost` (image draws, glyph puts via the shipped `ds:` font
+tables sliced out of the exe image, `0x125C` clear, `0x1260` DAC,
+int-33 calls) and `front::window`
 (feature `minifb`) presents the buffer + pumps input. `supremacy-run`
 binary drives it; tests in `rust/tests/game_front.rs`.
 
