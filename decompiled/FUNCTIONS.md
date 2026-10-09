@@ -146,6 +146,74 @@ module — the install sets `int 0x80` = `(loadbase + [0x156]):0`
   block loop (`0x3431`) + `mpu_sysex(0x1C07)`; on success `[0x19AC]=1`,
   `[0x2062]=0x4B`, returns `al=1`.
 
+## Embedded song data (A/R module, file `0x4970`–`0x1074E`)
+
+Four song records live inside the driver image right after its workspace
+(module `0x2070`+ = file `0x4970`+). Each starts with the 3-byte tag
+`B4 9A 01`. Module-relative offsets below are file − `0x2900`.
+
+| tag (file) | name | end | sounds | timbre table | FM table |
+|---|---|---|---|---|---|
+| `0x4970` | *(none)* | `0x6770` | 8 | `0x5568`–`0x5F68` (10) | `0x5F68`–`0x6768` (32) |
+| `0x6770` | `supremsucc` | `0xA1A0` | 6 | `0x7998`–`0x9998` (32) | `0x9998`–`0xA198` (128) |
+| `0xA1A0` | `supremunsuccess` | `0xCFE0` | 2 | `0xA7D8`–`0xC7D8` (32) | `0xC7D8`–`0xCFD8` (30) |
+| `0xCFE0` | *(none)* | `0x1074E`* | 25 | `0xE698`–`0xFE98` (24) | `0xFE98`–`0x10718` (32) |
+
+\* song3's tail runs into a scale/level table at `0x1074E`; its last full
+FM slot ends `0x10718` (8-byte pad like the other records ⇒ `0x10720`).
+
+### Song record layout (offsets from the tag)
+
+| off | size | field |
+|---|---|---|
+| `+0x000` | 3 | tag `B4 9A 01` |
+| `+0x003` | `0x15` | song name, space/NUL padded |
+| `+0x018` | `0x80` | sound→block map: byte *i* = block-table index for sound *i* (driver scans `0x7F` for the max) |
+| `+0x098` | `0x80` | 32-entry program→timbre-slot map (u16s; both bytes nonzero ⇒ upload that slot to the MT-32) |
+| `+0x118` | `0x200` | paragraph-offset table, `0x100` LE u16s, `0xFFFF`-filled: entry *i* = offset in paragraphs from the record base of block *i*'s `0x118` header |
+| `+0x318` | var | data area: blocks, then the instrument area |
+
+Each **block** *i* = a `0x118`-byte header at `tag + tbl[i]*16` (mostly
+`0xFF` fill) followed by the command queue at `+0x118`. `tbl[max+1]` =
+the **instrument area** base; its own `0x118` header is followed by:
+
+- **timbre table** — `0x100`-stride records: `+0` type (`0x02` melodic,
+  `0x03` percussion, `0x20` unused slot), `+1..7` params,
+  `+8..0x11` name (`0x0A`, space-pad for type-2, NUL-pad for type-3),
+  `+0x12..0xFF` timbre data. Sent to the MT-32 via SysEx.
+- **FM table** — `0x40`-stride records on the same grid:
+  `+0..0x09` name (`0x0A`, NUL/space padded), `+0x0A..0x3F` AdLib patch
+  params. Starts on the `0x100` grid at the first `+0`-named slot
+  (`BDRUM1`/`LIFEBASS`/`SNARE1` …), space/NUL-named slots are unused.
+- 8-byte pad, then the next tag.
+
+### Driver routines for the song data (module-relative)
+
+- export `0x09` → `0x381` **load song**: `ds:si` → song record; copies
+  `0x118` hdr → `cs:0x1673`, `0x200` table → `cs:0x178C`, saves `ds` →
+  `[0x1C03]`; `0x36A` finds the max sound→block entry `dl`;
+  `tbl[dl+1] + [0x1C03]` → `[0x1C81]` = instrument-area segment.
+- `0x404` (Roland only, `[0x19AC]≠0`): for each of the 32 `cs:0x170B`
+  program entries with both bytes nonzero, `0x44F` uploads timbre slot
+  *i* = `es:[0x1C81]:[i*0x100+0x118]` via `mpu_sysex`; then 32 ×
+  program-change bytes (`0xC1`) via `0xC0E`/`mpu_send`.
+- export `0x0C` → `0xEE` **select sound**: `cl` = sound index →
+  `[0x19FA]`; `[0x19FB]=0x118` resets the queue cursor.
+- `0x5DD`+ **queue tick**: block seg = `tbl[map[[0x19FA]]]+[0x1C03]`,
+  cursor `si=[0x19FB]`; each `u16` command word carries 2 bits/channel ×
+  16 channels: `0`=idle, `1`=u16 event, `2`=2×u8 event, `3`=7-byte event
+  into the `0x20`-byte channel records at `0x1A00+ch*0x20`. After `0x40`
+  passes it wraps to the next sound index.
+- `0xBB9` `mpu_sysex` (file `0x34B9`): `[si]`-counted head + body,
+  Roland checksum `(-sum)&0x7F`, `0xF7`.
+
+### Extraction
+
+`decompiled/tools/extract_adlib.py` → `decompiled/fixtures/adlib/`:
+per-song blobs (`*.bin` whole record, `.hdr`/`.table`/`.blocks`/
+`.timbres`/`.fm`), named patches under `patches/<song>/`, and a
+`manifest.json` with every offset/length/sha256 (77 named instruments).
+
 ## PC speaker driver (file `0xC00` module)
 
 - `0x0E9F` `spk_note(cx=divisor)`: skips PIT program when `cx == [0x2E]`;

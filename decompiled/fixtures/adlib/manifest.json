@@ -1,0 +1,1833 @@
+{
+ "source": "GAME.unpacked.exe",
+ "source_sha256": "d469e0e482b7f6908491d83339fbc292b1475f21e4ae65232a71e59f63555572",
+ "module_base": 10496,
+ "tag": [
+  180,
+  154,
+  1
+ ],
+ "songs": [
+  {
+   "name": "song0",
+   "tag": 18800,
+   "end": 26480,
+   "files": [
+    {
+     "file": "song0.bin",
+     "off": 18800,
+     "len": 7680,
+     "sha256": "1b08224d8065ff63f73510a8c82a44b191375383e3e0b9e6b6a5498cb9b8a7a7"
+    },
+    {
+     "file": "song0.hdr.bin",
+     "off": 18800,
+     "len": 280,
+     "sha256": "d7945d7b809a50321a9b9de875b6b3b71a4a42ee22e7c972d1dc4df8e3750d40"
+    },
+    {
+     "file": "song0.table.bin",
+     "off": 19080,
+     "len": 512,
+     "sha256": "4a53a47ee6d4aa8f0400cf11748e274c99e4f02feb1891f3723fd21ddb436b3f"
+    },
+    {
+     "file": "song0.blocks.bin",
+     "off": 19592,
+     "len": 1992,
+     "sha256": "14a94bbef5ec6c8af983016b7a6539483f8174d78c04ae139c9f427522d09243"
+    },
+    {
+     "file": "song0.timbres.bin",
+     "off": 21864,
+     "len": 2560,
+     "sha256": "0033a824d8d6aec7fcfd32aba07efdf8d3a1c0b53a149dd5f2ce56d3a007041a"
+    },
+    {
+     "file": "song0.fm.bin",
+     "off": 24424,
+     "len": 2048,
+     "sha256": "b9f3dd5f03f3e940f13618c0a9b22b0c81b774ebd919b57fc9c66a462fc06fb1"
+    }
+   ],
+   "block_map": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7
+   ],
+   "para_table": [
+    32,
+    48,
+    58,
+    80,
+    103,
+    125,
+    148,
+    165,
+    174
+   ],
+   "blocks": [
+    19312,
+    19568,
+    19728,
+    20080,
+    20448,
+    20800,
+    21168,
+    21440
+   ],
+   "instrument_base": 21584,
+   "timbre_start": 21864,
+   "fm_start": 24424,
+   "fm_end": 26472,
+   "timbres": [
+    {
+     "idx": 0,
+     "off": 21864,
+     "kind": "timbre",
+     "type": 2,
+     "name": "Timpani"
+    },
+    {
+     "idx": 1,
+     "off": 22120,
+     "kind": "timbre",
+     "type": 2,
+     "name": "Contrabass"
+    },
+    {
+     "idx": 2,
+     "off": 22376,
+     "kind": "timbre",
+     "type": 2,
+     "name": "Pizzicato"
+    },
+    {
+     "idx": 3,
+     "off": 22632,
+     "kind": "timbre",
+     "type": 2,
+     "name": "Sax 1"
+    },
+    {
+     "idx": 4,
+     "off": 22888,
+     "kind": "timbre",
+     "type": 2,
+     "name": "Cello 2"
+    },
+    {
+     "idx": 5,
+     "off": 23144,
+     "kind": "timbre",
+     "type": 2,
+     "name": "Clavi 3"
+    },
+    {
+     "idx": 6,
+     "off": 23400,
+     "kind": "timbre",
+     "type": 3,
+     "name": "HAT4"
+    },
+    {
+     "idx": 7,
+     "off": 23656,
+     "kind": "timbre",
+     "type": 32,
+     "name": null
+    },
+    {
+     "idx": 8,
+     "off": 23912,
+     "kind": "timbre",
+     "type": 2,
+     "name": "Contrabass"
+    },
+    {
+     "idx": 9,
+     "off": 24168,
+     "kind": "timbre",
+     "type": 32,
+     "name": null
+    }
+   ],
+   "fm": [
+    {
+     "idx": 0,
+     "off": 24424,
+     "kind": "fm",
+     "name": "BDRUM1"
+    },
+    {
+     "idx": 1,
+     "off": 24488,
+     "kind": "fm",
+     "name": "BAGPIPE1"
+    },
+    {
+     "idx": 2,
+     "off": 24552,
+     "kind": "fm",
+     "name": "ORGAN1"
+    },
+    {
+     "idx": 3,
+     "off": 24616,
+     "kind": "fm",
+     "name": "LIFEBASS"
+    },
+    {
+     "idx": 4,
+     "off": 24680,
+     "kind": "fm",
+     "name": "KEYBRD2"
+    },
+    {
+     "idx": 5,
+     "off": 24744,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 6,
+     "off": 24808,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 7,
+     "off": 24872,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 8,
+     "off": 24936,
+     "kind": "fm",
+     "name": "LIFEBASS"
+    },
+    {
+     "idx": 9,
+     "off": 25000,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 10,
+     "off": 25064,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 11,
+     "off": 25128,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 12,
+     "off": 25192,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 13,
+     "off": 25256,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 14,
+     "off": 25320,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 15,
+     "off": 25384,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 16,
+     "off": 25448,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 17,
+     "off": 25512,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 18,
+     "off": 25576,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 19,
+     "off": 25640,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 20,
+     "off": 25704,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 21,
+     "off": 25768,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 22,
+     "off": 25832,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 23,
+     "off": 25896,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 24,
+     "off": 25960,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 25,
+     "off": 26024,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 26,
+     "off": 26088,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 27,
+     "off": 26152,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 28,
+     "off": 26216,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 29,
+     "off": 26280,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 30,
+     "off": 26344,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 31,
+     "off": 26408,
+     "kind": "fm",
+     "name": null
+    }
+   ]
+  },
+  {
+   "name": "supremsucc",
+   "tag": 26480,
+   "end": 41376,
+   "files": [
+    {
+     "file": "supremsucc.bin",
+     "off": 26480,
+     "len": 14896,
+     "sha256": "a6d411e24d0a8bbe7b7fab1d396ac965b782bf2d01a28b08c5581d44dbaab209"
+    },
+    {
+     "file": "supremsucc.hdr.bin",
+     "off": 26480,
+     "len": 280,
+     "sha256": "8a79c80dc211d51a24608756886db9d2eb1bfc52ffef902ffc190c1ad69b4edc"
+    },
+    {
+     "file": "supremsucc.table.bin",
+     "off": 26760,
+     "len": 512,
+     "sha256": "49a590958d15b4f051c05a1d5fe5dac7fac288aa8b1349b64e317766638f95cb"
+    },
+    {
+     "file": "supremsucc.blocks.bin",
+     "off": 27272,
+     "len": 3576,
+     "sha256": "757feb4a8b19fcdacd643bc8dce14c29cef766f6408cd320b4f743471595680f"
+    },
+    {
+     "file": "supremsucc.timbres.bin",
+     "off": 31128,
+     "len": 8192,
+     "sha256": "7480130f378498db5d4b919473310909ed1438dae10f79f55a4a0a8c9e0e2e13"
+    },
+    {
+     "file": "supremsucc.fm.bin",
+     "off": 39320,
+     "len": 2048,
+     "sha256": "19353df906a58f995341019c696f29167ba9b6afda4445a542bd296f87300e41"
+    }
+   ],
+   "block_map": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "para_table": [
+    32,
+    71,
+    112,
+    152,
+    191,
+    233,
+    273
+   ],
+   "blocks": [
+    26992,
+    27616,
+    28272,
+    28912,
+    29536,
+    30208
+   ],
+   "instrument_base": 30848,
+   "timbre_start": 31128,
+   "fm_start": 39320,
+   "fm_end": 41368,
+   "timbres": [
+    {
+     "idx": 0,
+     "off": 31128,
+     "kind": "timbre",
+     "type": 2,
+     "name": "Echo Bell"
+    },
+    {
+     "idx": 1,
+     "off": 31384,
+     "kind": "timbre",
+     "type": 2,
+     "name": "Atmosphere"
+    },
+    {
+     "idx": 2,
+     "off": 31640,
+     "kind": "timbre",
+     "type": 32,
+     "name": null
+    },
+    {
+     "idx": 3,
+     "off": 31896,
+     "kind": "timbre",
+     "type": 2,
+     "name": "Syn Bass 4"
+    },
+    {
+     "idx": 4,
+     "off": 32152,
+     "kind": "timbre",
+     "type": 2,
+     "name": "Celesta 2"
+    },
+    {
+     "idx": 5,
+     "off": 32408,
+     "kind": "timbre",
+     "type": 32,
+     "name": null
+    },
+    {
+     "idx": 6,
+     "off": 32664,
+     "kind": "timbre",
+     "type": 32,
+     "name": null
+    },
+    {
+     "idx": 7,
+     "off": 32920,
+     "kind": "timbre",
+     "type": 32,
+     "name": null
+    },
+    {
+     "idx": 8,
+     "off": 33176,
+     "kind": "timbre",
+     "type": 32,
+     "name": null
+    },
+    {
+     "idx": 9,
+     "off": 33432,
+     "kind": "timbre",
+     "type": 32,
+     "name": null
+    },
+    {
+     "idx": 10,
+     "off": 33688,
+     "kind": "timbre",
+     "type": 32,
+     "name": null
+    },
+    {
+     "idx": 11,
+     "off": 33944,
+     "kind": "timbre",
+     "type": 32,
+     "name": null
+    },
+    {
+     "idx": 12,
+     "off": 34200,
+     "kind": "timbre",
+     "type": 32,
+     "name": null
+    },
+    {
+     "idx": 13,
+     "off": 34456,
+     "kind": "timbre",
+     "type": 32,
+     "name": null
+    },
+    {
+     "idx": 14,
+     "off": 34712,
+     "kind": "timbre",
+     "type": 32,
+     "name": null
+    },
+    {
+     "idx": 15,
+     "off": 34968,
+     "kind": "timbre",
+     "type": 32,
+     "name": null
+    },
+    {
+     "idx": 16,
+     "off": 35224,
+     "kind": "timbre",
+     "type": 32,
+     "name": null
+    },
+    {
+     "idx": 17,
+     "off": 35480,
+     "kind": "timbre",
+     "type": 32,
+     "name": null
+    },
+    {
+     "idx": 18,
+     "off": 35736,
+     "kind": "timbre",
+     "type": 32,
+     "name": null
+    },
+    {
+     "idx": 19,
+     "off": 35992,
+     "kind": "timbre",
+     "type": 32,
+     "name": null
+    },
+    {
+     "idx": 20,
+     "off": 36248,
+     "kind": "timbre",
+     "type": 32,
+     "name": null
+    },
+    {
+     "idx": 21,
+     "off": 36504,
+     "kind": "timbre",
+     "type": 32,
+     "name": null
+    },
+    {
+     "idx": 22,
+     "off": 36760,
+     "kind": "timbre",
+     "type": 32,
+     "name": null
+    },
+    {
+     "idx": 23,
+     "off": 37016,
+     "kind": "timbre",
+     "type": 32,
+     "name": null
+    },
+    {
+     "idx": 24,
+     "off": 37272,
+     "kind": "timbre",
+     "type": 32,
+     "name": null
+    },
+    {
+     "idx": 25,
+     "off": 37528,
+     "kind": "timbre",
+     "type": 32,
+     "name": null
+    },
+    {
+     "idx": 26,
+     "off": 37784,
+     "kind": "timbre",
+     "type": 32,
+     "name": null
+    },
+    {
+     "idx": 27,
+     "off": 38040,
+     "kind": "timbre",
+     "type": 32,
+     "name": null
+    },
+    {
+     "idx": 28,
+     "off": 38296,
+     "kind": "timbre",
+     "type": 32,
+     "name": null
+    },
+    {
+     "idx": 29,
+     "off": 38552,
+     "kind": "timbre",
+     "type": 32,
+     "name": null
+    },
+    {
+     "idx": 30,
+     "off": 38808,
+     "kind": "timbre",
+     "type": 32,
+     "name": null
+    },
+    {
+     "idx": 31,
+     "off": 39064,
+     "kind": "timbre",
+     "type": 32,
+     "name": null
+    }
+   ],
+   "fm": [
+    {
+     "idx": 0,
+     "off": 39320,
+     "kind": "fm",
+     "name": "LIFEBASS"
+    },
+    {
+     "idx": 1,
+     "off": 39384,
+     "kind": "fm",
+     "name": "SYN2"
+    },
+    {
+     "idx": 2,
+     "off": 39448,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 3,
+     "off": 39512,
+     "kind": "fm",
+     "name": "LIFEBASS"
+    },
+    {
+     "idx": 4,
+     "off": 39576,
+     "kind": "fm",
+     "name": "CLARINET"
+    },
+    {
+     "idx": 5,
+     "off": 39640,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 6,
+     "off": 39704,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 7,
+     "off": 39768,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 8,
+     "off": 39832,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 9,
+     "off": 39896,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 10,
+     "off": 39960,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 11,
+     "off": 40024,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 12,
+     "off": 40088,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 13,
+     "off": 40152,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 14,
+     "off": 40216,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 15,
+     "off": 40280,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 16,
+     "off": 40344,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 17,
+     "off": 40408,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 18,
+     "off": 40472,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 19,
+     "off": 40536,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 20,
+     "off": 40600,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 21,
+     "off": 40664,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 22,
+     "off": 40728,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 23,
+     "off": 40792,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 24,
+     "off": 40856,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 25,
+     "off": 40920,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 26,
+     "off": 40984,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 27,
+     "off": 41048,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 28,
+     "off": 41112,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 29,
+     "off": 41176,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 30,
+     "off": 41240,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 31,
+     "off": 41304,
+     "kind": "fm",
+     "name": null
+    }
+   ]
+  },
+  {
+   "name": "supremunsuccess",
+   "tag": 41376,
+   "end": 53216,
+   "files": [
+    {
+     "file": "supremunsuccess.bin",
+     "off": 41376,
+     "len": 11840,
+     "sha256": "fa5bdf8790100a2611e019abd864fa1191235aba75083ea47eac4c7f1285008f"
+    },
+    {
+     "file": "supremunsuccess.hdr.bin",
+     "off": 41376,
+     "len": 280,
+     "sha256": "92a56156760a2924be4c8d1a4a64c282f0c640724401cd6d0d336959abbe70b9"
+    },
+    {
+     "file": "supremunsuccess.table.bin",
+     "off": 41656,
+     "len": 512,
+     "sha256": "e3fe52991eb1f836b094150afa882c8ec9cc6c059744963162a185c676d94e30"
+    },
+    {
+     "file": "supremunsuccess.blocks.bin",
+     "off": 42168,
+     "len": 520,
+     "sha256": "ab85380f9cd01fb1ff844017ce16cf39101fc0d8e6cdae3599e120a225b79d96"
+    },
+    {
+     "file": "supremunsuccess.timbres.bin",
+     "off": 42968,
+     "len": 8192,
+     "sha256": "f4637a17f2beb3f24e7bc69bc15e91f555e47155ecae00fc0a076bb9a0d57000"
+    },
+    {
+     "file": "supremunsuccess.fm.bin",
+     "off": 51160,
+     "len": 2048,
+     "sha256": "af81dbed8098d1bb0e9c14b3204f36a97fcda9d174368b8c9d4b05f2e0bf8534"
+    }
+   ],
+   "block_map": [
+    0,
+    1
+   ],
+   "para_table": [
+    32,
+    58,
+    82
+   ],
+   "blocks": [
+    41888,
+    42304
+   ],
+   "instrument_base": 42688,
+   "timbre_start": 42968,
+   "fm_start": 51160,
+   "fm_end": 53208,
+   "timbres": [
+    {
+     "idx": 0,
+     "off": 42968,
+     "kind": "timbre",
+     "type": 2,
+     "name": "Syn Brass3"
+    },
+    {
+     "idx": 1,
+     "off": 43224,
+     "kind": "timbre",
+     "type": 71,
+     "name": null
+    },
+    {
+     "idx": 2,
+     "off": 43480,
+     "kind": "timbre",
+     "type": 2,
+     "name": "Clarinet 1"
+    },
+    {
+     "idx": 3,
+     "off": 43736,
+     "kind": "timbre",
+     "type": 2,
+     "name": "Pizzicato"
+    },
+    {
+     "idx": 4,
+     "off": 43992,
+     "kind": "timbre",
+     "type": 2,
+     "name": "Str Sect 2"
+    },
+    {
+     "idx": 5,
+     "off": 44248,
+     "kind": "timbre",
+     "type": 2,
+     "name": "Harp 2"
+    },
+    {
+     "idx": 6,
+     "off": 44504,
+     "kind": "timbre",
+     "type": 71,
+     "name": null
+    },
+    {
+     "idx": 7,
+     "off": 44760,
+     "kind": "timbre",
+     "type": 2,
+     "name": "Chorale"
+    },
+    {
+     "idx": 8,
+     "off": 45016,
+     "kind": "timbre",
+     "type": 71,
+     "name": null
+    },
+    {
+     "idx": 9,
+     "off": 45272,
+     "kind": "timbre",
+     "type": 71,
+     "name": null
+    },
+    {
+     "idx": 10,
+     "off": 45528,
+     "kind": "timbre",
+     "type": 71,
+     "name": null
+    },
+    {
+     "idx": 11,
+     "off": 45784,
+     "kind": "timbre",
+     "type": 71,
+     "name": null
+    },
+    {
+     "idx": 12,
+     "off": 46040,
+     "kind": "timbre",
+     "type": 71,
+     "name": null
+    },
+    {
+     "idx": 13,
+     "off": 46296,
+     "kind": "timbre",
+     "type": 71,
+     "name": null
+    },
+    {
+     "idx": 14,
+     "off": 46552,
+     "kind": "timbre",
+     "type": 71,
+     "name": null
+    },
+    {
+     "idx": 15,
+     "off": 46808,
+     "kind": "timbre",
+     "type": 71,
+     "name": null
+    },
+    {
+     "idx": 16,
+     "off": 47064,
+     "kind": "timbre",
+     "type": 71,
+     "name": null
+    },
+    {
+     "idx": 17,
+     "off": 47320,
+     "kind": "timbre",
+     "type": 71,
+     "name": null
+    },
+    {
+     "idx": 18,
+     "off": 47576,
+     "kind": "timbre",
+     "type": 71,
+     "name": null
+    },
+    {
+     "idx": 19,
+     "off": 47832,
+     "kind": "timbre",
+     "type": 71,
+     "name": null
+    },
+    {
+     "idx": 20,
+     "off": 48088,
+     "kind": "timbre",
+     "type": 71,
+     "name": null
+    },
+    {
+     "idx": 21,
+     "off": 48344,
+     "kind": "timbre",
+     "type": 71,
+     "name": null
+    },
+    {
+     "idx": 22,
+     "off": 48600,
+     "kind": "timbre",
+     "type": 71,
+     "name": null
+    },
+    {
+     "idx": 23,
+     "off": 48856,
+     "kind": "timbre",
+     "type": 71,
+     "name": null
+    },
+    {
+     "idx": 24,
+     "off": 49112,
+     "kind": "timbre",
+     "type": 71,
+     "name": null
+    },
+    {
+     "idx": 25,
+     "off": 49368,
+     "kind": "timbre",
+     "type": 71,
+     "name": null
+    },
+    {
+     "idx": 26,
+     "off": 49624,
+     "kind": "timbre",
+     "type": 71,
+     "name": null
+    },
+    {
+     "idx": 27,
+     "off": 49880,
+     "kind": "timbre",
+     "type": 71,
+     "name": null
+    },
+    {
+     "idx": 28,
+     "off": 50136,
+     "kind": "timbre",
+     "type": 71,
+     "name": null
+    },
+    {
+     "idx": 29,
+     "off": 50392,
+     "kind": "timbre",
+     "type": 71,
+     "name": null
+    },
+    {
+     "idx": 30,
+     "off": 50648,
+     "kind": "timbre",
+     "type": 71,
+     "name": null
+    },
+    {
+     "idx": 31,
+     "off": 50904,
+     "kind": "timbre",
+     "type": 71,
+     "name": null
+    }
+   ],
+   "fm": [
+    {
+     "idx": 0,
+     "off": 51160,
+     "kind": "fm",
+     "name": "LIFEBASS"
+    },
+    {
+     "idx": 1,
+     "off": 51224,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 2,
+     "off": 51288,
+     "kind": "fm",
+     "name": "STEELGT2"
+    },
+    {
+     "idx": 3,
+     "off": 51352,
+     "kind": "fm",
+     "name": "SYN2"
+    },
+    {
+     "idx": 4,
+     "off": 51416,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 5,
+     "off": 51480,
+     "kind": "fm",
+     "name": "HARP1"
+    },
+    {
+     "idx": 6,
+     "off": 51544,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 7,
+     "off": 51608,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 8,
+     "off": 51672,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 9,
+     "off": 51736,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 10,
+     "off": 51800,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 11,
+     "off": 51864,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 12,
+     "off": 51928,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 13,
+     "off": 51992,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 14,
+     "off": 52056,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 15,
+     "off": 52120,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 16,
+     "off": 52184,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 17,
+     "off": 52248,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 18,
+     "off": 52312,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 19,
+     "off": 52376,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 20,
+     "off": 52440,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 21,
+     "off": 52504,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 22,
+     "off": 52568,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 23,
+     "off": 52632,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 24,
+     "off": 52696,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 25,
+     "off": 52760,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 26,
+     "off": 52824,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 27,
+     "off": 52888,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 28,
+     "off": 52952,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 29,
+     "off": 53016,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 30,
+     "off": 53080,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 31,
+     "off": 53144,
+     "kind": "fm",
+     "name": null
+    }
+   ]
+  },
+  {
+   "name": "song3",
+   "tag": 53216,
+   "end": 67406,
+   "files": [
+    {
+     "file": "song3.bin",
+     "off": 53216,
+     "len": 14190,
+     "sha256": "0a945964b694f5b09164d7990a544584d1a9b9e5576b55b1cf3e29bc259671a6"
+    },
+    {
+     "file": "song3.hdr.bin",
+     "off": 53216,
+     "len": 280,
+     "sha256": "baa2d4509a50718f2b87167d9bea96f78a8e72b8ead60d184ef72768d4d540fc"
+    },
+    {
+     "file": "song3.table.bin",
+     "off": 53496,
+     "len": 512,
+     "sha256": "8382a4e1845542b12f05dc651a32842781c1a02c0aace850116c3a9dbfffe157"
+    },
+    {
+     "file": "song3.blocks.bin",
+     "off": 54008,
+     "len": 4744,
+     "sha256": "4edef092b3e9f7c65eb1ca01e2651d054aa41cdc4d774d5dd717d656189c94fb"
+    },
+    {
+     "file": "song3.timbres.bin",
+     "off": 59032,
+     "len": 6144,
+     "sha256": "d610f1e2b0b289b956df9a62843063fa64db3882195fe90993ecc9e6e690d72e"
+    },
+    {
+     "file": "song3.fm.bin",
+     "off": 65176,
+     "len": 2176,
+     "sha256": "601e12026e3852f1f0341f2bdfc9fcf7972812842f603b119035003308854e2a"
+    }
+   ],
+   "block_map": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24
+   ],
+   "para_table": [
+    32,
+    42,
+    57,
+    89,
+    117,
+    127,
+    137,
+    149,
+    165,
+    173,
+    186,
+    195,
+    208,
+    218,
+    228,
+    237,
+    252,
+    261,
+    271,
+    281,
+    292,
+    304,
+    316,
+    327,
+    336,
+    346
+   ],
+   "blocks": [
+    53728,
+    53888,
+    54128,
+    54640,
+    55088,
+    55248,
+    55408,
+    55600,
+    55856,
+    55984,
+    56192,
+    56336,
+    56544,
+    56704,
+    56864,
+    57008,
+    57248,
+    57392,
+    57552,
+    57712,
+    57888,
+    58080,
+    58272,
+    58448,
+    58592
+   ],
+   "instrument_base": 58752,
+   "timbre_start": 59032,
+   "fm_start": 65176,
+   "fm_end": 67352,
+   "timbres": [
+    {
+     "idx": 0,
+     "off": 59032,
+     "kind": "timbre",
+     "type": 2,
+     "name": "Deep Snare"
+    },
+    {
+     "idx": 1,
+     "off": 59288,
+     "kind": "timbre",
+     "type": 2,
+     "name": "Elec Perc1"
+    },
+    {
+     "idx": 2,
+     "off": 59544,
+     "kind": "timbre",
+     "type": 3,
+     "name": "HAT4"
+    },
+    {
+     "idx": 3,
+     "off": 59800,
+     "kind": "timbre",
+     "type": 2,
+     "name": "Sax 1"
+    },
+    {
+     "idx": 4,
+     "off": 60056,
+     "kind": "timbre",
+     "type": 2,
+     "name": "SquareWave"
+    },
+    {
+     "idx": 5,
+     "off": 60312,
+     "kind": "timbre",
+     "type": 2,
+     "name": "Trombone 1"
+    },
+    {
+     "idx": 6,
+     "off": 60568,
+     "kind": "timbre",
+     "type": 2,
+     "name": "Harpsi 2"
+    },
+    {
+     "idx": 7,
+     "off": 60824,
+     "kind": "timbre",
+     "type": 2,
+     "name": "Vibe 1"
+    },
+    {
+     "idx": 8,
+     "off": 61080,
+     "kind": "timbre",
+     "type": 2,
+     "name": "Str Sect 1"
+    },
+    {
+     "idx": 9,
+     "off": 61336,
+     "kind": "timbre",
+     "type": 3,
+     "name": "HAT4"
+    },
+    {
+     "idx": 10,
+     "off": 61592,
+     "kind": "timbre",
+     "type": 2,
+     "name": "JungleTune"
+    },
+    {
+     "idx": 11,
+     "off": 61848,
+     "kind": "timbre",
+     "type": 2,
+     "name": "Syn Mallet"
+    },
+    {
+     "idx": 12,
+     "off": 62104,
+     "kind": "timbre",
+     "type": 2,
+     "name": "Syn Brass4"
+    },
+    {
+     "idx": 13,
+     "off": 62360,
+     "kind": "timbre",
+     "type": 2,
+     "name": "Atmosphere"
+    },
+    {
+     "idx": 14,
+     "off": 62616,
+     "kind": "timbre",
+     "type": 2,
+     "name": "Flute 1"
+    },
+    {
+     "idx": 15,
+     "off": 62872,
+     "kind": "timbre",
+     "type": 2,
+     "name": "Syn Bass 1"
+    },
+    {
+     "idx": 16,
+     "off": 63128,
+     "kind": "timbre",
+     "type": 2,
+     "name": "Str Sect 2"
+    },
+    {
+     "idx": 17,
+     "off": 63384,
+     "kind": "timbre",
+     "type": 2,
+     "name": "Clavi 1"
+    },
+    {
+     "idx": 18,
+     "off": 63640,
+     "kind": "timbre",
+     "type": 2,
+     "name": "Syn Bass 1"
+    },
+    {
+     "idx": 19,
+     "off": 63896,
+     "kind": "timbre",
+     "type": 3,
+     "name": "HAT4"
+    },
+    {
+     "idx": 20,
+     "off": 64152,
+     "kind": "timbre",
+     "type": 3,
+     "name": "HAT4"
+    },
+    {
+     "idx": 21,
+     "off": 64408,
+     "kind": "timbre",
+     "type": 3,
+     "name": "TRAIN"
+    },
+    {
+     "idx": 22,
+     "off": 64664,
+     "kind": "timbre",
+     "type": 2,
+     "name": "Telephone"
+    },
+    {
+     "idx": 23,
+     "off": 64920,
+     "kind": "timbre",
+     "type": 3,
+     "name": "HAT4"
+    }
+   ],
+   "fm": [
+    {
+     "idx": 0,
+     "off": 65176,
+     "kind": "fm",
+     "name": "SNARE1"
+    },
+    {
+     "idx": 1,
+     "off": 65240,
+     "kind": "fm",
+     "name": "BDRUM1"
+    },
+    {
+     "idx": 2,
+     "off": 65304,
+     "kind": "fm",
+     "name": "PIANO1"
+    },
+    {
+     "idx": 3,
+     "off": 65368,
+     "kind": "fm",
+     "name": "LIFEBASS"
+    },
+    {
+     "idx": 4,
+     "off": 65432,
+     "kind": "fm",
+     "name": "SYN2"
+    },
+    {
+     "idx": 5,
+     "off": 65496,
+     "kind": "fm",
+     "name": "LIFEBASS"
+    },
+    {
+     "idx": 6,
+     "off": 65560,
+     "kind": "fm",
+     "name": "JAZZGUIT"
+    },
+    {
+     "idx": 7,
+     "off": 65624,
+     "kind": "fm",
+     "name": "MARIMBA1"
+    },
+    {
+     "idx": 8,
+     "off": 65688,
+     "kind": "fm",
+     "name": "SHRTVIBE"
+    },
+    {
+     "idx": 9,
+     "off": 65752,
+     "kind": "fm",
+     "name": "SHRTVIBE"
+    },
+    {
+     "idx": 10,
+     "off": 65816,
+     "kind": "fm",
+     "name": "SNRSUST"
+    },
+    {
+     "idx": 11,
+     "off": 65880,
+     "kind": "fm",
+     "name": "PHONE2"
+    },
+    {
+     "idx": 12,
+     "off": 65944,
+     "kind": "fm",
+     "name": "STEELGT1"
+    },
+    {
+     "idx": 13,
+     "off": 66008,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 14,
+     "off": 66072,
+     "kind": "fm",
+     "name": "KEYBRD2"
+    },
+    {
+     "idx": 15,
+     "off": 66136,
+     "kind": "fm",
+     "name": "SCRATCH"
+    },
+    {
+     "idx": 16,
+     "off": 66200,
+     "kind": "fm",
+     "name": "PIANO4"
+    },
+    {
+     "idx": 17,
+     "off": 66264,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 18,
+     "off": 66328,
+     "kind": "fm",
+     "name": "CROMORNE"
+    },
+    {
+     "idx": 19,
+     "off": 66392,
+     "kind": "fm",
+     "name": "CROMORNE"
+    },
+    {
+     "idx": 20,
+     "off": 66456,
+     "kind": "fm",
+     "name": "FUZGUIT2"
+    },
+    {
+     "idx": 21,
+     "off": 66520,
+     "kind": "fm",
+     "name": "HARPE1"
+    },
+    {
+     "idx": 22,
+     "off": 66584,
+     "kind": "fm",
+     "name": "JAVAICAN"
+    },
+    {
+     "idx": 23,
+     "off": 66648,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 24,
+     "off": 66712,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 25,
+     "off": 66776,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 26,
+     "off": 66840,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 27,
+     "off": 66904,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 28,
+     "off": 66968,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 29,
+     "off": 67032,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 30,
+     "off": 67096,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 31,
+     "off": 67160,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 32,
+     "off": 67224,
+     "kind": "fm",
+     "name": null
+    },
+    {
+     "idx": 33,
+     "off": 67288,
+     "kind": "fm",
+     "name": null
+    }
+   ]
+  }
+ ]
+}
