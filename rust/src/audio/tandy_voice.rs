@@ -10,22 +10,30 @@ const VIB_TAB: u16 = 0x847;
 const ENV_TAB: u16 = 0x87C;
 
 impl<P: Ports> Tandy<P> {
-    /// `0x115E` — one channel's render: `≥ 0xD0`-latched channels (2
-    /// and 3) run the sfx engine while `[0x24]`'s `0x81` bits hold —
-    /// note the `0x80` sign-bit test on the masked result, so the
-    /// transient `1` written at sfx load renders as music/silence.
-    pub(super) fn voice(&mut self, c: usize) {
-        if self.chans[c].vlatch >= 0xD0 && self.sfx_on & 0x81 == 0x81 {
-            self.sfx(c);
-        } else {
+    /// File `0x1DAE` — one channel's render dispatch: `≥ 0xD0`-latched
+    /// channels (2 and 3) take the sfx path while `[0x24] & 0x81` is
+    /// nonzero, and the `test`'s sign bit decides which — set → the
+    /// `0x1CD8` engine, clear → a `jns` to the `0x1CBC` `ret`. Both
+    /// leave the render loop early (`true`); only the sfx `end`-hit
+    /// fall-through to `music` carries on to the next channel.
+    pub(super) fn voice(&mut self, c: usize) -> bool {
+        if self.chans[c].vlatch < 0xD0 {
             self.music(c);
+            return false;
         }
+        let masked = self.sfx_on & 0x81;
+        if masked == 0 {
+            self.music(c);
+        } else if masked & 0x80 != 0 {
+            return self.sfx(c);
+        }
+        masked != 0
     }
 
-    /// `0x116E` — the music render: unarmed → `vlatch|0xF` mute;
-    /// else env step, the `stc; adc [0x26]` volume fold (carry keeps
-    /// the wrapped sum, else `0`), vibrato, transpose (ch3 skips
-    /// `[0x2B]`), then the channel's tone write.
+    /// File `0x1DBE` — the music render: unarmed → `vlatch|0xF` mute
+    /// (`0x1D4C`); else env step, the `stc; adc [0x26]` volume fold
+    /// (carry keeps the wrapped sum, else `0`), vibrato, transpose
+    /// (ch3 skips `[0x2B]`), then the channel's tone write.
     pub(super) fn music(&mut self, c: usize) {
         if self.mus == 0 {
             self.ports.outb(0xC0, self.chans[c].vlatch | 0xF);
@@ -43,9 +51,9 @@ impl<P: Ports> Tandy<P> {
         self.tone(c, al);
     }
 
-    /// `0x1206`/`0x115F` — the tone tail: ch3's note byte becomes the
-    /// noise-register value `0xE0 | note&0xF`; 0–2 run tremolo/sweep
-    /// then the `cs:0x5C[note] + run` 10-bit divisor write.
+    /// `0x1D56` — the tone tail: `loop` lands ch3 (`cx` = 0) on the
+    /// `0x1D58` noise-register write (`0xE0 | note&0xF`); 0–2 run
+    /// tremolo/sweep then the `cs:0x5C[note] + run` 10-bit divisor.
     fn tone(&mut self, c: usize, al: u8) {
         if c == 3 {
             self.ports.outb(0xC0, al & 0xF | 0xE0);
@@ -58,7 +66,7 @@ impl<P: Ports> Tandy<P> {
         self.twrite(tl, dx);
     }
 
-    /// `0x11ED` — the `cs:0x7E2` tremolo/`+0x12` sweep accumulation:
+    /// `0x1D8C` — the `cs:0x7E2` tremolo/`+0x12` sweep accumulation:
     /// returns the new `run` (signed table value + sweep delta when
     /// `scount` wraps and flag `8` holds).
     fn trem_run(&mut self, c: usize) -> u16 {
@@ -76,7 +84,7 @@ impl<P: Ports> Tandy<P> {
         ax
     }
 
-    /// `0x1217` — the tremolo seq: `{wait, val}` pairs at `cs:0x7E2`;
+    /// `0x1D67` — the tremolo seq: `{wait, val}` pairs at `cs:0x7E2`;
     /// `val` is the per-tick `run` increment. A `0` wait byte loops
     /// the cursor to the index stored in `val`'s place.
     fn trem(&mut self, c: usize) -> u8 {
@@ -97,7 +105,7 @@ impl<P: Ports> Tandy<P> {
         al
     }
 
-    /// `0x1233` — the vibrato byte: positive values `advance` the
+    /// `0x1DD9` — the vibrato byte: positive values `advance` the
     /// cursor and offset the note; `0xFF` ends it (no offset, cursor
     /// held); other negatives give `val + 0x80` and loop the cursor
     /// to `+0x1A`. The `+0x1B` cursor indexes `cs:0x847 + cursor + 1`.
@@ -117,7 +125,7 @@ impl<P: Ports> Tandy<P> {
         al
     }
 
-    /// `0x12CA` — one envelope step: `evol += cs:0x87C[ecur]` each
+    /// `0x1E1A` — one envelope step: `evol += cs:0x87C[ecur]` each
     /// tick; `ewait` expiry reloads from `+1` and walks the cursor
     /// two bytes. `ewait 0` leaves the envelope frozen.
     pub(super) fn env(&mut self, c: usize) {
@@ -137,12 +145,12 @@ impl<P: Ports> Tandy<P> {
         }
     }
 
-    /// `0x11ED` — attenuation write: `~v >> 4 | latch` to `0xC0`.
+    /// `0x1D3D` — attenuation write: `~v >> 4 | latch` to `0xC0`.
     pub(super) fn vol(&mut self, latch: u8, v: u8) {
         self.ports.outb(0xC0, latch | (0xFF - v) >> 4);
     }
 
-    /// `0x12B5` — the 10-bit tone pair: `latch | (d & 0xF)` then
+    /// `0x1E05` — the 10-bit tone pair: `latch | (d & 0xF)` then
     /// `d >> 6` (the `shr dx,2; shr al,2` top-six-bits).
     pub(super) fn twrite(&mut self, latch: u8, d: u16) {
         self.ports.outb(0xC0, latch | (d & 0xF).to_le_bytes()[0]);

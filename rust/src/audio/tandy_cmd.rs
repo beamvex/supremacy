@@ -29,7 +29,7 @@ impl<P: Ports> Tandy<P> {
         al
     }
 
-    /// `ah=1` — file `0x1FFC`: disarm both engines, then mute all
+    /// `ah=1` — file `0x1CAC`: disarm both engines, then mute all
     /// four attenuators (`0x9F` stepping `0x20` to `0xFF`).
     pub fn stop(&mut self) {
         self.mus = 0;
@@ -45,7 +45,7 @@ impl<P: Ports> Tandy<P> {
         }
     }
 
-    /// `ah=2, al` — file `0x1E79`: stop, clear the records (only the
+    /// `ah=2, al` — file `0x1AC9`: stop, clear the records (only the
     /// first 14 words — the `+0x1C`/`+0x1D` latch tails persist),
     /// load `{tempo, list0..3}` from `cs:0x93E + al·9`, arm `[0x23]`.
     pub fn song(&mut self, al: u8) {
@@ -77,11 +77,12 @@ impl<P: Ports> Tandy<P> {
         self.mus = self.mus.wrapping_sub(1);
     }
 
-    /// `ah=3, al` — file `0x1EDC`: the `0x14`-byte record at
+    /// `ah=3, al` — file `0x1B2C`: the `0x14`-byte record at
     /// `cs:0x4EA + al·0x14` seeds the `[0x2C..0x34]` sfx block, forces
-    /// ch2's envelope cursor to `cs:0x85F[al·0x14 >> 8]` with
-    /// `ewait 1` (the `[0x134]` word write clears `evol` too — the
-    /// `imul` left the product's high byte in `bl`), `[0x24] = 0xFF`.
+    /// ch2's envelope cursor to `cs:0x85F[rec+0x11]` with `ewait 1`
+    /// (the `[0x134]` word write clears `evol` too; `bl = ah` is the
+    /// last `lodsw`'s high half, not the `imul` product's), then
+    /// `[0x24] = 0xFF` — the `1` written mid-load is transient.
     pub fn effect(&mut self, al: u8) {
         let di = SFX_TAB + u16::from(al) * 0x14;
         self.srec = di;
@@ -93,11 +94,11 @@ impl<P: Ports> Tandy<P> {
         self.end = self.d8(di + 0x12);
         self.chans[2].ewait = 1;
         self.chans[2].evol = 0;
-        self.chans[2].ecur = self.d8(ENV_TAB + u16::from(al) * 0x14 / 0x100);
+        self.chans[2].ecur = self.d8(ENV_TAB + u16::from(self.d8(di + 0x11)));
         self.sfx_on = 0xFF;
     }
 
-    /// `0xEB4` — the cell path: `0x20..0x30` reads `cs:0x23 + i`,
+    /// `0x1AB4` — the cell path: `0x20..0x30` reads `cs:0x23 + i`,
     /// `0x30..` writes it (`bl` had `0x30` folded in before the jump).
     fn cell_io(&mut self, ah: u8, al: u8) -> u8 {
         if ah >= 0x30 {
@@ -108,7 +109,8 @@ impl<P: Ports> Tandy<P> {
         }
     }
 
-    /// `cs:0x23 + i` read — the named driver cells.
+    /// `cs:0x23 + i` read — the named driver cells; `0x2C..0x34`
+    /// (i `9..0x12`) is the sfx block.
     fn cell_get(&self, i: u8) -> u8 {
         match i {
             0 => self.mus,
@@ -120,6 +122,15 @@ impl<P: Ports> Tandy<P> {
             6 => self.step_acc,
             7 => self.beat,
             8 => self.gtrans,
+            9 => self.srec.to_le_bytes()[0],
+            10 => self.srec.to_le_bytes()[1],
+            11 => self.bcnt,
+            12 => self.pcnt,
+            13 => self.sel,
+            14 => self.vsel,
+            15 => self.cur.to_le_bytes()[0],
+            16 => self.cur.to_le_bytes()[1],
+            17 => self.end,
             _ => self.scratch[usize::from(i & 7)],
         }
     }
@@ -136,6 +147,15 @@ impl<P: Ports> Tandy<P> {
             6 => self.step_acc = v,
             7 => self.beat = v,
             8 => self.gtrans = v,
+            9 => self.srec = self.srec & 0xFF00 | u16::from(v),
+            10 => self.srec = self.srec & 0x00FF | u16::from(v) << 8,
+            11 => self.bcnt = v,
+            12 => self.pcnt = v,
+            13 => self.sel = v,
+            14 => self.vsel = v,
+            15 => self.cur = self.cur & 0xFF00 | u16::from(v),
+            16 => self.cur = self.cur & 0x00FF | u16::from(v) << 8,
+            17 => self.end = v,
             _ => self.scratch[usize::from(i & 7)] = v,
         }
     }

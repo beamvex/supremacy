@@ -3,9 +3,10 @@ use super::{Ports, Tandy};
 impl<P: Ports> Tandy<P> {
     /// The `cs:0x36` opcode table — 14 real entries (`0x80..0x8D`);
     /// `0x8E..` indexes past it onto the dispatch/`freq` tables — the
-    /// asm jumps wild, the port ends the decode instead. Returns
+    /// asm jumps wild, the port ends the decode instead. `0x86` never
+    /// reaches here (`step` runs it — it exits the tick). Returns
     /// `true` when the channel's decode is done for this step:
-    /// `0x80`/`0x88` run the `0x1095` tail, `0x86` ends the module.
+    /// `0x80`/`0x88` run the `0x1C95` tail.
     pub(super) fn opcode(&mut self, c: usize, op: u8, dl: &mut u8, si: &mut u16) -> bool {
         match op {
             0x80 => self.op_mute(c),
@@ -14,7 +15,6 @@ impl<P: Ports> Tandy<P> {
             0x83 => *dl |= 0xC0,
             0x84 => *dl |= 0x40,
             0x85 => self.op_next(c, si),
-            0x86 => return self.op_end(),
             0x87 => self.byte(si, |s, v| s.gtrans = v),
             0x88 => {}
             0x89 => self.op_nadd(c, si),
@@ -38,16 +38,18 @@ impl<P: Ports> Tandy<P> {
         f(self, v);
     }
 
-    /// `0x104B` — `0x80` mute: freeze the envelope (`ewait = 0`)
-    /// unless the sfx engine owns the channel (`latch ≥ 0xD0` while
-    /// `[0x24]` armed) — then tail.
+    /// `0x1C4B` — `0x80` mute: freeze the envelope (the
+    /// `mov word [di+0xC],0` clears `ewait` and `evol`) unless the
+    /// sfx engine owns the channel (`latch ≥ 0xD0` while `[0x24]`
+    /// armed) — then tail.
     fn op_mute(&mut self, c: usize) {
         if self.chans[c].vlatch < 0xD0 || self.sfx_on == 0 {
             self.chans[c].ewait = 0;
+            self.chans[c].evol = 0;
         }
     }
 
-    /// `0xFC0` — `0x82` sweep: word `+0x0E`, byte `+0x12`, flag `8`.
+    /// `0x1BC0` — `0x82` sweep: word `+0x0E`, byte `+0x12`, flag `8`.
     fn op_sweep(&mut self, c: usize, dl: &mut u8, si: &mut u16) {
         self.chans[c].sdelta = self.d16(*si);
         *si = si.wrapping_add(2);
@@ -56,7 +58,7 @@ impl<P: Ports> Tandy<P> {
         *dl |= 8;
     }
 
-    /// `0xFA2` — `0x85` next stream: `list+2`, `0` word wraps to base.
+    /// `0x1BA2` — `0x85` next stream: `list+2`, `0` word wraps to base.
     fn op_next(&mut self, c: usize, si: &mut u16) {
         let mut s = self.chans[c].list.wrapping_add(2);
         if self.d16(s) == 0 {
@@ -66,22 +68,22 @@ impl<P: Ports> Tandy<P> {
         *si = self.d16(s);
     }
 
-    /// `0x1FF7` — `0x86` end: `stop`, then one render + gate pass
-    /// (the asm pops the step frame and pushes the `0x243` tick tail).
-    fn op_end(&mut self) -> bool {
+    /// `0x1CA7` — `0x86` end: `stop`, then one render + gate pass
+    /// (the asm pops the step frame and pushes the `cs:0x243` =
+    /// `0x1B93` tick tail).
+    pub(super) fn op_end(&mut self) {
         self.stop();
         self.render();
         self.gate();
-        true
     }
 
-    /// `0xFD3` — `0x89` note-add word → `+0x18` (`run`'s reload).
+    /// `0x1BD3` — `0x89` note-add word → `+0x18` (`run`'s reload).
     fn op_nadd(&mut self, c: usize, si: &mut u16) {
         self.chans[c].nadd = self.d16(*si);
         *si = si.wrapping_add(2);
     }
 
-    /// `0xFE7` — `0x8B` new list: the operand word IS a list
+    /// `0x1BE7` — `0x8B` new list: the operand word IS a list
     /// pointer — base/cursor both replaced, stream = `[list]`.
     fn op_list(&mut self, c: usize, si: &mut u16) {
         let s = self.d16(*si);
@@ -90,7 +92,7 @@ impl<P: Ports> Tandy<P> {
         *si = self.d16(s);
     }
 
-    /// `0xFF3` — `0x8C` tempo operand → `[0x27]`/`[0x28]`.
+    /// `0x1BF3` — `0x8C` tempo operand → `[0x27]`/`[0x28]`.
     fn op_tempo(&mut self, si: &mut u16) {
         self.tempo = self.d8(*si);
         self.tempo0 = self.tempo;

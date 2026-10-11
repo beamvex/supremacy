@@ -1,4 +1,4 @@
-//! GAM-29 — the Tandy `int 0x80` driver (`audio::Tandy`, file
+//! GAM-29/38 — the Tandy `int 0x80` driver (`audio::Tandy`, file
 //! `0x1950`): the `ah`-dispatch contract (tick/stop/song/sfx/resume
 //! plus the `ah ≥ 0x20` cell peek/poke), the four-channel tracker
 //! rendered to the SN76489 on `0xC0`, and the `0x61 | 0x60` enable
@@ -125,6 +125,78 @@ fn song_tick_drives_psg_tone_writes() {
     // Channel tone latches (`0x80/0xA0` + low nibble) and attenuators.
     assert!(psg.iter().any(|&v| v & 0xF0 == 0x80 || v & 0xF0 == 0xA0));
     assert!(psg.iter().any(|&v| v & 0x90 == 0x90));
+}
+
+#[test]
+fn cell_path_reaches_the_sfx_block() {
+    let mut t = Tandy::new(Rec::new(), img().as_slice());
+    t.dispatch(3, 0); // sfx record 0: bcnt 2, pcnt 1, sel 0x55, cur 0x03F0
+    assert_eq!(t.dispatch(0x29, 0), 0xEA); // `[0x2C]` srec lo (0x4EA)
+    assert_eq!(t.dispatch(0x2B, 0), 0x02); // `[0x2E]` bcnt
+    assert_eq!(t.dispatch(0x2C, 0), 0x01); // `[0x2F]` pcnt
+    assert_eq!(t.dispatch(0x2D, 0), 0x55); // `[0x30]` sel
+    assert_eq!(t.dispatch(0x2F, 0), 0xF0); // `[0x32]` cur lo
+    t.dispatch(0x3B, 7); // `[0x2E]` = 7
+    assert_eq!(t.dispatch(0x2B, 0), 7);
+}
+
+#[test]
+fn beat_overflow_renders_nothing_but_the_gate() {
+    let mut t = Tandy::new(Rec::new(), img().as_slice());
+    t.dispatch(2, 0); // arm the music engine
+    t.dispatch(0x32, 0xFF); // `[0x25]` pace — every other tick overflows
+    t.dispatch(0, 0); // `[0x2A]` = 0xFF — still a normal tick
+    t.ports.ops.clear();
+    t.dispatch(0, 0); // overflow → `jc` to the gate: no `0xC0` traffic
+    assert!(t.ports.ops.iter().all(|&(is_in, p, _)| p == 0x61 || is_in));
+    assert!(t.ports.outs().iter().all(|&(p, _)| p == 0x61));
+}
+
+#[test]
+fn sfx_sweep_runs_once_per_tick() {
+    let mut t = Tandy::new(Rec::new(), img().as_slice());
+    t.dispatch(3, 0);
+    t.ports.ops.clear();
+    t.dispatch(0, 0);
+    // ch2's sfx `ret` pops the render call — one `0xE7` noise write,
+    // not one per sweep channel.
+    let noise = t
+        .ports
+        .outs()
+        .iter()
+        .filter(|&&(p, v)| p == 0xC0 && v == 0xE7)
+        .count();
+    assert_eq!(noise, 1);
+}
+
+#[test]
+fn sfx_transient_one_skips_the_channel() {
+    let mut t = Tandy::new(Rec::new(), img().as_slice());
+    t.dispatch(0x31, 1); // `[0x24]` = 1 — masked `0x81` without bit7
+    t.dispatch(0, 0);
+    // `jns` to the `0x1CBC` `ret`: ch0/1 mute as music, the render
+    // stops at ch2 — no ch2/ch3 writes at all.
+    assert_eq!(t.ports.outs(), [(0xC0, 0x9F), (0xC0, 0xBF), (0x61, 0x60)]);
+}
+
+#[test]
+fn sfx_end_falls_back_to_music_and_finishes_the_pass() {
+    let mut t = Tandy::new(Rec::new(), img().as_slice());
+    t.dispatch(3, 0);
+    t.dispatch(0x41, 1); // `[0x34]` end = 1 — next tick disarms
+    t.dispatch(0, 0);
+    // The `end` hit renders ch2 as music and the pass continues —
+    // all four `vlatch|0xF` mutes land.
+    assert_eq!(
+        t.ports.outs(),
+        [
+            (0xC0, 0x9F),
+            (0xC0, 0xBF),
+            (0xC0, 0xDF),
+            (0xC0, 0xFF),
+            (0x61, 0x60)
+        ]
+    );
 }
 
 #[test]

@@ -1,18 +1,22 @@
 use super::{Ports, Tandy};
 
 impl<P: Ports> Tandy<P> {
-    /// `0x1186` — the two-voice sfx engine, run per `≥ 0xD0`-latched
-    /// channel (twice a tick): `end` countdown, `cur` sweep with the
+    /// `0x1CD6` — the two-voice sfx engine, entered on the first
+    /// `≥ 0xD0`-latched channel (ch2 — it renders once a tick; its
+    /// `0x1D4B` `ret` pops the render call, so the channels after it
+    /// are skipped): `end` countdown, `cur` sweep with the
     /// `sel`-picked phase delta and `bcnt`-paced `reset`, divisor to
     /// ch3's latch + `0xE7` noise, ch2's `evol` as volume onto the
-    /// `vsel`-picked channel — its partner muted.
-    pub(super) fn sfx(&mut self, c: usize) {
+    /// `vsel`-picked channel — its partner muted. Returns `false`
+    /// when the `end`-hit path fell through to `music` — the render
+    /// continues to the next channel like the asm's `jmp 0x1DBE`.
+    pub(super) fn sfx(&mut self, c: usize) -> bool {
         if self.end != 0 {
             self.end -= 1;
             if self.end == 0 {
                 self.sfx_off();
                 self.music(c);
-                return;
+                return false;
             }
         }
         self.env(c);
@@ -20,9 +24,10 @@ impl<P: Ports> Tandy<P> {
         let (w, m) = self.vsel_pick();
         self.vol(w, self.chans[2].evol);
         self.vol(m, 0);
+        true
     }
 
-    /// `0x1196`–`0x11D1` — the sweep divisor: `cur + add`, the
+    /// `0x1CE7`–`0x1D26` — the sweep divisor: `cur + add`, the
     /// `pcnt`-paced `sel` phase delta (`+6`/`+8`), the `bcnt`-paced
     /// `+2` `reset`, `| +4` or-mask, then ch3 tone pair + `0xE7` noise.
     fn sweep(&mut self) {
@@ -45,7 +50,7 @@ impl<P: Ports> Tandy<P> {
         self.ports.outb(0xC0, 0xE7);
     }
 
-    /// `0x11D8` — the `vsel` rotate picks which of ch2 (`0xD0`) /
+    /// `0x1D2B` — the `vsel` rotate picks which of ch2 (`0xD0`) /
     /// ch3 (`0xF0`) gets the sfx volume; carry → ch3.
     fn vsel_pick(&mut self) -> (u8, u8) {
         let pick = self.vsel & 1 != 0;
@@ -57,8 +62,9 @@ impl<P: Ports> Tandy<P> {
         }
     }
 
-    /// `0x1175` — `end` hit: disarm and zero both sweep channels'
-    /// env counters (the `bx=0` word writes), then render as music.
+    /// `0x1CC5` — `end` hit: disarm and zero both sweep channels'
+    /// env counters (the `bx=0` word writes at `[0x134]`/`[0x152]`),
+    /// then render as music.
     fn sfx_off(&mut self) {
         self.sfx_on = 0;
         for i in 2..4 {

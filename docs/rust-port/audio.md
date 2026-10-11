@@ -90,6 +90,40 @@ concrete `Ports`; the driver's tick is fed at ~50 Hz — the
 PIT channel 0 with divisor `0x5CEC`. The A/R module has its own
 timer install (file `0x3552`, `cs:[0x1C00] = 0x5D37`).
 
+## `Tandy<P: Ports>` — Tandy 3-voice tracker (`tandy.rs` + `tandy_*.rs`)
+
+The `int 0x80` driver module at file `0x1950` (image `0x0D50`,
+installed at `[0x156] = 0xD5`). Same `ah`-dispatch contract as `Pc`
+(`tandy_cmd.rs`, table `cs:0x52`): `ah=0` tick, `ah=1` stop, `ah=2`/`al`
+song (9-byte records at `cs:0x93E`), `ah=3`/`al` sfx (`0x14`-byte
+records at `cs:0x4EA`), `ah=4` resume; `ah ≥ 0x20` is the
+`[bx+0x23]` cell peek/poke (`0x1AB4`) covering the driver cells
+`[0x23..0x34]` — engine flags, tempo/pace gate, and the sfx block.
+
+- `tick` (`tandy_tick.rs`, file `0x1B6B`) — `[0x2A] += [0x25]` paces
+  the engine: a carry jumps straight to the `0x61 | 0x60` sound-enable
+  tail, so overflow ticks render nothing. Otherwise `[0x29] += [0x27]`
+  overflow steps all four `0x1E`-byte `TChan` records
+  (`cs:0xEC + 0x1E·i`), then the render pass.
+- `step`/`opcode` (`tandy_step.rs`, `tandy_ops.rs`, file `0x1C02` +
+  table `cs:0x36`) — the stream decode: `< 0x80` notes (bit7-tied
+  notes skip the vibrato/envelope reset), `0x80..0x8D` opcodes (mute,
+  tremolo, sweep, slide, list/next-stream, transpose, tempo, master
+  volume), `0xA0..` selects. `0x86` pops the step frame — `stop` +
+  one render/gate pass ends the tick outright.
+- `voice`/`music` (`tandy_voice.rs`, file `0x1DAE`/`0x1DBE`) — env
+  (`cs:0x87C` `{add,wait}` pairs seeded via `cs:0x85F`), the
+  `stc; adc` master-volume fold, tremolo (`cs:0x7E2`), vibrato
+  (`cs:0x847`), sweep, transpose (ch3 skips `[0x2B]`). Rendered to
+  the SN76489 on `0xC0`: tone latches `0x80/0xA0/0xC0`, noise `0xE0`,
+  attenuators `0x90/0xB0/0xD0/0xF0`.
+- `sfx` (`tandy_sfx.rs`, file `0x1CD8`) — the two-voice sweep on the
+  `≥ 0xD0`-latched channels, gated on `[0x24] & 0x81` (the `test`'s
+  sign bit picks engine vs a bare `ret` — the transient `1` skips the
+  channel silently). It runs once a tick inside ch2's render slot:
+  its `ret` pops the render call, so ch3 is skipped while it holds;
+  the `end` countdown disarms and falls back to `music`.
+
 ## `Ar<P: Ports>` — AdLib/Roland driver (`ar.rs` + `ar_*.rs`)
 
 The C-compiled file-`0x2900` module (image `0x1D00`, installed at

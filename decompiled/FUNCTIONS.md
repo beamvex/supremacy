@@ -121,6 +121,68 @@ module — the install sets `int 0x80` = `(loadbase + [0x156]):0`
   `call far [cs:0x1280]`; `0x38A80` `ah=2`/`0` gated on `[0x91D3]==0`;
   `0x38AA7` `ah=0x32`/`0x33` `al=0`.
 
+## The Tandy module (file `0x1950` segment) — routine map (GAM-38)
+
+`cs:` below = module-relative (file = `cs` + `0x1950`). Four `0x1E`-byte
+channel records at `cs:0xEC`/`0x10A`/`0x128`/`0x146`; SN76489 on `0xC0`.
+Driver cells `[0x23..0x34]`: `[0x23]` music arm, `[0x24]` sfx arm,
+`[0x25]` pace, `[0x26]` master vol, `[0x27]`/`[0x28]` tempo copies,
+`[0x29]` step acc, `[0x2A]` gate acc, `[0x2B]` gtrans, `[0x2C]` srec,
+`[0x2E]` bcnt, `[0x2F]` pcnt, `[0x30]` sel, `[0x31]` vsel, `[0x32]` cur,
+`[0x34]` end.
+
+- `cs:0x000` (file `0x1950`) int-80 entry: `ah<0x20` →
+  `call [ah*2+0x52]`; `ah≥0x20` → `0x164` cell path (`sub bl,0x30`:
+  `<0x30` reads `[bx+0x23]` with `bl=ah−0x20`, else writes it). Dispatch
+  table `cs:0x52`: `0`=tick `0x21B`, `1`=stop `0x35C`, `2`=song `0x179`,
+  `3`=sfx `0x1DC`, `4`=resume `0x36D` (`[0x23]=0xFF`); a 6th "entry" is
+  the `cs:0x5C` freq table's first word — `ah≥5` jumps wild.
+- `0x179` (file `0x1AC9`) song: `stop`, `rep stosw` 14 words per record
+  (latch pair `+0x1C/+0x1D` survives), `{tempo, list0..3}` from
+  `cs:0x93E + al·9`, `wait=1`, `[0x26]=0xFF`, `[0x29]=0xFF`, `dec [0x23]`.
+- `0x1DC` (file `0x1B2C`) sfx: `0x14`-byte record `cs:0x4EA + al·0x14` →
+  `[0x24]=1` (transient), srec/bcnt/pcnt/sel/vsel/cur/end off
+  `+0x0C..+0x12`; `[0x134]` word write = ch2 `ewait=1`+`evol=0`;
+  `bl=ah` (the last `lodsw` high half = record `+0x11`) →
+  `[0x133]` ecur = `[0x85F+bl]`; then `[0x24]=0xFF`.
+- `0x21B` (file `0x1B6B`) tick: `[0x2A]+=[0x25]` — carry jumps to the
+  `0x61` tail (`0x24B`, `or 0x60`) skipping everything; else `[0x23]≠0`
+  and `[0x29]+=[0x27]` carry → `call 0x2B2` per channel; then
+  `call 0x45E` render, `0x61` gate.
+- `0x2B2` (file `0x1C02`) step: `+8` wait dec; nonzero → `0x2E9` slide
+  (`flags 0x40`, `0x80`=down, `+0x16 ±1`). Decode `lodsb` at `+6`:
+  `<0x80` → `0x30E` note; `0x80..0x9F` → `jmp [al*2+0x36]` (table
+  `cs:0x36`, 14 real entries — `0x8E..` runs onto `cs:0x52`); `≥0xA0` →
+  twin `+0x20` adds: carry → `+9` reload (`0xE0..`), carry → `+0xA`
+  esel (`0xC0..`), else `+0x1A` inst = `[0x762 + byte+0x40]` (`0xA0..`).
+  `0x30E` note: `+0x14`=`+0x13` tcur, `+0x15`=`[0x7E2+tsel]`; OLD `+0x16`
+  bit7 tied → `0x345` tail only; else `+0x1B`=`+0x1A`, env reset
+  (`+0xB`=`[0x85F+esel]`, `word +0xC`=1 ⇒ ewait=1, evol=0) unless
+  latch≥`0xD0` while `[0x24]` armed. `0x345` tail: `+0x10`=`+0x18`,
+  `+8`=`+9`, `+0`=dl, `+6`=si.
+- `0x45E` (file `0x1DAE`) render, `cx`=4→0 via in-body `loop`s:
+  latch≥`0xD0` + `test [0x24],0x81` nonzero → `0x386`; the sign bit then
+  picks `0x388` engine vs `0x36C` bare `ret` (masked `1` skips the
+  channel AND the pass). Else `0x46E` music: `[0x23]==0` → `0x3FC`
+  `vlatch|0xF`; env `0x4CA`, `stc;adc [0x26]` vol fold → `0x3ED` write,
+  vib `0x489`, `+[0x2B]` (skip when `di==0x146`), `+[+0x17]` → `0x406`
+  `loop` — `cx=0` lands the `0x408` noise write `0xE0|al&0xF`, else
+  `0x40F` trem (`0x7E2` pairs)/sweep (`+0xE` when `+0x12` wraps &
+  flag 8) → `0x5C[note]+[+0x10]` → `0x4B5` 10-bit pair.
+- `0x386`/`0x388` (file `0x1CD6`) sfx engine: `[0x34]` dec → `0` →
+  `0x375` disarm (`[0x24]=0`, `[0x134]`/`[0x152]` word-zero) → `0x46E`.
+  Else env, `dx=[0x32]+[di]`; `[0x2F]`-paced `ror [0x30]` picks `+6`/`+8`
+  phase delta; `[0x2E]`-paced `+2` reset; `|+4` → `0x4B5` ch3 pair +
+  `0xE7` noise; `[0x135]` evol → `0x3ED` onto `ror [0x31]`-picked
+  `0xD0`/`0xF0`, partner `xor 0x20` muted — `ret` ends the render.
+- `0x2FB` (file `0x1C4B`) op `0x80`: `word +0xC`=0 (ewait+evol) unless
+  sfx-owned. `0x357` (file `0x1CA7`) op `0x86`: `pop ax` (step frame) +
+  `push 0x243` (the `0x1B93` render+gate tail) → falls into `0x35C`
+  `stop`: `[0x23]`/`[0x24]`=0, `0x9F`+`0x20` mutes ×4 on `0xC0`.
+- Data: freq table `cs:0x5C`, chans `cs:0xEC`, trem `cs:0x7E2`, vib
+  `cs:0x847`, esel→ecur `cs:0x85F`, env `cs:0x87C`, sfx recs `cs:0x4EA`
+  (`0x14`), song recs `cs:0x93E` (`9`).
+
 ## Device drivers inside the A/R module (file `0x2900` segment)
 
 - `0x3EFD` `opl_write(ax)`: `ah`=reg, `al`=data — `0x388`←reg, 6 status
