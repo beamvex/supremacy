@@ -15,6 +15,9 @@
 //! - `[0x1262]`/`[0x1268]` → the popup frame through
 //!   [`Screen::put_pixel`] / the glyph put via `font::draw`, which
 //!   replays the mode's packed/planar record merge byte-for-byte.
+//! - `Call::Sound`/`Call::Chan`/`Call::Sfx` → [`Audio`] — the ported
+//!   `int 0x80` driver over the synth bus; `window` renders it to a
+//!   stream (GAM-31).
 //! - `Call::Load` → [`Loader`] (`front/load.rs`) — the int-21 asset
 //!   loaders' `ds:0x1208`+ cell → `{stem}{sfx}.{BIN,GPH}` swap
 //!   (GAM-33).
@@ -22,8 +25,7 @@
 //!   `Call::Stars` → `front/stars.rs` — the `cs:0x4EC4` starfield.
 //! - `[0x1264]`/`[0x125E]`/`[0x1266]` stay stubs — the refresh-list copy
 //!   and palette flushes are presentation details the window's
-//!   per-frame blit supersedes (GAM-7/GAM-9); `Sound`/`Chan`/`Sfx`/
-//!   `Song`/`SndReset` count `dropped` until the GAM-31 audio layer.
+//!   per-frame blit supersedes (GAM-7/GAM-9).
 //!
 //! `cs:` word reads map `+0x30000` like the rest of the port. The
 //! `VmHost` impl and per-call bodies live in [`svc`].
@@ -37,6 +39,7 @@ use crate::assets::AssetSet;
 use crate::palette::Palette;
 use crate::video::Screen;
 
+use super::audio::{Audio, BOOT_RATE};
 use super::{load::Loader, stars::Stars, Pump};
 
 /// The concrete host — owns the visible framebuffer and input state.
@@ -52,9 +55,9 @@ pub struct Host {
     /// Unpacked `GAME.EXE` bytes — source for `cs_word` and the `ds:`
     /// font tables `font::draw` slices.
     pub img: Vec<u8>,
-    /// The `[0x155]` device selector (`S` arg) — reserved for the
-    /// GAM-31 audio backend.
-    pub sound: Sound,
+    /// The sound backend — `Call::Sound`/`Chan`/`Sfx` map onto the
+    /// ported `int 0x80` driver; `window` renders `snd` to a stream.
+    pub snd: Audio,
     /// Ink for the `[0x1262]` popup-frame outline.
     pub ink: u8,
     /// Calls dropped because the port doesn't model them yet.
@@ -70,9 +73,8 @@ pub struct Host {
 }
 
 impl Host {
-    /// A host for `mode` with the given assets/image/palette; `k_mode`
-    /// is the keyboard-mouse `K` arg and `snd` the `[0x155]` `S`
-    /// device selector.
+    /// A host for `mode` with the given assets/image/palette; `snd` is
+    /// the `[0x155]` device selector (`S` arg).
     #[must_use]
     pub fn new(
         scr: Screen,
@@ -87,7 +89,7 @@ impl Host {
             pal,
             pump: Pump::new(k_mode),
             set,
-            sound: snd,
+            snd: Audio::new(snd, &img, BOOT_RATE),
             img,
             ink: 0x0F,
             dropped: 0,

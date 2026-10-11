@@ -36,4 +36,5 @@ pub use kbd_nav::{nav_dir, NavDir};
 pub use keyboard::Keyboard;
 pub use memfs::MemFs;
 pub use mouse::{Mouse, MouseEvent};
+pub use pit_freq::PIT_HZ;
 pub use timer::Timer;

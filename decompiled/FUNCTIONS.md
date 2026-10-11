@@ -654,8 +654,8 @@ The galaxy-screen frame loop (entered via `jmp 0x395B`, exits
 4. `[0x91EF]` → `0x3AE9` info panel (below).
 5. Ambient-sound select on the frame counter `[0x91D4]` and the
    selected type's `+0x12` byte — type 7: every 32 frames `0x26/0x0E`;
-   3: every 64 `0x29/0x0D`; 4: every 64 `0x0C/0x0C`; 6: `0x2A/0x0A` on
-   frame 0 and `0x21/0x13` on frame `0x80`. All via `cs:0x8577` — the
+   3: every 64 `0x29/0x0D`; 4: every 64 `0x0C/0x0C`; 6: `0x21/0x13` on
+   frame 0 and `0x2A/0x0A` on frame `0x80`. All via `cs:0x8577` — the
    `call far [cs:0x127C]` wrapper (`cl+1` to the driver) gated on
    `[0x91D3] != 0xFF`.
 6. `[0x91D4] += 1`; `call 0x73D9` (tick_step); `call 0x5C1E` (sequencer);

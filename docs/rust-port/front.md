@@ -75,6 +75,10 @@ a `dropped` counter for unmodelled calls. `cs:` reads map through
   MCGA only; the EGA/TGA slots are `int 10/AX=1002` palette-register
   writes and CGA's `AH=5` page select, all no-ops under the fixed
   `Palette::{ega16,cga}` model.
+- `pump_input` → `pump.write`; `key_flush` → `pump.flush_keys`.
+- `Sound`/`Chan`/`Sfx` → `snd` — the `audio` backend below (GAM-31);
+  `Song`/`SndReset` (`[cs:0x1278]`/`[cs:0x1280]` far exports) →
+  `snd.far_export()`.
 - `Call::Load(ofs)` → `front/load.rs` `Loader` — `ds:0x1208`+ cell →
   `{stem}{sfx}.{BIN,GPH}`; the `.GPH` half swaps `set`
   (`Host::set_assets` configures dir + stem; the endings' `*DTH`/`*WIN`
@@ -84,13 +88,10 @@ a `dropped` counter for unmodelled calls. `cs:` reads map through
   are counted `dropped` (menu font not drawn).
 - `Call::Stars(cx)` → `front/stars.rs` — the host-side `cs:0x4EC4`
   starfield walk, `cx+1` stars marked in `ink`.
-- `pump_input` → `pump.write`; `key_flush` → `pump.flush_keys`.
 - Menu/Dialog/Refresh/Present/Flash/PlanetPanel/Blit/other
-  `Slot`/`Native`/`Ui`/`Draw`/`Sound`/`Chan`/`Sfx`/`Song`/`SndReset` →
-  `dropped += 1` (GAM-7/GAM-9 stubs — the window's per-frame blit
-  supersedes the refresh-list copy and palette flushes; the
-  `Sound`/`Chan`/`Sfx`/`Song`/`SndReset` calls await the GAM-31 audio
-  layer).
+  `Slot`/`Native`/`Ui`/`Draw` → `dropped += 1`
+  (GAM-7/GAM-9 stubs — the window's per-frame blit supersedes the
+  refresh-list copy and palette flushes).
 
 ## `Game`/`Phase` (`runner.rs`)
 
@@ -101,9 +102,8 @@ image), `State::new`, `Rng::new(seed)`, `Host::new`, then
 preset survives `new_game`'s `0x8432` restore) → `new_game` →
 `shell_enter`.
 
-`step()` = one frame: `pump_input` mirrors inputs into `ds:`, then —
-when `Vm::end` is live (`cs:0x8B17`/`0x8C65` sequence running) —
-`end_step` owns the frame and both loops stay parked; otherwise
+`step()` = one frame: `pump_input` mirrors inputs into `ds:` (plus
+the `[0x91D3]` gate byte into the audio layer), then
 `shell_step` (Phase::Shell, `cs:0x2CC5`) or `frame_step`
 (Phase::Galaxy, `cs:0x395B`; returns `Frame::Shell` → back to shell on
 the `[0x9CDA] & 2` exit edge). `enter_galaxy()` forces the galaxy loop —
@@ -116,4 +116,26 @@ per frame `input()` polls cursor/buttons/keys into the pump (scancodes
 are set-1: arrows `0x48`/`0x50`/`0x4B`/`0x4D`, Enter `0x1C`, Esc `0x01`,
 Space `0x39`, Backspace `0x0E`; break = `scan | 0x80`), `g.step()`, then
 `blit` expands `Screen::pixels()` through `Palette::rgb` into
-`0xRRGGBB` `u32`s for `update_with_buffer`.
+`0xRRGGBB` `u32`s for `update_with_buffer`. With the `audio`
+feature a cpal `audio::Out` stream is opened first (rate negotiated
+back into `snd`), and each stepped frame renders `rate/30` mono
+samples into its bounded queue.
+
+## `audio` (`audio/`) — the GAM-31 sound backend
+
+`audio::Audio` owns a `audio::Pc`-driver-over-`audio::Bus` pair and maps
+the game calls onto the asm wrapper semantics (files `0x38A5B`,
+`0x38A3B`, `0x38A80`, `0x38577`): `Sfx` → `int 80` `ah=1`+`ah=3` + the
+`[cs:0x127C]` export; `Chan(0x8A5B)` → `ah=1` + `[cs:0x1280]`; `Chan(
+0x8A3B)` → `ah=3`; `Chan(0x8A80)` → `ah=2` gated on the mirrored
+`[0x91D3] == 0`; `Sound` → the far export alone. Every wrapper gates
+`[0x155] <= 2` — `AdLib`/`Roland` skip the `int 80` and count their
+export calls into `Audio::dropped` (the C driver module isn't ported).
+
+`Bus` is the concrete `audio::Ports`: `0x43`/`0x42` latch the PIT-2
+divisor, `0x61` is the gate, and `sample()` emits the square wave;
+`0x388`/`0x389` write an `oplon` OPL2 rendered in the same frame;
+`0x330`/`0x331` answer as a quiescent MPU-401. `Audio::render` runs the
+driver's `ah=0` tick at the ~50 Hz rate `install_drivers` programs
+into PIT channel 0 (`0x5CEC`; the `0x5D37` at `cs:[0x1C00]` is the
+A/R module's own install) inside the sample stream.

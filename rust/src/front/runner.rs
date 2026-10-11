@@ -91,11 +91,12 @@ impl Game {
         }
     }
 
-    /// One frame — mirror inputs into `ds:` ([`VmHost::pump_input`]),
-    /// then step the active loop. Transitions are action-driven: a
-    /// shell menu action sets `uimode = 5` (`cs:0x3906`) to hand the
-    /// runner the galaxy loop; the galaxy exit edge `jmp 0x2CC5`s —
-    /// [`shell_enter`] — back.
+    /// One frame — mirror inputs into `ds:` (and the `[0x91D3]` gate
+    /// into the audio layer — [`Host::pump_input`]), then step the
+    /// active loop. Transitions are action-driven: a shell menu action
+    /// sets `uimode = 5` (`cs:0x3906`) to hand the runner the galaxy
+    /// loop; the galaxy exit edge `jmp 0x2CC5`s — [`shell_enter`] —
+    /// back.
     pub fn step(&mut self) {
         self.host.pump_input(&mut self.vm, &mut self.st);
         // A running `cs:0x8B17`/`0x8C65` ending owns the machine — the

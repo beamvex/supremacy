@@ -65,3 +65,27 @@ driver (file `0x0C00` module, frequency program at `0x0E9F`).
 - `silence()` — clears port-`0x61` bits 0–1 and resets `last`. The
   driver reaches silence by keying channels off; this is the modelled
   counterpart of `note`.
+
+## `Pc<P: Ports>` — PC-speaker tracker (`pc.rs`)
+
+The `int 0x80` driver module at file `0x0C00` — the engine the
+`[0x155] ≤ 2` wrappers (`0x389D7`–`0x38ABF`) dispatch into. Dispatch
+(`pc_cmd.rs`, table at `cs:0x52`): `ah=0` tick, `ah=1` stop, `ah=2/al`
+load song, `ah=3/al` load SFX (15-byte records at `cs:0x461`), `ah=4`
+resume.
+
+- `tick` (`pc_tick.rs`, file `0x0DE3`) — SFX sweep then the two music
+  channels; each active channel `step`s its stream and `voice`s the
+  result to PIT channel 2 (`Speaker::note`'s `0x43`/`0x42`/`0x61`
+  sequence).
+- `step`/`op` (`pc_step.rs`, `pc_ops.rs`, `cs:0xF3D` + opcode table
+  `cs:0x32`) — byte-stream decode: tempo, wait, divisor, envelope and
+  jump opcodes.
+- `voice` (`pc_voice.rs`, `cs:0xFBD`) — envelope sequence → divisor →
+  tremolo/sweep → gate.
+
+The host backend (`front::audio`, see `front.md`) supplies the
+concrete `Ports`; the driver's tick is fed at ~50 Hz — the
+`install_drivers` int-8 hook (file `0x31E8E`, P/T only) reprograms
+PIT channel 0 with divisor `0x5CEC`. The A/R module has its own
+timer install (file `0x3552`, `cs:[0x1C00] = 0x5D37`).

@@ -98,12 +98,12 @@ fn ambient(c: &mut Ctx) {
     }
 }
 
-/// Type 6 alternates two commands — `0x2A/0x0A` on frame 0, `0x21/0x13`
+/// Type 6 alternates two commands — `0x21/0x13` on frame 0, `0x2A/0x0A`
 /// on frame `0x80` (file `0x339DF`–`0x339F9`).
 fn ambient6(bl: u8) -> Option<(u16, u8)> {
     match bl {
-        0 => Some((0x2A, 0x0A)),
-        0x80 => Some((0x21, 0x13)),
+        0 => Some((0x21, 0x13)),
+        0x80 => Some((0x2A, 0x0A)),
         _ => None,
     }
 }

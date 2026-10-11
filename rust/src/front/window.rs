@@ -7,10 +7,15 @@
 
 use minifb::{Key, MouseButton, MouseMode, Scale, Window, WindowOptions};
 
+#[cfg(feature = "audio")]
+use super::audio::Out;
 use super::Game;
 
 const W: usize = 320;
 const H: usize = 200;
+/// Game frame rate — also the audio render stride (`rate/30` samples
+/// per `step`).
+const FPS: u32 = 30;
 
 /// `minifb` key → DOS set-1 scancode.
 const SCAN: &[(Key, u8)] = &[
@@ -38,12 +43,26 @@ pub fn run(g: &mut Game) -> Result<(), minifb::Error> {
             ..WindowOptions::default()
         },
     )?;
-    win.set_target_fps(30);
+    win.set_target_fps(usize::try_from(FPS).unwrap_or(30));
+    #[cfg(feature = "audio")]
+    let audio = Out::open();
+    #[cfg(feature = "audio")]
+    if let Some(o) = &audio {
+        g.host.snd.set_rate(o.rate);
+    }
     let mut buf = vec![0u32; W * H];
     let mut prev: Vec<Key> = Vec::new();
+    #[cfg(feature = "audio")]
+    let mut pcm: Vec<f32> = Vec::new();
     while win.is_open() {
         input(g, &win, &mut prev);
         g.step();
+        #[cfg(feature = "audio")]
+        if let Some(o) = &audio {
+            pcm.resize(o.rate as usize / usize::try_from(FPS).unwrap_or(30), 0.0);
+            g.host.snd.render(&mut pcm);
+            o.push(&pcm);
+        }
         blit(&mut buf, g);
         win.update_with_buffer(&buf, W, H)?;
     }

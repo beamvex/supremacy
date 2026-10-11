@@ -6,12 +6,15 @@ description = "Rust rewrite of reverse-engineered routines from Supremacy: Your 
 publish = false
 
 [dependencies]
+cpal = { version = "0.18", optional = true }
 minifb = { version = "0.28", optional = true }
+oplon = "1"
 
 [features]
 minifb = ["dep:minifb"]
+audio = ["dep:cpal"]
 
 [[bin]]
 name = "supremacy-run"
 path = "src/bin/run.rs"
-required-features = ["minifb"]
+required-features = ["minifb", "audio"]

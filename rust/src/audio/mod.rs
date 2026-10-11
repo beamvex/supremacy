@@ -15,6 +15,14 @@
 //!   checksummed `sysex` block sender (`0x34C8`).
 //! - [`Speaker`]: PIT channel 2 + port `0x61` gate — `note` (`0x0E9F`)
 //!   with the driver's `[0x2E]` last-divisor cache.
+//! - [`Pc`]: the whole file-`0xC00` PC-speaker driver — the `int 0x80`
+//!   `ah`-dispatch ([`Pc::dispatch`]), the `int 8`-rate tick engine
+//!   (`0xDE3`), the two tracker channels' stream decode (`0xF3D`),
+//!   opcode table (`cs:0x32`), voice render (`0xFBD`) and the
+//!   `cs:0x450` sfx sweep — feeding PIT divisors to its [`Ports`] bus.
+//!   Tandy shares the `int 0x80` contract; its module (`file 0x1950`)
+//!   is the same tracker with an SN76489 backend — the port runs the
+//!   PC engine for it as an approximation.
 //!
 //! All port traffic goes through [`Ports`] so tests can record the exact
 //! byte sequences and hosts can map them to real audio backends.
@@ -27,11 +35,18 @@ mod opl;
 mod opl_detect;
 mod opl_key;
 mod opl_write;
+mod pc;
+mod pc_cmd;
+mod pc_ops;
+mod pc_step;
+mod pc_tick;
+mod pc_voice;
 mod ports;
 mod speaker;
 mod spk_note;
 
 pub use mpu::Mpu;
 pub use opl::Opl;
+pub use pc::{Chan, Pc, Sfx};
 pub use ports::Ports;
 pub use speaker::Speaker;

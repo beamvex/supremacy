@@ -10,3 +10,13 @@ pub trait Ports {
     /// `in al,dx`.
     fn inb(&mut self, port: u16) -> u8;
 }
+
+impl<P: Ports + ?Sized> Ports for &mut P {
+    fn outb(&mut self, port: u16, val: u8) {
+        (**self).outb(port, val);
+    }
+
+    fn inb(&mut self, port: u16) -> u8 {
+        (**self).inb(port)
+    }
+}

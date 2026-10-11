@@ -74,18 +74,21 @@ pub fn jingle(c: &mut Ctx) -> Flow {
     Flow::Ret
 }
 
-/// The `0x7E67` note-play tail of `jingle`.
+/// The `0x7E67` note-play tail of `jingle` — `t == 0` skips the whole
+/// block; the stop/load/far trio is gated on `[0x91D3] != 0xFF`, and
+/// the `0x8A80` song call (`al = t` low byte) runs regardless — its
+/// own `[0x91D3] == 0` gate decides inside the driver helper.
 fn jingle_note(c: &mut Ctx, t: u16) {
-    if t == 0 || c.vm.r8(c.st, QUIET) == 0xFF {
-        c.host.svc(Call::Native(0x8A80));
+    if t == 0 {
         return;
     }
-    c.host.svc(Call::Chan(0x8A5B, 0));
-    c.host.svc(Call::Chan(0x8A3B, 0xFF));
-    c.host.svc(Call::Sound(
-        u8::try_from(t & 0xFF).unwrap_or(0).wrapping_sub(2),
-    ));
-    c.host.svc(Call::Native(0x8A80));
+    let al = u8::try_from(t & 0xFF).unwrap_or(0);
+    if c.vm.r8(c.st, QUIET) != 0xFF {
+        c.host.svc(Call::Chan(0x8A5B, al));
+        c.host.svc(Call::Chan(0x8A3B, 0xFF));
+        c.host.svc(Call::Sound(al.wrapping_sub(2)));
+    }
+    c.host.svc(Call::Chan(0x8A80, al));
 }
 
 /// `cs:0x76DE` — the `0xAB..0xC0` message pass: draws one pending

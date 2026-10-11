@@ -85,10 +85,10 @@ fn ambient_type6_alternates_halves() {
     r.w16(game::TYPE_REC, u16::try_from(tb).unwrap_or(0));
     r.w8(tb + 0x12, 6);
     game::frame_step(&mut r.ctx()); // frame 0 → first pair
-    assert!(r.host.0.contains(&Call::Sfx(0x2A, 0x0B)));
+    assert!(r.host.0.contains(&Call::Sfx(0x21, 0x14)));
     r.w8(game::FRAME, 0x80);
     game::frame_step(&mut r.ctx()); // frame 0x80 → second pair
-    assert!(r.host.0.contains(&Call::Sfx(0x21, 0x14)));
+    assert!(r.host.0.contains(&Call::Sfx(0x2A, 0x0B)));
 }
 
 #[test]

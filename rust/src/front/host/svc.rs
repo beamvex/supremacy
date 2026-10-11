@@ -2,7 +2,7 @@
 //! the arms need (`rect`, `int33`, `dac0`, `load`, `menu_text`,
 //! `star`).
 
-use crate::game::{Call, VmHost};
+use crate::game::{Call, VmHost, SND_ON};
 
 use super::super::{font, text};
 use super::Host;
@@ -101,6 +101,10 @@ impl VmHost for Host {
                     self.dac0();
                 }
             }
+            Call::Sound(cl) => self.snd.sound(cl),
+            Call::Chan(t, al) => self.snd.chan(t, al),
+            Call::Sfx(ax, cl) => self.snd.sfx(ax, cl),
+            Call::Song(_) | Call::SndReset => self.snd.far_export(),
             Call::Load(ofs) => {
                 if !self.load(ofs) {
                     self.dropped += 1;
@@ -118,12 +122,7 @@ impl VmHost for Host {
             | Call::Slot(..)
             | Call::Native(_)
             | Call::Ui(_)
-            | Call::Draw(..)
-            | Call::Sound(_)
-            | Call::Chan(..)
-            | Call::Sfx(..)
-            | Call::Song(_)
-            | Call::SndReset => self.dropped += 1,
+            | Call::Draw(..) => self.dropped += 1,
         }
         0
     }
@@ -138,6 +137,10 @@ impl VmHost for Host {
 
     fn pump_input(&mut self, vm: &mut crate::game::Vm, st: &mut crate::game::State) {
         self.pump.write(vm, st);
+        // Keep the audio layer's [0x91D3] gate byte in sync — the
+        // `0x8A80`/`0x8577` wrappers key song/sfx dispatch off it.
+        self.snd
+            .set_quiet(vm.r8(st, u16::try_from(SND_ON).unwrap_or(0)));
     }
 
     fn key_flush(&mut self) {
