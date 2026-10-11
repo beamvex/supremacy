@@ -89,3 +89,43 @@ concrete `Ports`; the driver's tick is fed at ~50 Hz — the
 `install_drivers` int-8 hook (file `0x31E8E`, P/T only) reprograms
 PIT channel 0 with divisor `0x5CEC`. The A/R module has its own
 timer install (file `0x3552`, `cs:[0x1C00] = 0x5D37`).
+
+## `Ar<P: Ports>` — AdLib/Roland driver (`ar.rs` + `ar_*.rs`)
+
+The C-compiled file-`0x2900` module (image `0x1D00`, installed at
+`[0x156] = 0x1D0`). Its exports are the eight 3-byte `jmp`s at
+`cs:0`; the game's far table `cs:0x126C`–`0x1282` holds the six
+`01D0:xxxx` pointers to the first six (`install_drivers` `0x31EF7`
+`retf`-stubs them when `[0x155] ≤ 2`). `[cs:0x1270]`/`[cs:0x1274]`
+have no call sites — shutdown is unreferenced and service runs
+through the installed int-8 vector (module `0xCBF`, file `0x35BF`:
+EOI + every-3rd-tick BIOS chain via `[cs:0x1666]`, then the service
+call at the `0x5D37` rate).
+
+| export | `cs:` | file | port |
+|---|---|---|---|
+| 0 `init` | `0x000` | `0x2998` | `Ar::init(ax)` — `al` 0=`0x2D3B` OPL / 1=`0x27CF` MPU; `bh` skips `0x2952` install |
+| 1 `shutdown` | `0x003` | `0x29CC` | `Ar::shutdown(al)` — `al`-picked re-`init` when live, `mode = 0xFF`, `0x298C` uninstall |
+| 2 `service` | `0x006` | `0x2EBC` | `Ar::service()` — `0x1F05` fader, then `div`-cadence `0x24AC`/`0x23EF` fetch/apply |
+| 3 `load_song` | `0x009` | `0x2C81` | `Ar::load_song(rec)` — `0x118` hdr + `0x200` tbl, `qbase`/`qend`, Roland `0x2104` timbres |
+| 4 `select` | `0x00C` | `0x29EE` | `Ar::select(cl)` — all-off, `map` bound, vol reset, `idx`/`cur`/`en` |
+| 5 `reset` | `0x00F` | `0x2A7C` | `Ar::reset()` — `en = 0` + `0x1FE0` all-off |
+| 6 `fade_set` | `0x012` | `0x2AB7` | `Ar::fade_set(cl)` — arm the fader (`cl` doubled on OPL) |
+| 7 `fade_query` | `0x015` | `0x2AA9` | `Ar::fade_query()` — the `[0x2060]` armed flag |
+
+Game-side routing (`front/audio/engine.rs`, `drv.rs`): the
+`call far [cs:0x126C]` at `0x31FF2` is `Audio::new`'s `init` with
+`ax = [0x155] − 3`; `Call::Song` → `[cs:0x1278]` (4 sites),
+`Call::Sound`/`Sfx` → `[cs:0x127C]` (56 sites), `Call::SndReset` +
+the `0x8A5B` stop → `[cs:0x1280]` (5 sites). The `int 0x80`
+`ah`-wrappers gate on `[0x155] ≤ 2` so the P/T `dispatch` path is
+never taken with A/R resident (the vector points at the jump table
+itself — export 0).
+
+State mirrors the `cs:` workspace cells (`[0x19AC]` mode,
+`[0x1C05]` `en`, `[0x1C02]` MPU ack, `hdr`/`tbl` at `0x1673`/`0x178C`,
+the eight `0x20`-byte `AChan` records at `0x1A00`, the `0x1C1D` staging
+block and the `0x1BED`/`0x1FF8`/`0x204B` `SysEx` buffers). The queue
+interpreter decodes each song's stream region into OPL writes
+(`mode == 0`: patch/vol/note/key + rhythm/`4op` staging) or MPU MIDI
+(`mode == 1`: note/vol/bend/program/pan + `syx` blocks).
