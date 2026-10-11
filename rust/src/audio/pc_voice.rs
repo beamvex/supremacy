@@ -43,19 +43,22 @@ impl<P: Ports> Pc<P> {
     }
 
     /// File `0xFF3`–`0x1020` — tremolo: depth `& flags` (a `0` depth
-    /// acts as `1`), `+0x11` walks `±` toward the `+0x0F` limit and
-    /// flips the `0x20` direction bit there; the centred value adds to
-    /// the divisor.
+    /// acts as `1`), `+0x11` walks `±` and flips the `0x20` direction
+    /// bit at the ends — the `sub` half jumps to the `jnz` before the
+    /// `cmp ah,dl`, so it flips on `0` while the `add` half flips on
+    /// the `+0x0F` limit; the centred value adds to the divisor.
     fn tremolo(&mut self, c: usize, cx: u16, flags: &mut u8) -> u16 {
         let depth = self.chans[c].tdep.max(1) & *flags;
         let lim = self.chans[c].tlim;
-        let cur = if *flags & 0x20 == 0 {
-            self.chans[c].tcur.wrapping_sub(depth)
+        let (cur, hit) = if *flags & 0x20 == 0 {
+            let v = self.chans[c].tcur.wrapping_sub(depth);
+            (v, v == 0)
         } else {
-            self.chans[c].tcur.wrapping_add(depth)
+            let v = self.chans[c].tcur.wrapping_add(depth);
+            (v, v == lim)
         };
         self.chans[c].tcur = cur;
-        if cur == lim {
+        if hit {
             *flags ^= 0x20;
         }
         let delta = i16::from(cur.wrapping_sub(lim >> 1).cast_signed());

@@ -72,17 +72,26 @@ The `int 0x80` driver module at file `0x0C00` — the engine the
 `[0x155] ≤ 2` wrappers (`0x389D7`–`0x38ABF`) dispatch into. Dispatch
 (`pc_cmd.rs`, table at `cs:0x52`): `ah=0` tick, `ah=1` stop, `ah=2/al`
 load song, `ah=3/al` load SFX (15-byte records at `cs:0x461`), `ah=4`
-resume.
+resume, `ah=5`/`ah=6` the `[0x457]` peek/poke — which aliases the sfx
+`alt` divisor's high byte. `ah ≥ 0x20` is the `[bx+0x23]` cell
+peek/poke (`0x20..0x30` read, `0x30..` write) covering the driver
+cells `[0x23..0x31]` plus the `cs:` bytes beyond.
 
-- `tick` (`pc_tick.rs`, file `0x0DE3`) — SFX sweep then the two music
-  channels; each active channel `step`s its stream and `voice`s the
-  result to PIT channel 2 (`Speaker::note`'s `0x43`/`0x42`/`0x61`
+- `tick` (`pc_tick.rs`, file `0x0DE3`) — `[0x29] += [0x25]` carry
+  skips the music block; else `[0x28] += [0x26]` overflow `step`s the
+  two channels and each `voice`s its divisor; the `[0x13E]` mux picks
+  ch0/ch1, the `0xE41` sfx sweep may override, and the `0xE9F` tail
+  programs PIT channel 2 (`Speaker::note`'s `0x43`/`0x42`/`0x61`
   sequence).
 - `step`/`op` (`pc_step.rs`, `pc_ops.rs`, `cs:0xF3D` + opcode table
   `cs:0x32`) — byte-stream decode: tempo, wait, divisor, envelope and
-  jump opcodes.
+  jump opcodes. `0x85` advances the `+0x02` stream-list cursor (wrap
+  on a `0` word); `0x87` is the end marker — its `pop ax` drops the
+  step frame so the `ret` lands on the ISR epilogue, ending the whole
+  `int 0x80` call (the tick's remaining work is skipped).
 - `voice` (`pc_voice.rs`, `cs:0xFBD`) — envelope sequence → divisor →
-  tremolo/sweep → gate.
+  tremolo (`+0x11` walks −depth to a `0` flip / +depth to the `+0x0F`
+  limit — the `sub` half jumps over the `cmp`)/sweep → gate.
 
 The host backend (`front::audio`, see `front.md`) supplies the
 concrete `Ports`; the driver's tick is fed at ~50 Hz — the

@@ -11,10 +11,14 @@ const SONG_TAB: u16 = 0x6EB;
 
 impl<P: Ports> Pc<P> {
     /// The `int 0x80` entry (file `0xC00`): `ah < 0x20` jumps through
-    /// the `cs:0x52` table; `ah ≥ 0x20` is the `[bx+0x23]` cell
-    /// peek/poke (`0x20..0x30` read, `0x30..` write — the `0x8A1B`/
-    /// `0x8AA7` wrappers' `0x32`/`0x33` hit `pace`/`tempo`). Returns
-    /// the `al` the caller sees.
+    /// the `cs:0x52` table — `0` tick, `1` stop, `2`/`al` song,
+    /// `3`/`al` sfx, `4` resume, `5`/`6` the `[0x457]` peek/poke (the
+    /// sfx `alt` divisor's high byte; `ah ≥ 7` falls off the table
+    /// into data, so the port ignores it like the asm's wild near-call
+    /// would deserve). `ah ≥ 0x20` is the `[bx+0x23]` cell peek/poke
+    /// (`0x20..0x30` read, `0x30..` write — the `0x8A1B`/`0x8AA7`
+    /// wrappers' `0x32`/`0x33` hit `pace`/`tempo`). Returns the `al`
+    /// the caller sees.
     pub fn dispatch(&mut self, ah: u8, al: u8) -> u8 {
         if ah >= 0x20 {
             return self.cell_io(ah, al);
@@ -25,8 +29,8 @@ impl<P: Ports> Pc<P> {
             2 => self.song(al),
             3 => self.effect(al),
             4 => self.resume(),
-            5 => return self.aux,
-            6 => self.aux = al,
+            5 => return self.sfx.alt.to_le_bytes()[1],
+            6 => self.sfx.alt = self.sfx.alt & 0x00FF | i16::from(al) << 8,
             _ => {}
         }
         al
@@ -94,31 +98,63 @@ impl<P: Ports> Pc<P> {
         }
     }
 
-    /// The `ah ≥ 0x20` cell path — file `0xD4C`/`0xD58`.
+    /// The `ah ≥ 0x20` cell path — file `0xD4C`/`0xD58`: `bl` had
+    /// `0x30` folded in before the jump, so `0x20..0x30` reads
+    /// `cs:0x23 + (ah−0x20)` and `0x30..` writes `cs:0x23 + (ah−0x30)`.
     fn cell_io(&mut self, ah: u8, al: u8) -> u8 {
         if ah >= 0x30 {
-            *self.cell(ah - 0x30) = al;
+            self.cell_set(ah.wrapping_sub(0x30), al);
             al
         } else {
-            *self.cell(ah - 0x20)
+            self.cell_get(ah - 0x20)
         }
     }
 
-    /// `cs:0x23 + i` cell — the byte fields map to their `ds:`-cell
-    /// namesakes; anything else lands on a scratch pad.
-    fn cell(&mut self, i: u8) -> &mut u8 {
+    /// `cs:0x23 + i` read — the named cells, the `[0x2D]` pad, the
+    /// `[0x2E]`/`[0x30]` word halves, then `cs:` bytes: `i=0x0F` lands
+    /// on the `0x32` opcode table (the read path caps at `ah=0x2F`).
+    fn cell_get(&self, i: u8) -> u8 {
         match i {
-            0 => &mut self.mus,
-            1 => &mut self.sfx_on,
-            2 => &mut self.pace,
-            3 => &mut self.tempo,
-            4 => &mut self.tempo0,
-            5 => &mut self.step_acc,
-            6 => &mut self.beat,
-            7 => &mut self.loaded,
-            8 => &mut self.gtrans,
-            9 => &mut self.mux_ror,
-            _ => &mut self.scratch[usize::from(i & 7)],
+            0 => self.mus,
+            1 => self.sfx_on,
+            2 => self.pace,
+            3 => self.tempo,
+            4 => self.tempo0,
+            5 => self.step_acc,
+            6 => self.beat,
+            7 => self.loaded,
+            8 => self.gtrans,
+            9 => self.mux_ror,
+            10 => self.pad,
+            11 => self.last.to_le_bytes()[0],
+            12 => self.last.to_le_bytes()[1],
+            13 => self.div0.to_le_bytes()[0],
+            14 => self.div0.to_le_bytes()[1],
+            _ => self.d8(0x23 + u16::from(i)),
+        }
+    }
+
+    /// `cs:0x23 + i` write — matching [`cell_get`][Self::`cell_get`];
+    /// `i ≥ 0x0F` would patch the module's code/tables — the port drops
+    /// those on the scratch pad instead of self-modifying.
+    fn cell_set(&mut self, i: u8, v: u8) {
+        match i {
+            0 => self.mus = v,
+            1 => self.sfx_on = v,
+            2 => self.pace = v,
+            3 => self.tempo = v,
+            4 => self.tempo0 = v,
+            5 => self.step_acc = v,
+            6 => self.beat = v,
+            7 => self.loaded = v,
+            8 => self.gtrans = v,
+            9 => self.mux_ror = v,
+            10 => self.pad = v,
+            11 => self.last = self.last & 0xFF00 | u16::from(v),
+            12 => self.last = self.last & 0x00FF | u16::from(v) << 8,
+            13 => self.div0 = self.div0 & 0xFF00 | u16::from(v),
+            14 => self.div0 = self.div0 & 0x00FF | u16::from(v) << 8,
+            _ => self.scratch[usize::from(i & 7)] = v,
         }
     }
 }

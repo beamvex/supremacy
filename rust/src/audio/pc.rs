@@ -9,9 +9,10 @@ use super::Ports;
 /// State mirrors the module's own `cs:` cells: `[0x23]`/`[0x24]` arm
 /// music/sfx, `[0x25]`/`[0x26]` are the two accumulator steps,
 /// `[0x29]`/`[0x28]` the accumulators, `[0x2A]` the song-loaded flag,
-/// `[0x2B]` the global transpose, `[0x2C]` the channel-mux mode,
-/// `[0x457]` the `ah=5`/`ah=6` peek/poke cell. Channel records
-/// `cs:0x11C`/`0x134` and the sfx block `cs:0x450` are [`Chan`]/[`Sfx`].
+/// `[0x2B]` the global transpose, `[0x2C]` the channel-mux mode, and
+/// `[0x457]` — the `ah=5`/`ah=6` peek/poke — is the [`Sfx::alt`] high
+/// byte. Channel records `cs:0x11C`/`0x134` and the sfx block
+/// `cs:0x450` are [`Chan`]/[`Sfx`].
 pub struct Pc<P: Ports> {
     /// Port bus — the tick writes PIT `0x43`/`0x42` and gates `0x61`.
     pub ports: P,
@@ -43,13 +44,15 @@ pub struct Pc<P: Ports> {
     /// `[0x2C]` — nonzero: rotate `[0x13E]` (mux loops); zero: `shr` it
     /// (the pattern runs out and channel 0 takes over).
     pub(super) mux_ror: u8,
+    /// `[0x2D]` — unused cell between `mux_ror` and the `[0x2E]`
+    /// divisor cache; a real byte of storage for the cell path.
+    pub(super) pad: u8,
     /// `[0x2E]` — last-programmed PIT divisor cache.
     pub(super) last: u16,
     /// `[0x30]` — channel-0 rendered-divisor scratch for the mux.
     pub(super) div0: u16,
-    /// `[0x457]` — the `ah=5`/`ah=6` scratch cell.
-    pub(super) aux: u8,
-    /// Pad for `[bx+0x23]` cell reads/writes outside the named fields.
+    /// Pad for `[bx+0x23]` writes at `i ≥ 0x0F` — those would patch the
+    /// module's own code/tables, which the immutable image can't model.
     pub(super) scratch: [u8; 8],
     /// The two channel records (`cs:0x11C`/`0x134`, `0x18` bytes each).
     pub(super) chans: [Chan; 2],
@@ -65,7 +68,8 @@ pub struct Pc<P: Ports> {
 pub struct Chan {
     /// `+0x00` — base of the stream-pointer list the channel walks.
     pub base: u16,
-    /// `+0x02` — list cursor (opcode `0x85` reads `base+2` style).
+    /// `+0x02` — list cursor (opcode `0x85` advances +2, wraps to
+    /// `base` on a `0` word, and stores it back here).
     pub list: u16,
     /// `+0x04` — stream read pointer.
     pub ptr: u16,
@@ -120,7 +124,8 @@ pub struct Sfx {
     pub add: i16,
     /// `+0x04`/`[0x454]` — running divisor.
     pub cur: i16,
-    /// `+0x06`/`[0x456]` — alternate divisor used on beat wrap.
+    /// `+0x06`/`[0x456]` — alternate divisor used on beat wrap; the
+    /// `ah=5`/`ah=6` `[0x457]` peek/poke aliases its high byte.
     pub alt: i16,
     /// `+0x08`/`[0x458]` — phase delta A (`sel` carry).
     pub da: i16,
@@ -159,9 +164,9 @@ impl<P: Ports> Pc<P> {
             loaded: 0,
             gtrans: 0,
             mux_ror: 0,
+            pad: 0,
             last: 0,
             div0: 0,
-            aux: 0,
             scratch: [0; 8],
             chans: [Chan::default(); 2],
             sfx: Sfx::default(),

@@ -4,9 +4,11 @@ impl<P: Ports> Pc<P> {
     /// The `cs:0x32` opcode table (`0x80..0x8F` → handlers at
     /// `0xEBC`–`0xFA1`). Returns true when the decode ends — `0x80`/
     /// `0x8B` finish through the `0xF97` tail (`wait=reload`,
-    /// `ptr=si`), `0x87` is the song-end marker (file `0xFA1`: kills
-    /// `[0x23]`/`[0x24]`/`[0x2A]` outright). Bytes `0x90..0x9F` index
-    /// past the real table — the asm would jump wild; the port stops.
+    /// `ptr=si`), `0x87` is the song-end marker (file `0xFA1`: its
+    /// `pop ax` drops the step frame so the `ret` lands on the ISR
+    /// epilogue — the whole `int 0x80` call is over, and it kills
+    /// `[0x23]`/`[0x24]`/`[0x2A]`). Bytes `0x90..0x9F` index past the
+    /// real table — the asm would jump wild; the port stops.
     pub(super) fn opcode(&mut self, c: usize, op: u8, dl: &mut u8, si: &mut u16) -> bool {
         match op {
             0x80 => self.chans[c].fade = 0,     // 0xF81 — mute → tail
@@ -50,12 +52,14 @@ impl<P: Ports> Pc<P> {
     }
 
     /// `0xEDC` — advance the stream list: cursor `+0x02 +2`, a `0` word
-    /// there loops to `+0x00`; `ptr` takes the word at the cursor.
+    /// there loops to `+0x00`; the cursor stores back to `+0x02` and
+    /// `si` takes the word at it.
     fn op_next(&mut self, c: usize, si: &mut u16) {
         let mut s = self.chans[c].list.wrapping_add(2);
         if self.d16(s) == 0 {
             s = self.chans[c].base;
         }
+        self.chans[c].list = s;
         *si = self.d16(s);
     }
 

@@ -288,6 +288,81 @@ per-song blobs (`*.bin` whole record, `.hdr`/`.table`/`.blocks`/
   jump table at `cs:0x32` for stream bytes `≥0x80`, note table
   `[bx+0x5EA]`.
 
+### The PC module — routine map (GAM-37)
+
+`cs:` below = module-relative (file = `cs` + `0xC00`). Two `0x18`-byte
+channel records at `cs:0x11C`/`0x134`; PIT ch2 + `0x61` gate. Driver
+cells `[0x23..0x32]`: `[0x23]` music arm, `[0x24]` sfx arm, `[0x25]`
+pace, `[0x26]`/`[0x27]` tempo copies, `[0x28]` step acc, `[0x29]` gate
+acc, `[0x2A]` song loaded, `[0x2B]` gtrans, `[0x2C]` mux-rotate mode,
+`[0x2E]` last-divisor cache, `[0x30]` ch0 divisor scratch — `[0x32]+`
+is the opcode jump table, so cell reads past `i=0x0E` land on code.
+
+- `cs:0x000` (file `0xC00`) int-80 entry: `ah<0x20` →
+  `call [ah*2+0x52]`; `ah≥0x20` → `0x14C` cell path (`sub bl,0x30`:
+  `<0x30` reads `[bx+0x23]` with `bl=ah−0x20`, else writes it).
+  Dispatch table `cs:0x52`: `0`=tick `0x1E3`, `1`=stop `0x3A7`,
+  `2`=song `0x161`, `3`=sfx `0x1BF`, `4`=resume `0x3B0`,
+  `5`=`[0x457]` read `0x448`, `6`=`[0x457]` write `0x44C`; `ah≥7`
+  indexes past the table into data — wild near-calls.
+- `0x161` (file `0xD61`) song: clears `[0x23]`/`[0x2A]`/`[0x29]`/
+  `[0x2B]`/`[0x2C]`, `rep`-zeroes the two `0x18`-byte records
+  (`0x18` words from `0x11C`), `{tempo, list0, list1}` from
+  `cs:0x6EB + al·5`, `wait=1`, `[0x28]=0xFF`, `dec [0x23]`, `dec [0x2A]`.
+- `0x1BF` (file `0xDBF`) sfx: `0x0F`-byte record `cs:0x461 + al·0xF` →
+  `cs:0x452`; `word [0x450] = [0x45F]` (cnt=rcnt, phase=rphase);
+  `[0x24]=0` then `dec` → `0xFF`. `[0x457]` is the `alt` word's high
+  byte — the `ah=5`/`ah=6` peek/poke aliases it.
+- `0x1E3` (file `0xDE3`) tick: `cx=2`, `[0x29]+=[0x25]` — carry jumps
+  to the `0xE41` sfx section (music skipped); else `[0x23]≠0`,
+  `[0x28]+=[0x26]` carry → `call 0x33D` per channel (`0x11C`/`0x134`);
+  render `0x3BD` ×2 (`[0x30]`=`cx` after ch0); `[0x126]` dec or `ax=2`;
+  `[0x13E]` `ror`/`shr` mux — carry keeps ch1's `cx`, else `cx=ax`;
+  `0xE41` sfx sweep may replace it; `0xE99` programs the PIT.
+- `0x33D` (file `0xF3D`) step: `+6` dec — nonzero → `0x36F` sustain
+  slide (`flags 0x40`, `0x80`=down, `+0x15 ±1`). Expiry: `dl = +0x12
+  & 0x30` (tremolo bits survive), `si = +4`; `0x34B` `lodsb`: `<0xA0`
+  → `0x365` (`shl bl,1`: carry → `jmp [bl+0x32]` opcode table `cs:0x32`,
+  else `0x386` note); `≥0xA0` → `+0x20`: carry → `+7` reload =
+  wrapped+1 (`0xE0..`), else `+9` env base = `[0x5EA + byte+0x20]`
+  (`0xA0..0xDF`). `0x386` note: `word +0xC`=0, `+0x12`=dl, `+0x15`=al,
+  `word +0xA` = `word +0x8` (fade=mux, seq=env); `0x397` tail:
+  `+6`=`+7`, `+4`=si.
+- opcode table `cs:0x32` (`0x80..0x8F`, handlers `jmp`ed to — most end
+  `jmp 0x34B` continuing the decode): `0x80` `0x381` `+0xA`=0 → tail
+  (mute); `0x81` `0x328` `dl`=0; `0x82` `0x2FC` `+0x13`=word, `dl|8`,
+  `+0xE`=byte; `0x83` `0x320` `dl|0x80` **falls into** `0x84` `0x323`
+  `dl|0x40`; `0x85` `0x2DC` `+2`+=2 (`0` → `+0` base), `+2`=cursor,
+  `si`=`[cursor]`; `0x86` `0x309` `+0x10`=`lodsw` lo, `+0x11`=byte,
+  `+0xF`=cur`<<1`, `dl|0x10`; `0x87` `0x3A1` `pop ax` — drops the step
+  frame so the shared `0x3A7` `stop` `ret`s straight to the ISR
+  epilogue (the whole int-80 call ends); `0x88` `0x2F0` `+0x16`=byte;
+  `0x89` `0x31B` `dl|2`; `0x8A` `0x32C` `+8`=byte, `di==0x134` →
+  `[0x2C]`=0; `0x8B` `0x397` the tail itself (hold `+7` ticks);
+  `0x8C` `0x2F6` `[0x2B]`=byte; `0x8D` `0x2D1` `+0`=`+2`=`[si]`,
+  `si`=`[base]`; `0x8E` `0x2C8` `[0x26]`/`[0x27]`=byte; `0x8F` `0x2BC`
+  `+8`=`0x55`, `[0x2C]`=`0xFF`.
+- `0x3BD` (file `0xFBD`) voice: `+0xB`+1 → `al`=`[0x6B9+bx]`; `0xFF`
+  sustains (store skipped, `al`=0), other negatives `+1`,`+0x7F`-fold
+  with `+0xB`=`+0x09` reset; `al + +0x15 + [0x2B] + +0x16`, `<<1` →
+  `cx`=`[0x70+bx]`; flags `^1` → `bl`. `0x10` trem (`0x3F3`): depth =
+  `(+0x10 | 1) & bl`, `ah`=`+0x11` walks `−depth` flipping on `0` (the
+  `jmp` skips the `cmp ah,+0xF`!) or `+depth` flipping on `+0xF`; `cx`
+  += signed `+0x11 − +0xF/2`. `0x8` sweep (`0x427`): `+0xE` dec → on
+  wrap `+0xC` += `+0x13`, `cx` += `+0xC`. `+0x12`=`bl`; `~bl & 3`==0 →
+  `cx=2` (half-mute).
+- `0xE41` sfx sweep: `[0x45E]` dec → `0` disarms `[0x24]` (music `cx`
+  stands); `[0x451]` dec → `0` reloads `[0x460]` and `ror [0x45C]`
+  picks `+0x458`/`+0x45A` into `[0x454]`; `dx = [0x454]+[0x452]`;
+  `[0x450]` dec → `0` reloads `[0x45F]` and `dx=[0x456]`; `[0x454]`=
+  `dx`; `ror [0x45D]` — carry keeps `cx`, else `cx=dx`. `0xE99`:
+  `cx`≠`[0x2E]` → the `0xE9F` program; `0xEB3` `in 0x61 | 3` → `out`.
+- Data: opcode jmp table `cs:0x32` (16 words), dispatch `cs:0x52`
+  (7 words), divisor table `cs:0x70`, chans `cs:0x11C`/`0x134`, sfx
+  block `cs:0x450` (rec image `cs:0x452..0x460`, `alt` spans
+  `0x456..0x457`), sfx recs `cs:0x461` (`0x0F`), env-select `cs:0x5EA`,
+  env seq `cs:0x6B9`, song recs `cs:0x6EB` (`5` bytes).
+
 ## int-9 keyboard ISR (file `0x31D74` = `286B:8AC4`)
 
 The first far pointer in every mode template. `in 0x60` → `ah`; keyboard

@@ -5,16 +5,18 @@ impl<P: Ports> Pc<P> {
     /// down; while it holds, the `0xF6F` sustain path applies the
     /// `0x40`/`0x80` pitch slide; on expiry the stream decodes until a
     /// note byte (`< 0x80`), a `0x80`/`0x8B` hold, or `0x87` (end —
-    /// clears `[0x23]`/`[0x24]`/`[0x2A]` via `0xFA1`). Bytes
-    /// `0xA0..0xDF` pick an envelope base through `cs:0x5EA`, bytes
-    /// `0xE0..` set the `+0x07` tick reload; `0x80..0x9F` jump through
-    /// the `cs:0x32` opcode table ([`Pc::opcode`]).
-    pub(super) fn step(&mut self, c: usize) {
+    /// its `0xFA1` `pop ax` drops the step frame so the `ret` lands on
+    /// the ISR epilogue: the whole `int 0x80` call is over, `true`,
+    /// after clearing `[0x23]`/`[0x24]`/`[0x2A]`). Bytes `0xA0..0xDF`
+    /// pick an envelope base through `cs:0x5EA`, bytes `0xE0..` set the
+    /// `+0x07` tick reload; `0x80..0x9F` jump through the `cs:0x32`
+    /// opcode table ([`Pc::opcode`]).
+    pub(super) fn step(&mut self, c: usize) -> bool {
         let mut dl = self.chans[c].flags;
         self.chans[c].wait = self.chans[c].wait.wrapping_sub(1);
         if self.chans[c].wait != 0 {
             self.slide(c, dl);
-            return;
+            return false;
         }
         dl &= 0x30;
         let mut si = self.chans[c].ptr;
@@ -23,15 +25,16 @@ impl<P: Ports> Pc<P> {
             si += 1;
             if al < 0x80 {
                 self.note(c, al, dl, si);
-                return;
+                return false;
             }
             if al < 0xA0 && self.opcode(c, al, &mut dl, &mut si) {
-                return;
+                return al == 0x87;
             }
             if al >= 0xA0 {
                 self.load_env(c, al);
             }
         }
+        false
     }
 
     /// `0xF6F` — sustain: `0x40` set slides `+0x15` each tick, `0x80`

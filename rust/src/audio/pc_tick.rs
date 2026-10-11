@@ -13,9 +13,8 @@ impl<P: Ports> Pc<P> {
         if !over && self.mus != 0 {
             let (acc, step) = self.step_acc.overflowing_add(self.tempo);
             self.step_acc = acc;
-            if step {
-                self.step(0);
-                self.step(1);
+            if step && (self.step(0) || self.step(1)) {
+                return; // `0x87` popped the step frame — the ISR epilogue runs
             }
             cx = self.mix();
         }
