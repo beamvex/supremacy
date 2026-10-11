@@ -14,11 +14,13 @@
 
 mod bus;
 mod bus_io;
+mod drv;
 mod engine;
 #[cfg(feature = "audio")]
 mod out;
 
 pub use bus::Bus;
+pub use drv::Drv;
 pub use engine::{Audio, BOOT_RATE};
 #[cfg(feature = "audio")]
 pub use out::Out;

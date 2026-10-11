@@ -1,32 +1,33 @@
 use crate::args::Sound;
-use crate::audio::Pc;
+use crate::audio::{Ar, Pc, Tandy};
 
-use super::Bus;
+use super::{Bus, Drv};
 
-/// The driver tick rate — the `install_drivers` int-8 hook (file
-/// `0x31E8E`, P/T only) reprograms PIT channel 0 with `0x5CEC`:
+/// The P/T driver tick rate — the `install_drivers` int-8 hook (file
+/// `0x31E8E`) reprograms PIT channel 0 with `0x5CEC`:
 /// `PIT_HZ`/0x5CEC ≈ 50 Hz; each pulse runs the ISR tail at file
-/// `0x389D7` — `int 0x80` `ah=0` on the loaded driver. (`0x5D37` is
-/// the same ~50 Hz on the A/R side — `cs:[0x1C00]` in that module's
-/// own timer install, file `0x3552`.)
+/// `0x389D7` — `int 0x80` `ah=0` on the loaded driver.
 const TICK_HZ: f64 = 1_193_182.0 / 0x5CEC as f64;
+/// The A/R module's own int-8 install (`0x2952`, `cs:[0x1C00]`) —
+/// `0x5D37` ≈ the same 50 Hz, driving the export-2 `service`.
+const AR_TICK_HZ: f64 = 1_193_182.0 / 0x5D37 as f64;
 /// Boot-time output rate; [`Audio::set_rate`] retunes to the stream's.
 pub const BOOT_RATE: u32 = 44_100;
 
 /// The host sound engine — maps the game's [`Call`][crate::game::Call]
-/// sound ops onto the ported `int 0x80` driver over the synth [`Bus`],
-/// and renders PCM at the output rate.
+/// sound ops onto the ported `int 0x80` drivers over the synth
+/// [`Bus`], and renders PCM at the output rate.
 ///
-/// The `int 0x80` wrappers all gate `[0x155] ≤ 2` before interrupting
-/// (file `0x38A5B`/`0x38A3B`/`0x38A80`): for `AdLib`/`Roland` the
-/// engine is silent and their `[cs:0x127C]`/`[cs:0x1280]` far exports
-/// land in [`Audio::dropped`] — that C driver module (`file 0x2900`)
-/// isn't ported. Tandy runs the PC engine as an approximation — same
-/// `int 0x80` contract, different (unported) module internals.
+/// `[0x155]` picks the resident module (`[0x156]` = `0`/`0xD5`/
+/// `0x1D0`): the `int 0x80` `ah`-wrappers (files `0x38A5B`/`0x38A3B`/
+/// `0x38A80`) feed the P/T trackers; the `cs:0x126C` far table —
+/// `retf`-stubbed for P/T — reaches the A/R driver's jump-table
+/// exports (`[cs:0x1278]` load, `[cs:0x127C]` select,
+/// `[cs:0x1280]` reset).
 pub struct Audio {
-    /// The file-`0xC00` driver over the synth bus — `drv.ports` is the
-    /// [`Bus`] `render` pulls samples from.
-    pub drv: Pc<Bus>,
+    /// The `[0x156]`-selected driver over the synth bus — `drv.bus()`
+    /// is the [`Bus`] `render` pulls samples from.
+    pub drv: Drv,
     /// The selected device (`[0x155]`).
     dev: Sound,
     /// Mirrored `[0x91D3]` — the wrappers' gate byte.
@@ -35,7 +36,7 @@ pub struct Audio {
     acc: f64,
     /// Output rate — the tick accumulator's unit.
     rate: u32,
-    /// A/R far-export calls with no ported driver to run them.
+    /// Calls with no `int 0x80`/far-export route to take.
     pub dropped: usize,
 }
 
@@ -43,8 +44,13 @@ impl Audio {
     /// Engine for `dev` over `img`'s driver modules at `rate` Hz.
     #[must_use]
     pub fn new(dev: Sound, img: &[u8], rate: u32) -> Self {
+        let drv = match dev {
+            Sound::PcSpeaker => Drv::Pc(Pc::new(Bus::new(rate), img)),
+            Sound::Tandy => Drv::Tandy(Tandy::new(Bus::new(rate), img)),
+            Sound::AdLib | Sound::Roland => Drv::Ar(Box::new(Self::ar(dev, img, rate))),
+        };
         Self {
-            drv: Pc::new(Bus::new(rate), img),
+            drv,
             dev,
             quiet: 0,
             acc: 0.0,
@@ -53,10 +59,19 @@ impl Audio {
         }
     }
 
+    /// The A/R module after the `0x31FF2` `call far [cs:0x126C]`
+    /// (export 0 `init`) with `ax = [0x155] − 3` — `0` `AdLib`, `1`
+    /// Roland; `bh = 0` so the driver's int-8 timer installs.
+    fn ar(dev: Sound, img: &[u8], rate: u32) -> Ar<Bus> {
+        let mut a = Ar::new(Bus::new(rate), img);
+        a.init(u16::from(matches!(dev, Sound::Roland)));
+        a
+    }
+
     /// Retune to the stream's negotiated rate.
     pub fn set_rate(&mut self, rate: u32) {
         self.rate = rate;
-        self.drv.ports.set_rate(rate);
+        self.drv.bus().set_rate(rate);
     }
 
     /// Mirror `[0x91D3]` — the `0x8A80` song helper only fires when the
@@ -75,7 +90,7 @@ impl Audio {
         match target {
             0x8A5B => {
                 self.int80(1, al);
-                self.far();
+                self.drv.reset();
             }
             0x8A3B => self.int80(3, al),
             0x8A80 => {
@@ -93,47 +108,60 @@ impl Audio {
     /// `[0x91D3] != 0xFF`: `0x8A5B` (stop-music `ah=1` + the
     /// `[cs:0x1280]` export), `0x8A3B` (load the `al = ax` sfx record,
     /// `ah=3`), then the `[cs:0x127C]` export with `cl` (the caller
-    /// already applied the wrapper's `inc cl`; both exports are `retf`
-    /// stubs on the timer drivers — they reach only the unported A/R
-    /// module).
+    /// already applied the wrapper's `inc cl`).
     pub fn sfx(&mut self, ax: u16, cl: u8) {
         if self.quiet == 0xFF {
             return;
         }
         let al = ax.to_le_bytes()[0]; // `al` = the command's low byte
         self.int80(1, al);
-        self.far();
+        self.drv.reset();
         self.int80(3, al);
-        self.far();
-        let _ = cl;
+        self.drv.select(cl);
     }
 
     /// `Call::Sound` — the direct `call far [cs:0x127C]` (`cl`
     /// function selector). Same export as `sfx`'s tail.
     pub fn sound(&mut self, cl: u8) {
-        self.far();
-        let _ = cl;
+        self.drv.select(cl);
     }
 
-    /// Fill `out` with the mix — the `ah=0` driver tick interleaved at
-    /// ~50 Hz (`TICK_HZ`, the `0x5CEC` PIT rate), then the bus sample
-    /// each slot.
+    /// `Call::Song` — `call far [cs:0x1278]` (export 3 `load_song`):
+    /// the asm sets `ds = seg`, `si = 0` — the record at file offset
+    /// `seg·16 + 0xC00` (`0x03D7` → `0x4970`, the embedded songs).
+    pub fn song(&mut self, seg: u16, img: &[u8]) {
+        let ofs = usize::from(seg) * 16 + 0xC00;
+        self.drv.load_song(img.get(ofs..).unwrap_or(&[]));
+    }
+
+    /// `Call::SndReset` — `call far [cs:0x1280]` (export 5 `reset`:
+    /// `en = 0` + all-notes-off on A/R; a stub on the trackers).
+    pub fn snd_reset(&mut self) {
+        self.drv.reset();
+    }
+
+    /// Fill `out` with the mix — the driver heartbeat interleaved at
+    /// ~50 Hz (`TICK_HZ` on P/T, the A/R module's `0x5D37` rate), then
+    /// the bus sample each slot.
     pub fn render(&mut self, out: &mut [f32]) {
         let rate = f64::from(self.rate);
+        let hz = if matches!(self.drv, Drv::Ar(_)) {
+            AR_TICK_HZ
+        } else {
+            TICK_HZ
+        };
         for s in out.iter_mut() {
-            self.acc += TICK_HZ;
+            self.acc += hz;
             while self.acc >= rate {
                 self.acc -= rate;
-                if self.timer_dev() {
-                    self.drv.tick();
-                }
+                self.drv.tick();
             }
-            *s = self.drv.ports.sample();
+            *s = self.drv.bus().sample();
         }
     }
 
     /// `[0x155] ≤ 2` — the wrappers' shared gate: the `int 0x80` runs
-    /// the timer-driven (PC/Tandy) module, never on the A/R path.
+    /// the timer-driven (PC/Tandy) module, never the A/R path.
     fn timer_dev(&self) -> bool {
         matches!(self.dev, Sound::PcSpeaker | Sound::Tandy)
     }
@@ -143,21 +171,6 @@ impl Audio {
     fn int80(&mut self, ah: u8, al: u8) {
         if self.timer_dev() {
             self.drv.dispatch(ah, al);
-        }
-    }
-
-    /// `Call::Song`/`Call::SndReset` — the `[cs:0x1278]`/`[cs:0x1280]`
-    /// far-export calls the ending/restart music swaps make; same
-    /// accounting as `far`.
-    pub fn far_export(&mut self) {
-        self.far();
-    }
-
-    /// The `[cs:0x127C]`/`[cs:0x1280]` far exports — `retf` stubs on
-    /// P/T; on A/R they'd land in the unported C driver, so count them.
-    fn far(&mut self) {
-        if !self.timer_dev() {
-            self.dropped += 1;
         }
     }
 }

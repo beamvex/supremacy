@@ -12,7 +12,10 @@ impl Ports for Bus {
             0x42 => self.latch(val),
             0x61 => self.gate = val,
             0x388 => self.opl_addr = val,
-            0x389 => self.opl.write_reg(self.opl_addr, val),
+            0x389 => {
+                self.opl.write_reg(self.opl_addr, val);
+                self.opl_reg4(val);
+            }
             0x331 => self.mpu_cmd(val),
             // `0x330` UART data is accepted and dropped, like every
             // unmapped port.
@@ -36,8 +39,8 @@ impl Ports for Bus {
                 }
             }
             0x331 => u8::from(!self.mpu_ack) << 7,
-            // 0x388 OPL status reads 0 (no timer flags); the rest of
-            // the map floats low.
+            0x388 => self.opl_status(),
+            // The rest of the map floats low.
             _ => 0,
         }
     }
@@ -63,11 +66,38 @@ impl Bus {
         }
     }
 
-    /// `0x331` — MPU-401 command port; `0xFF` (reset) arms the `0xFE`
-    /// acknowledge the driver's poll reads off `0x330`.
-    fn mpu_cmd(&mut self, val: u8) {
-        if val == 0xFF {
-            self.mpu_ack = true;
+    /// `0x331` — MPU-401 command port; any command byte earns the
+    /// `0xFE` acknowledge the driver's DRR poll reads off `0x330`
+    /// (`0xFF` reset, `0x3F` UART-mode, … all ACK on hardware).
+    fn mpu_cmd(&mut self, _val: u8) {
+        self.mpu_ack = true;
+    }
+
+    /// `0x389` to reg 4 — the timer-control effects `detect` (file
+    /// `0x3EA4`) relies on: `0x80` (IRQ reset) clears the flag bits; a
+    /// timer-1 start (bit 0) arms expiry `OPL_T1_READS` status reads
+    /// out (~the 80.8 µs timer vs the driver's ~152-read wait).
+    fn opl_reg4(&mut self, val: u8) {
+        if self.opl_addr != 4 {
+            return;
         }
+        if val & 0x80 != 0 {
+            self.opl_st = 0;
+        }
+        if val & 1 != 0 {
+            self.opl_t1 = super::bus::OPL_T1_READS;
+        }
+    }
+
+    /// `0x388` — OPL status; expiry of an armed timer-1 sets the
+    /// `0xC0` flag pair the canonical `detect` polls for.
+    fn opl_status(&mut self) -> u8 {
+        if self.opl_t1 != 0 {
+            self.opl_t1 -= 1;
+            if self.opl_t1 == 0 {
+                self.opl_st |= 0xC0;
+            }
+        }
+        self.opl_st
     }
 }

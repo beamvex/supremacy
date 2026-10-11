@@ -9,6 +9,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 pub mod gsim;
+pub mod rec;
 pub mod rig;
 
 /// Repo root (crate lives in `<root>/rust`).

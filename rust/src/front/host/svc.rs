@@ -104,7 +104,8 @@ impl VmHost for Host {
             Call::Sound(cl) => self.snd.sound(cl),
             Call::Chan(t, al) => self.snd.chan(t, al),
             Call::Sfx(ax, cl) => self.snd.sfx(ax, cl),
-            Call::Song(_) | Call::SndReset => self.snd.far_export(),
+            Call::Song(seg) => self.snd.song(seg, &self.img),
+            Call::SndReset => self.snd.snd_reset(),
             Call::Load(ofs) => {
                 if !self.load(ofs) {
                     self.dropped += 1;

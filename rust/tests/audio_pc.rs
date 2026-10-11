@@ -116,7 +116,7 @@ fn engine_sfx_reaches_the_bus() {
     a.sfx(0x0000, 0x0F); // the 0x8577 block — record 0
     let mut pcm = vec![0f32; 4410];
     a.render(&mut pcm);
-    assert_eq!(a.drv.ports.divisor(), 0x2AA0);
+    assert_eq!(a.drv.bus().divisor(), 0x2AA0);
     assert!(pcm.iter().any(|&s| s != 0.0));
 }
 
@@ -132,19 +132,19 @@ fn chan_8a80_is_gated_on_quiet() {
     a.chan(0x8A80, 0); // unmuted — song 0 loads and ticks
     a.render(&mut pcm);
     assert!(pcm.iter().any(|&s| s != 0.0));
-    assert_ne!(a.drv.ports.divisor(), 0);
+    assert_ne!(a.drv.bus().divisor(), 0);
 }
 
 #[test]
-fn adlib_select_drops_the_timer_driver() {
+fn adlib_calls_route_to_the_far_exports() {
     let mut a = Audio::new(Sound::AdLib, img().as_slice(), 44_100);
-    a.sfx(0x0026, 0x0F); // 0x8A5B + 0x8A3B + [cs:0x127C] — two exports
+    a.sfx(0x0026, 0x0F); // 0x8A5B + 0x8A3B + [cs:0x127C] select
     a.chan(0x8A5B, 0); // int 80 skipped (dev > 2) + far [cs:0x1280]
-    a.chan(0x8A80, 0); // no far call in this wrapper — stays silent
+    a.chan(0x8A80, 0); // int-80 wrapper — gated out, nothing fires
     let mut pcm = vec![0f32; 4410];
     a.render(&mut pcm);
-    assert!(pcm.iter().all(|&s| s == 0.0));
-    assert_eq!(a.dropped, 3); // [cs:0x1280] + [cs:0x127C] + [cs:0x1280]
+    // The exports route to the ported A/R driver — no drops.
+    assert_eq!(a.dropped, 0);
 }
 
 #[test]
@@ -159,7 +159,7 @@ fn sfx_is_gated_on_quiet() {
     // The int-8 service still runs — its idle path programs the
     // driver's `cx=2` divisor (1.19 MHz / 2, far past Nyquist), which
     // is how the asm silences an unarmed channel.
-    assert_eq!(a.drv.ports.divisor(), 2);
+    assert_eq!(a.drv.bus().divisor(), 2);
 }
 
 #[test]
@@ -186,7 +186,7 @@ fn host_svc_sfx_renders_real_samples() {
     h.svc(Call::Sfx(0x0026, 0x0F)); // kind-7 ambient command
     let mut pcm = vec![0f32; 8820];
     h.snd.render(&mut pcm);
-    assert_ne!(h.snd.drv.ports.divisor(), 0);
+    assert_ne!(h.snd.drv.bus().divisor(), 0);
     assert!(pcm.iter().any(|&s| s != 0.0));
     assert_eq!(h.dropped, 0); // the sound calls aren't dropped anymore
 }

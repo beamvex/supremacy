@@ -6,6 +6,9 @@ const SPK_AMP: f32 = 0.25;
 /// OPL gain — `render_frame` runs on the hardware ±4084-per-channel
 /// exp scale; `/32768` normalises a full 9-voice chord to about ±1.
 const OPL_GAIN: f32 = 1.0 / 32768.0;
+/// Status reads before the armed OPL timer-1 "expires" — the ~80.8 µs
+/// timer ≈ 80 ISA `in` cycles; `detect`'s wait is 4×38 reads.
+pub(super) const OPL_T1_READS: u8 = 80;
 
 /// The host's port-mapped sound hardware — the concrete
 /// [`Ports`][crate::audio::Ports] sink
@@ -25,9 +28,14 @@ pub struct Bus {
     pub(super) gate: u8,
     /// `AdLib` address latch (`0x388`).
     pub(super) opl_addr: u8,
+    /// `0x388` status shadow — bit 7 IRQ + bit 6 timer-1 expired (the
+    /// pair `detect`'s `st1 & 0xE0 == 0xC0` check wants).
+    pub(super) opl_st: u8,
+    /// Status reads left before the started OPL timer-1 expires.
+    pub(super) opl_t1: u8,
     /// The OPL2 chip.
     pub(super) opl: Opl2,
-    /// MPU-401 — `0xFF` written to `0x331` arms the reset ACK.
+    /// MPU-401 — a `0x331` command write arms the `0xFE` ACK.
     pub(super) mpu_ack: bool,
     /// Square-wave phase, 0..1 cycles.
     phase: f64,
@@ -45,6 +53,8 @@ impl Bus {
             latch_hi: false,
             gate: 0,
             opl_addr: 0,
+            opl_st: 0,
+            opl_t1: 0,
             opl: Opl2::new(rate),
             mpu_ack: false,
             phase: 0.0,
@@ -57,6 +67,8 @@ impl Bus {
     pub fn set_rate(&mut self, rate: u32) {
         self.rate = rate;
         self.opl = Opl2::new(rate);
+        self.opl_st = 0;
+        self.opl_t1 = 0;
     }
 
     /// The latched PIT ch2 divisor — what the driver last programmed
