@@ -18,3 +18,7 @@ audio = ["dep:cpal"]
 name = "supremacy-run"
 path = "src/bin/run.rs"
 required-features = ["minifb", "audio"]
+
+[[bin]]
+name = "supremacy-smoke"
+path = "src/bin/smoke.rs"

@@ -31,10 +31,13 @@ rust/
 │   ├── lzss/           # Okumura LZSS decoder (4 asm variants)
 │   ├── palette/        # 256×3 master DAC table
 │   ├── platform/       # int 21h files, int-8 timer, int-9 kbd, int-33h
+│   ├── smoke/          # headless CI run → FNV-1a digest (GAM-24)
 │   ├── video/          # per-mode VRAM + draw-image-by-index
 │   └── bin/
 │       ├── supremacy.rs   # `supremacy` — renders one record → PPM
-│       └── run.rs         # `supremacy-run` — playable minifb shell
+│       ├── difftest.rs    # `difftest` — DOSBox-X differential driver
+│       ├── run.rs         # `supremacy-run` — playable minifb shell
+│       └── smoke.rs       # `supremacy-smoke` — headless digest runner
 └── tests/              # integration tests + fixtures + common rigs
 ```
 
@@ -86,6 +89,8 @@ segment).
 | [`platform`](platform.md) | `0x31D74`, `0x353D`+ | DOS services layer |
 | [`video`](video.md) | `0x2EB8A`, `0x2FB36`, `0x30620`, `0x310CE` | VRAM + draw-by-index |
 | [`front`](front.md) | GAM-9 frontend | `VmHost` impl, `minifb` window |
+| [`difftest`](difftest.md) | GAM-25 | DOSBox-X side-by-side harness |
+| [`smoke`](smoke.md) | GAM-24 | headless tick run → hash digest |
 | [`game`](game-state.md) | `ds:0x7D39` block etc. | state, VM, tick, UI — see below |
 
 The `game` module is large enough to split across six pages:
@@ -116,8 +121,15 @@ The `game` module is large enough to split across six pages:
   `front::Game` (fresh galaxy via `select_galaxy` + `new_game`, saves via
   `HostFs` rooted at the game dir) and runs the `minifb` loop
   (`bin/run.rs`).
+- `supremacy-smoke <GAME-dir> [V] [K] [S] [--ticks N] [--script F.scr]
+  [--expect "k=v,…"] [--frame F.ppm]` — the headless CI mode: steps the
+  game deterministically with no display or audio device and prints a
+  `key=hex` digest of the VRAM, palette, PCM and `ds` state; `--expect`
+  gates it (exit 3 on mismatch). See [smoke](smoke.md).
+- `difftest <script.scr> [--root DIR] [--port-only] …` — the DOSBox-X
+  differential driver (`bin/difftest.rs`); see [difftest](difftest.md).
 
-Both take the DOS letter args positionally; `tail_bytes` synthesises a
+All four take the DOS letter args positionally; `tail_bytes` synthesises a
 PSP command tail (count byte, space, letters at `0x82`/`0x84`/`0x86`) so
 `args::parse` sees exactly what the asm sees.
 

@@ -26,6 +26,8 @@
 //! - [`game`]: the `0x1F8B`-byte saveable state block (`ds:0x7D39`),
 //!   save/load (`0x383CE`/`0x383F3`), the `cs:0x55B2` LCG, the `0x3A`-byte
 //!   record layout, galaxy presets and the `cs:0x9DAB` new-game init.
+//! - [`smoke`]: the headless CI mode — N deterministic `Game::step`s
+//!   hashed into a framebuffer/audio/state [`smoke::Digest`].
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
@@ -42,4 +44,5 @@ pub mod gph;
 pub mod lzss;
 pub mod palette;
 pub mod platform;
+pub mod smoke;
 pub mod video;

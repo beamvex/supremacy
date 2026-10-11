@@ -12,8 +12,9 @@ side-by-side on scripted input and compare state" stretch.
   scheduler). One tick = one int-8 chain call ≈ 55–60 ms.
 - `rust/src/difftest/` — `op`/`script` (record codec + text parser),
   `seg` (`ds`/`drv`/absolute selectors), `dump` (artefact names +
-  24-byte debug block), `snap` (port-side byte images), `drive` (the
-  replay loop), `boot` (start the port from a DOS `ds` dump), `conf`
+  24-byte debug block), `snap` (port-side byte images), `input` (the
+  key/mouse/poke/wait op application, shared with `smoke`), `drive`
+  (the replay loop), `boot` (start the port from a DOS `ds` dump), `conf`
   (the generated `dosbox-x.conf`), `spawn` (headless DOSBox-X),
   `report` (the diff).
 - `rust/src/bin/difftest.rs` — the driver binary.
