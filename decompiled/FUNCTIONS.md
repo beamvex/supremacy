@@ -544,15 +544,35 @@ skips it, so contested galaxies stay quiet).
   `0xA3BC`/`0x21BF`/`0x215B`/`0xA36A`, `jmp 0x8B17`.
 - **B** (`0x8309`): `[0x91F0] = 0xFF`, `[0x9C9A] = 3`, calls
   `0xA3BC`/`0x20F2`/`0x208E`/`0xA36A`, `jmp 0x8C65`.
-- `0x8B17`/`0x8C65` are full-screen sequences: `0xA3BC` + sound `al`,
-  then the music-swap idiom — `call far [cs:0x1280]` (driver reset),
-  `mov ds,0x95A`/`0x5B7` + `si=0` + `call far [cs:0x1278]` (**load_song**
-  export, not an image load — see "`0x1278` is two tables"), `cl=0` +
-  `call far [cs:0x127C]` (select_sound) — then the palette/present
-  slots draw the ending frames from the already-loaded `.BIN` set.
-  Which ending is victory vs defeat is unverified — the
-  conditions only say A ⇔ (faction kind `7` ∨ no kind-`7` planets),
-  B ⇔ (rec0 kind `0xA` ∨ no kind-`0xA` planets).
+- `0x8B17`/`0x8C65` are full-screen sequences: `0xA3BC` + the `0x8A80`
+  channel (`al = 2`/`1`), then the music-swap idiom — `call far
+  [cs:0x1280]` (driver reset), `mov ds,0x95A`/`0x5B7` + `si=0` +
+  `call far [cs:0x1278]` (**load_song** export — see "`0x1278` is two
+  tables"), `cl=0` + `call far [cs:0x127C]` (select_sound) — then
+  `[0x128E]`/`[0x1260]`/`[0x125C]`/`[0x125E]`/`[0x1292]` palette-present
+  over the arm's loaded pair, a `0x63`-frame `0x8891` starfield
+  warm-up, `menu_text` (`[0x1296]`) pages off `cs:0xF672` —
+  A picks `0x5712`/`0x578A`/`0x5802`/`0x587A` by `[0x91E5]`, B pages
+  the credits scroll (`0x5953`, `0x5E52` on scenario 3) until
+  `[0x9CCB]` — a `[0x1290]`/`0x8983` scroll between pages
+  (`cs:0xFB15` picks the `dx` variant), then the seq-run
+  (`cs:0x8863` polling `cs:0x5C1E` on `[0x9198]` streams `cs:0x0A0A`/
+  `0x0DBE`), a `{0x8891, [0x9CDA] == 1, 0x1E2E}` input wait, and
+  `jmp 0x1D35` — the title/new-game restart tail (`0x2F91` +
+  `[0x9C9A]=0`, `*IN.BIN`/`*IN.GPH`, `0x85B1` attract, `[0x9C9A]=1`,
+  base `*.BIN`/`*.GPH`, `jmp 0x305B`).
+- **Verified mapping — A is defeat, B is victory.** The arm loaders
+  dereference the `ds:0x1208`+ filename cells the mode select patches
+  from each template's stem table (`*.BIN`, `*.GPH`, `*IN.*`, `*DTH.*`,
+  `*WIN.*`): A's `0x21BF`/`0x215B` take `dx = 0x122C`/`0x1237` =
+  `*DTH.BIN`/`*DTH.GPH`; B's `0x20F2`/`0x208E` take `dx = 0x1242`/
+  `0x124D` = `*WIN.BIN`/`*WIN.GPH`. So kind `7` = fallen/conquered
+  (lost last world → death screen), kind `0xA` = inhabited (any left →
+  victory screen). The player faction record is index `[0x91B8]` via
+  `0x5E3A` — **not** record `0`, which is the home/starbase record the
+  tribute/pirate events read. Ported as `game/vend.rs` + `vend/seq.rs`
+  + `vend/tail.rs` (frame-stepped `End` in `Vm::end`; tests
+  `tests/game_end.rs`).
 
 ## Event VM — `cs:0x773D` (file `0x3773D`–`0x37C61`)
 

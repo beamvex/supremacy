@@ -21,6 +21,14 @@ buffers are `???.???` templates the video-mode select patches with
   `STEM.BIN` → `AssetSet`, matching how the game loads `MCG`/`EGAIN`/
   `CGAWIN` sets.
 
+`front/load.rs` (`Call::Load`, `Host::set_assets`) covers the same
+loaders driven the other way — the game passes a `ds:0x1208`+ filename
+cell (`*`, `*IN`, `*DTH`, `*WIN` × `.BIN`/`.GPH`), the loader resolves
+it to `{stem}{sfx}.{BIN,GPH}` and swaps the active `AssetSet` when the
+`.GPH` half lands (the endings' `*DTH`/`*WIN` and the restart tail's
+`*IN`/base pairs, GAM-33). The `0x8AC0` insert-disk retry is dropped
+(`dropped` tally).
+
 `AssetSet` (`set.rs`) mirrors the post-loader memory state:
 
 - `records: Vec<Record>` — the `ds:0x158` index, `ofs_para` already

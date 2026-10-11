@@ -7,11 +7,11 @@
 //! `Vm::from_image` (the shipped `ds` image), [`select_galaxy`] +
 //! [`new_game`] (record array + resources), then `shell_enter` itself.
 
-use crate::args::Video;
+use crate::args::{Sound, Video};
 use crate::assets::AssetSet;
 use crate::game::{
-    dispatch_action, frame_step, new_game, select_galaxy, shell_enter, shell_step, Ctx, Frame, Rng,
-    State, Vm, UIMODE,
+    dispatch_action, end_step, frame_step, new_game, select_galaxy, shell_enter, shell_step, Ctx,
+    Frame, Rng, State, Vm, VmHost, UIMODE,
 };
 use crate::palette::Palette;
 use crate::platform::DosFiles;
@@ -46,8 +46,8 @@ pub struct Game {
 
 impl Game {
     /// Fresh game — galaxy `preset` (0..3), PRNG `seed`, `shell_enter`ed
-    /// over a fresh [`Host`] for `video` mode, saving/loading through
-    /// `files`.
+    /// over a fresh [`Host`] for `video` mode + `sound` device (the
+    /// `[0x155]` selector), saving/loading through `files`.
     #[must_use]
     #[allow(clippy::too_many_arguments)]
     pub fn new(
@@ -55,6 +55,7 @@ impl Game {
         set: AssetSet,
         pal: Palette,
         video: Video,
+        sound: Sound,
         k_mode: bool,
         preset: usize,
         seed: u32,
@@ -64,7 +65,7 @@ impl Game {
             vm: Vm::from_image(&img),
             st: State::new(),
             rng: Rng::new(seed),
-            host: Host::new(Screen::new(video), pal, set, img, k_mode),
+            host: Host::new(Screen::new(video), pal, set, img, k_mode, sound),
             files,
             phase: Phase::Shell,
         };
@@ -90,12 +91,21 @@ impl Game {
         }
     }
 
-    /// One frame — mirror inputs into `ds:`, then step the active loop.
-    /// Transitions are action-driven: a shell menu action sets
-    /// `uimode = 5` (`cs:0x3906`) to hand the runner the galaxy loop;
-    /// the galaxy exit edge `jmp 0x2CC5`s — [`shell_enter`] — back.
+    /// One frame — mirror inputs into `ds:` ([`VmHost::pump_input`]),
+    /// then step the active loop. Transitions are action-driven: a
+    /// shell menu action sets `uimode = 5` (`cs:0x3906`) to hand the
+    /// runner the galaxy loop; the galaxy exit edge `jmp 0x2CC5`s —
+    /// [`shell_enter`] — back.
     pub fn step(&mut self) {
-        self.host.pump.write(&mut self.vm, &mut self.st);
+        self.host.pump_input(&mut self.vm, &mut self.st);
+        // A running `cs:0x8B17`/`0x8C65` ending owns the machine — the
+        // asm blocks inside the routine until its `0x1D35` restart, so
+        // the shell/galaxy loops stay parked while `Vm::end` is live.
+        if self.vm.end.is_some() {
+            let mut c = self.ctx();
+            end_step(&mut c);
+            return;
+        }
         match self.phase {
             Phase::Shell => {
                 let mut c = self.ctx();

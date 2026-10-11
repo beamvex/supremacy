@@ -5,7 +5,7 @@
 mod common;
 
 use common::{game_dir, gsim, read, root};
-use supremacy::args::Video;
+use supremacy::args::{Sound, Video};
 use supremacy::assets::{heap_segment, load_set};
 use supremacy::front::{Game, Host, Phase, Pump};
 use supremacy::game::{
@@ -23,7 +23,14 @@ fn host() -> Host {
     let i = img();
     let set = load_set(&game_dir(), "MCG", heap_segment()).unwrap();
     let pal = from_dac(&i[DAC_OFS..DAC_OFS + 768]);
-    Host::new(Screen::new(Video::Mcga), pal, set, i, false)
+    Host::new(
+        Screen::new(Video::Mcga),
+        pal,
+        set,
+        i,
+        false,
+        Sound::PcSpeaker,
+    )
 }
 
 /// A host for `mode` with its matching asset stem and palette model —
@@ -36,7 +43,7 @@ fn mode_host(mode: Video) -> Host {
         Video::Cga => supremacy::palette::Palette::cga(),
         Video::Ega | Video::Tga => supremacy::palette::Palette::ega16(),
     };
-    Host::new(Screen::new(mode), pal, set, i, false)
+    Host::new(Screen::new(mode), pal, set, i, false, Sound::PcSpeaker)
 }
 
 #[test]
@@ -160,6 +167,7 @@ fn game_enters_shell_and_galaxy_exits_on_right_click() {
         load_set(&game_dir(), "MCG", heap_segment()).unwrap(),
         from_dac(&img()[DAC_OFS..DAC_OFS + 768]),
         Video::Mcga,
+        Sound::PcSpeaker,
         false,
         3,
         0x42,

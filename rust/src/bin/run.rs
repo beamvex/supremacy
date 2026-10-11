@@ -59,12 +59,13 @@ fn run(
         Err(e) => return fail(&stem, e),
     };
     let pal = palette(&img, cfg.video);
-    boot(dir, img, set, pal, &cfg, preset, seed, galaxy)
+    boot(dir, stem, img, set, pal, &cfg, preset, seed, galaxy)
 }
 
 #[allow(clippy::too_many_arguments)]
 fn boot(
     dir: PathBuf,
+    stem: String,
     img: Vec<u8>,
     set: supremacy::assets::AssetSet,
     pal: Palette,
@@ -73,17 +74,21 @@ fn boot(
     seed: u32,
     galaxy: bool,
 ) -> ExitCode {
-    let files = Box::new(supremacy::platform::HostFs::new(dir));
+    let files = Box::new(supremacy::platform::HostFs::new(dir.clone()));
     let mut g = Game::new(
         img,
         set,
         pal,
         cfg.video,
+        cfg.sound,
         cfg.keyboard_mouse,
         preset,
         seed,
         files,
     );
+    // `Call::Load`'s `ds:0x1208`+ cell mapping — the endings' `*DTH`/
+    // `*WIN` and the restart tail's `*IN`/base pairs.
+    g.host.set_assets(&dir, &stem);
     if galaxy {
         g.enter_galaxy();
     }

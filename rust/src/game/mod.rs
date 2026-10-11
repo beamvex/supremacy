@@ -103,7 +103,7 @@ pub use status::{sel_name, tick_day};
 pub use text::{enqueue, print_str};
 pub use tick::{tick_step, Tick};
 pub use ticker::ticker_step;
-pub use vend::{endgame, Ending};
+pub use vend::{end_step, endgame, End, Ending};
 pub use vhost::{Call, NullHost, VmHost};
 pub use vm::{Vm, JT_BASE, KEYMAP, KEYMAP_N, KEYMAP_SRC, TAB_BASE};
 pub use vops::{run, vsync, Ctx};

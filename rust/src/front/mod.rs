@@ -7,7 +7,9 @@
 //!   `ds:` pointer tables and packed records, read from the exe image.
 //! - [`Pump`]: int-9/int-33h input state → `[0x9CD6..0x9CCD]` cells.
 //! - [`Host`]: `VmHost` impl — `Image` draws, `Glyph` puts, the
-//!   `0x125C` clear, `0x1260` DAC write, `int 33` calls; everything else
+//!   `0x125C` clear, `0x1260` DAC write, `int 33` calls; `Load` swaps
+//!   the `ds:0x1208`-cell asset pairs, `Text` walks the `menu_text`
+//!   stream, `Stars` runs the `cs:0x4EC4` starfield; everything else
 //!   counted in [`Host::dropped`].
 //! - [`Game`]: owns the `Vm`/`State`/`Rng`/`Host` bundle and alternates
 //!   the shell and galaxy frame loops.
@@ -15,8 +17,11 @@
 
 mod font;
 mod host;
+mod load;
 mod pump;
 mod runner;
+mod stars;
+mod text;
 #[cfg(feature = "minifb")]
 pub mod window;
 

@@ -80,7 +80,7 @@ planet sim `cs:0x3D1E`, defence `cs:0x4434`, stat refresh
 | off | field | notes |
 |---|---|---|
 | `0x00` | `F_WORD0` | zeroed at init |
-| `0x0C` | `F_KIND` | `0xFFFF` empty; `0xA` inhabited; `1`/`4`/`7` other classes |
+| `0x0C` | `F_KIND` | `0xFFFF` empty; `0xA` inhabited; `7` fallen/conquered; `4` unclaimed; `1` colonisation en route |
 | `0x12` | `F_STYPE` | station/ambient type → SFX selector |
 | `0x13` | `F_RATE` | rate × kind for display |
 | `0x0E` | `F_NAME` | 8-byte name + `0x21` terminator (`LIFELESS!` at init) |

@@ -75,11 +75,22 @@ a `dropped` counter for unmodelled calls. `cs:` reads map through
   MCGA only; the EGA/TGA slots are `int 10/AX=1002` palette-register
   writes and CGA's `AH=5` page select, all no-ops under the fixed
   `Palette::{ega16,cga}` model.
+- `Call::Load(ofs)` → `front/load.rs` `Loader` — `ds:0x1208`+ cell →
+  `{stem}{sfx}.{BIN,GPH}`; the `.GPH` half swaps `set`
+  (`Host::set_assets` configures dir + stem; the endings' `*DTH`/`*WIN`
+  and the restart tail's `*IN`/base pairs ride it).
+- `Call::Text(ofs)` → `front/text.rs` — one `menu_text` page of the
+  `ss:0x20000` stream; returns `end<<8 | fb15`; the 16×24 glyph tiles
+  are counted `dropped` (menu font not drawn).
+- `Call::Stars(cx)` → `front/stars.rs` — the host-side `cs:0x4EC4`
+  starfield walk, `cx+1` stars marked in `ink`.
 - `pump_input` → `pump.write`; `key_flush` → `pump.flush_keys`.
-- Menu/Dialog/Refresh/Present/Flash/PlanetPanel/Blit/Screen/other
-  `Slot`/`Native`/`Ui`/`Draw`/`Sound`/`Chan`/`Sfx` → `dropped += 1`
-  (GAM-7/GAM-9 stubs — the window's per-frame blit supersedes the
-  refresh-list copy and palette flushes).
+- Menu/Dialog/Refresh/Present/Flash/PlanetPanel/Blit/other
+  `Slot`/`Native`/`Ui`/`Draw`/`Sound`/`Chan`/`Sfx`/`Song`/`SndReset` →
+  `dropped += 1` (GAM-7/GAM-9 stubs — the window's per-frame blit
+  supersedes the refresh-list copy and palette flushes; the
+  `Sound`/`Chan`/`Sfx`/`Song`/`SndReset` calls await the GAM-31 audio
+  layer).
 
 ## `Game`/`Phase` (`runner.rs`)
 
@@ -90,7 +101,9 @@ image), `State::new`, `Rng::new(seed)`, `Host::new`, then
 preset survives `new_game`'s `0x8432` restore) → `new_game` →
 `shell_enter`.
 
-`step()` = one frame: `pump.write` mirrors inputs into `ds:`, then
+`step()` = one frame: `pump_input` mirrors inputs into `ds:`, then —
+when `Vm::end` is live (`cs:0x8B17`/`0x8C65` sequence running) —
+`end_step` owns the frame and both loops stay parked; otherwise
 `shell_step` (Phase::Shell, `cs:0x2CC5`) or `frame_step`
 (Phase::Galaxy, `cs:0x395B`; returns `Frame::Shell` → back to shell on
 the `[0x9CDA] & 2` exit edge). `enter_galaxy()` forces the galaxy loop —

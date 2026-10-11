@@ -19,6 +19,7 @@
 use super::consts::{REC_BASE, REC_STRIDE, STATE_LEN, STATE_OFS};
 use super::keymap::KEYMAP_BYTES;
 use super::state::State;
+use super::vend::End;
 
 /// `ds:0x50E3` — op jump table base (file `0x37760`).
 pub const JT_BASE: u16 = 0x50E3;
@@ -58,6 +59,11 @@ pub struct Vm {
     /// The `cs:0xE713` modal-dialog flag (a code-segment cell in the
     /// asm; kept here since the port has no code segment).
     pub modal: bool,
+    /// A running `cs:0x8B17`/`0x8C65` ending sequence — the asm blocks
+    /// inside the routine until its `jmp 0x1D35` restart; the port
+    /// suspends it here and [`end_step`][super::vend::end_step]
+    /// advances one unit per frame.
+    pub end: Option<End>,
     /// The heap segment the `0x844B`/`0x8432` routines snapshot the
     /// save block into/out of (allocated at `ds:0x3829` in the asm).
     /// Seeded from the image so `0x8432` during new-game init restores
@@ -75,6 +81,7 @@ impl Vm {
             low: vec![0; LOW_LEN].into_boxed_slice(),
             hi: vec![0; 0x10000 - HI_OFS].into_boxed_slice(),
             modal: false,
+            end: None,
             stage: Box::new([0; STATE_LEN]),
         };
         vm.install_keymap();

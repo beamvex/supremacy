@@ -140,7 +140,29 @@ fn endgame_fires_on_branch_conditions() {
     assert_eq!(r.seq(0xFA), Tick::Endgame(Some(game::Ending::B)));
     assert_eq!(r.st.byte(0x91F0), 0xFF);
     assert_eq!(r.st.byte(0x9C9A), 3);
-    assert_eq!(r.host.0, [Call::Screen(0x8C65)]);
+    // The `0x8309` arm — buttons-only hook, `*WIN.BIN`/`*WIN.GPH` loads,
+    // input reinstall — then the `0x8C65` head (file `0x38309`/`0x38C65`).
+    assert_eq!(
+        r.host.0,
+        [
+            Call::Mouse(0x14, 0x1E, 0),
+            Call::Load(0x1242),
+            Call::Load(0x124D),
+            Call::Mouse(0x14, 0x1F, 0),
+            Call::Mouse(0x14, 0x1E, 0),
+            Call::Chan(0x8A80, 1),
+            Call::SndReset,
+            Call::Song(0x5B7),
+            Call::Sound(0),
+            Call::Slot(0x128E, 8),
+            Call::Slot(0x1260, 0),
+            Call::Slot(0x125C, 0),
+            Call::Ui(0x2CA9),
+            Call::Present(9),
+            Call::Slot(0x1292, 9),
+        ]
+    );
+    assert!(r.vm.end.is_some());
 }
 
 #[test]

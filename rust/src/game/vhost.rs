@@ -44,9 +44,33 @@ pub enum Call {
     /// `call word [0x1262]` — the `ax`/`bx`/`cx`/`dx` box op at
     /// `cs:0x4309` (window frame before a popup).
     Rect(u16, u16, u16, u16),
-    /// `jmp 0x8B17`/`0x8C65` — the `0xFA` arm's full-screen sequences
-    /// (`ds` swap + `call far [cs:0x1278]` image load).
-    Screen(u16),
+    /// The int-21 asset loaders — `ax=0x4E00` find-first on the
+    /// filename cell at `ds:arg` (the `ds:0x1208`+ `???.???` table the
+    /// mode select patches with the set stem), then open/read/close
+    /// into the load heap, retrying through the `0x8AC0` insert-disk
+    /// prompt on failure (`0x20F2`/`0x208E`/`0x21BF`/`0x215B`/`0x2228`/
+    /// `0x228C`/`0x22F5`/`0x2359`).
+    Load(u16),
+    /// `call word far [cs:0x1278]` — the `load_song` far export;
+    /// `ds:0` holds the song record, the arg is the segment the asm
+    /// loads into `ds` (`0x095A` defeat / `0x05B7` victory / `0x03D7`
+    /// title / `0x0C3E` game).
+    Song(u16),
+    /// `call word far [cs:0x1280]` — the sound-driver reset far export.
+    SndReset,
+    /// `call word [0x1296]` — `menu_text` (`cs:0x2F629`): render one
+    /// page of the `ss:` stream cursor `cs:0xF672`. The arg stores a
+    /// fresh cursor first unless it is `u16::MAX` (the resume calls).
+    /// Returns `ax` = `end << 8 | cs:0xFB15` — `end` is the `0x00`-op
+    /// stream terminator the asm latches into `[0x9CCB]` itself (the
+    /// caller mirrors it); the low byte is the page's second header
+    /// byte the scroll variants test.
+    Text(u16),
+    /// `call 0x8891`'s starfield body — the `cs:0x4EC4` table walk
+    /// (move, respawn out-of-bounds, `[0x1294]` mark) for `cx = arg`
+    /// stars (`[0x9206]`). The `0x2CA9` head is the caller's `vsync`;
+    /// the `[0x9206]` growth stays game-side.
+    Stars(u16),
     /// `call word near [slot]` — an indirect `cs:0x12xx` template
     /// dispatch the port doesn't specialise (arg in `di`/`dx`).
     Slot(u16, u16),

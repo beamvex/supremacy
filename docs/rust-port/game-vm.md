@@ -156,10 +156,17 @@ Unmapped targets → `Flow::Ret`.
   `ds:0x4EBA` by the selected record's `+0x2E`/`+0x26`/kind (cycling
   selector `0x91AC` wraps `5→2`), load entry into the message cells
   (`0x9198`/`0x9255..0x926C`/`0x91D6`), refresh, `Native(0x5C49)`.
-- `vend::endgame` (`0xFA`, `cs:0x82E5`) — faction kind 7 or no kind-7
-  planet → `Ending::A` (flag `0x91F1`, code `2`, `Screen(0x8B17)`);
-  rec0 kind `0xA` or no kind-`0xA` planet → `Ending::B` (`0x91F0`, `3`,
-  `Screen(0x8C65)`); else `None`.
+- `vend::endgame` (`0xFA`, `cs:0x82E5`) — faction-record kind 7
+  (fallen — index `[0x91B8]` via `0x5E3A`, not rec0) or no kind-7
+  planet → `Ending::A` = **defeat** (flag `0x91F1`, code `2`, `*DTH`
+  pair via `ds:0x122C`/`0x1237`); rec0 kind `0xA` or no kind-`0xA`
+  planet → `Ending::B` = **victory** (`0x91F0`, `3`, `*WIN` pair via
+  `ds:0x1242`/`0x124D`); else `None`. The arm + sequence head run at
+  fire time; the rest suspends in `Vm::end` and `vend::end_step`
+  (`vend/seq.rs`) paces it per frame — `0x8891` starfield counts,
+  `menu_text` pages (`Call::Text`), the `0x8863` seq wait and the
+  `[0x9CDA]`/`0x1E2E` input poll — until `vend::tail` (`cs:0x1D35`)
+  reloads `*IN`/base assets and `act_newgame`s.
 - `vhud` — `0xA7` sel-ship reprint `(0x2C,0xB)`, `0xFD` faction credits
   dword `(0x45,0x32)`, `0xFC` faction pop `(0x49,0xB)` (all mode-1
   only); `0xAA` set `|0x80` on every `0x7562` sprite slot up to the
@@ -171,10 +178,13 @@ Unmapped targets → `Flow::Ret`.
 `Dialog`, `Refresh`, `Draw(u16,u16)`, `Sound(u8)`, `Chan(u16,u8)`,
 `Flash`, `Present(u16)`, `PlanetPanel`, `Blit(u16,u16)`,
 `Glyph(u8,u16,u16)`, `Native(u16)`, `Ui(u16)`, `Rect(u16,u16,u16,u16)`,
-`Screen(u16)`, `Slot(u16,u16)`, `Image(u16)`, `Sfx(u16,u8)` (the
-`0x8577` wrapper — `ax` command, `cl+1` driver function, `[0x91D3]`
-gate applied before emitting), `Mouse(u16,u16,u16)` (int 33h),
-`KeyPop` (channel-A LIFO pop → `ax`).
+`Load(u16)` (the int-21 loaders on the `ds:0x1208`+ name cells),
+`Song(u16)`/`SndReset` (the `load_song`/driver-reset far exports),
+`Text(u16)` (`menu_text` page → `end<<8 | fb15`), `Stars(u16)`
+(`0x8891`'s `cs:0x4EC4` walk), `Slot(u16,u16)`, `Image(u16)`,
+`Sfx(u16,u8)` (the `0x8577` wrapper — `ax` command, `cl+1` driver
+function, `[0x91D3]` gate applied before emitting),
+`Mouse(u16,u16,u16)` (int 33h), `KeyPop` (channel-A LIFO pop → `ax`).
 
 `trait VmHost { svc(call) -> u16; cs_word(ofs) -> u16; pump_input(vm, st);
 key_flush(); }` — `cs_word` serves the draw sequencer's `cs:` reads;
