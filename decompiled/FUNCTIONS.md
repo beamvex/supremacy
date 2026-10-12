@@ -1530,7 +1530,7 @@ routine (init callees, reprint tails, `*DTH.*` loaders).
 | `fcn.00000548` | `0x01148` | 3 | 44 | `0x01148` (PC); `0x31148` (TGA) | **TGA `lzss`** opaque decoder |
 | `fcn.00000602` | `0x01202` | 3 | 87 | `0x01202` (PC); `0x31202` (TGA) | **TGA `lzss_xor`** decoder |
 | `fcn.00000ddb` | `0x019DB` | 3 | 215 | `0x019DB` (Tandy); `0x319DB` (TGA) | TGA `map_draw` region |
-| `fcn.00000dfc` | `0x019FC` | 1 | 3 | `0x019FC` (Tandy); `0x319FC` (TGA) | routine — unnamed |
+| `fcn.00000dfc` | `0x019FC` | 1 | 3 | `0x019FC` (Tandy); `0x319FC` (TGA) | data — Tandy freq/param table (`00A9,009F,0096…`); the two `call 0x19fc` sites at `0x288C/0x2896` are decodes in the pre-module gap |
 | `fcn.00000f18` | `0x01B18` | 3 | 30 | `0x01B18` (Tandy); `0x31B18` (TGA) | `song` chan-init loop tail |
 | `fcn.00000f3e` | `0x01B3E` | 1 | 45 | `0x01B3E` (Tandy); `0x31B3E` (TGA) | `sfx` rec-copy body |
 | `fcn.00001002` | `0x01C02` | 8 | 41 | `0x01C02` (Tandy); `0x31C02` (TGA) | **`step`** Tandy chan decoder |
@@ -1552,7 +1552,7 @@ routine (init callees, reprint tails, `*DTH.*` loaders).
 | `fcn.000015bf` | `0x021BF` | 1 | 15 | `0x021BF` (Tandy); `0x321BF` (main) | `*DTH.*` arm loader (endgame A) |
 | `fcn.00001628` | `0x02228` | 1 | 44 | `0x02228` (Tandy); `0x32228` (main) | init callee `0x32228` |
 | `fcn.0000168c` | `0x0228C` | 6 | 105 | `0x0228C` (Tandy); `0x3228C` (main) | init callee `0x3228C` |
-| `int.000016f5` | `0x022F5` | 3 | 13 | `0x022F5` (Tandy); `0x322F5` (main) | init callee `0x322F5` |
+| `int.000016f5` | `0x022F5` | 3 | 13 | `0x022F5` (Tandy); `0x322F5` (main) | **`boot_file_load`** — `0x4E00` find-first `ds:0x1222` (retry via `0x8AC0` err), `0x3D00` open, `0x3F00` read `0x10B0` — startup file load; `0x22F5` = Tandy data |
 | `fcn.00001759` | `0x02359` | 52 | 436 | `0x02359` (Tandy); `0x32359` (main) | init callee `0x32359` (52 bb) |
 | `fcn.000019e2` | `0x025E2` | 1 | 1 | `0x025E2` (Tandy); `0x325E2` (main) | `0x25E2` modal print enqueue |
 | `fcn.000019eb` | `0x025EB` | 42 | 317 | `0x025EB` (Tandy); `0x325EB` (main) | inside modal printer |
@@ -1562,49 +1562,49 @@ routine (init callees, reprint tails, `*DTH.*` loaders).
 | `fcn.00001ac1` | `0x026C1` | 33 | 128 | `0x026C1` (Tandy); `0x326C1` (main) | `0x26C1` reprint tail |
 | `fcn.00001b41` | `0x02741` | 1 | 2 | `0x02741` (Tandy); `0x32741` (main) | `0x2741` reprint tail |
 | `fcn.00001d0a` | `0x0290A` | 11 | 415 | `0x0290A` (A/R); `0x3290A` (main) | int-80 entry jump-table tail |
-| `fcn.00001d3d` | `0x0293D` | 1 | 36 | `0x0293D` (A/R); `0x3293D` (main) | routine — unnamed |
-| `fcn.00001d61` | `0x02961` | 1 | 33 | `0x02961` (A/R); `0x32961` (main) | routine — unnamed |
-| `fcn.00001d82` | `0x02982` | 7 | 74 | `0x02982` (A/R); `0x32982` (main) | routine — unnamed |
+| `fcn.00001d3d` | `0x0293D` | 1 | 36 | `0x0293D` (A/R); `0x3293D` (main) | `xfer_total` — sum send fields `+0xA/+0xE/+0x10/+0x12` → print `(0x16,0x38)`, gated `[0x91DD]` (file `0x3293D` cs:`0x293D`; called from the four xfer reprint tails) |
+| `fcn.00001d61` | `0x02961` | 1 | 33 | `0x02961` (A/R); `0x32961` (main) | `pair_print` — `[si]` at `dx=0xB4`, then `[di]` if `[0x91DD]` (file `0x32961`; mod = `AA`-fill data) |
+| `fcn.00001d82` | `0x02982` | 7 | 74 | `0x02982` (A/R); `0x32982` (main) | `mach_sel 1` body — bay `[0x9184]+0x18` → machine rec, `0` → msgs `0x69B1`/`0x68C7` (file `0x32982`, head `0x3297E` cs:`0x297E`) |
 | `fcn.00001dd9` | `0x029D9` | 4 | 21 | `0x029D9` (A/R); `0x329D9` (main) | pre-`select_sound` thunk (`select_sound`=file `0x29EE`) |
-| `fcn.00001ee1` | `0x02AE1` | 3 | 22 | `0x02AE1` (A/R); `0x32AE1` (main) | routine — unnamed |
-| `fcn.00001ef7` | `0x02AF7` | 1 | 3 | `0x02AF7` (A/R); `0x32AF7` (main) | routine — unnamed |
+| `fcn.00001ee1` | `0x02AE1` | 3 | 22 | `0x02AE1` (A/R); `0x32AE1` (main) | main `mach_sel 2` body — bay `+0x1C` → shared resolve (file `0x32AE1`, head `0x32ADD` cs:`0x2ADD`; sibling `0x32AEA` = `mach_sel 3`) / mod `0x2AE1` = cmd-complete tail (`[0x205C]=cl;[0x2060]=0xFF`→retf) |
+| `fcn.00001ef7` | `0x02AF7` | 1 | 3 | `0x02AF7` (A/R); `0x32AF7` (main) | main **`xfer_out A`** (food) — `cx=min(5,src)` unit `+0xA` → planet `+0x2C` (file `0x32AF7` cs:`0x2AF7`; `unload_all` `0x4E0A` loops all four) / mod `0x2AF7` = mid-split |
 | `fcn.00001f05` | `0x02B05` | 5 | 27 | `0x02B05` (A/R); `0x32B05` (main) | guard helper (`[0x2060]`==0 → `ret`) |
-| `fcn.00001f20` | `0x02B20` | 1 | 9 | `0x02B20` (A/R); `0x32B20` (main) | routine — unnamed |
-| `fcn.00001f40` | `0x02B40` | 3 | 48 | `0x02B40` (A/R); `0x32B40` (main) | routine — unnamed |
-| `fcn.00001f49` | `0x02B49` | 3 | 22 | `0x02B49` (A/R); `0x32B49` (main) | routine — unnamed |
-| `fcn.00001f72` | `0x02B72` | 3 | 22 | `0x02B72` (A/R); `0x32B72` (main) | routine — unnamed |
+| `fcn.00001f20` | `0x02B20` | 1 | 9 | `0x02B20` (A/R); `0x32B20` (main) | main **`xfer_out B`** (minerals) — `+0xE` → `+0x30` (file `0x32B20` cs:`0x2B20`) / mod `0x2B20` = `vol_zero` (`[0x2058]=0;call 0x2B40;[0x1C05/0x2060]=0`) |
+| `fcn.00001f40` | `0x02B40` | 3 | 48 | `0x02B40` (A/R); `0x32B40` (main) | `snd_volume` — clamp `[0x2058]`≤100→`[0x2055]`; Roland→`mpu_sysex`, AdLib→`[0x2056]` (file `0x2B40`) |
+| `fcn.00001f49` | `0x02B49` | 3 | 22 | `0x02B49` (A/R); `0x32B49` (main) | main **`xfer_out C`** (fuel) — `+0x10` → `+0x32` (file `0x32B49` cs:`0x2B49`) / mod `0x2B49` = inside `snd_volume` |
+| `fcn.00001f72` | `0x02B72` | 3 | 22 | `0x02B72` (A/R); `0x32B72` (main) | main **`xfer_out D`** (energy) — `+0x12` → `+0x34` (file `0x32B72` cs:`0x2B72`) / mod `0x2B72` = `chan_foreach` (call `0x3A74` per `0x20` rec) |
 | `fcn.00001f86` | `0x02B86` | 3 | 45 | `0x02B86` (A/R); `0x32B86` (main) | driver routine (pusha prologue) |
 | `fcn.00001fb3` | `0x02BB3` | 3 | 45 | `0x02BB3` (A/R); `0x32BB3` (main) | driver routine (pusha prologue) |
-| `fcn.00001fe0` | `0x02BE0` | 8 | 138 | `0x02BE0` (A/R); `0x32BE0` (main) | routine — unnamed |
+| `fcn.00001fe0` | `0x02BE0` | 8 | 138 | `0x02BE0` (A/R); `0x32BE0` (main) | `patch_rec_copy` — 8B copy `0x200B+idx·8` → `0x2002` (file `0x2BE0`, callers `0x2A09/0x2A9B`) |
 | `fcn.0000206a` | `0x02C6A` | 5 | 23 | `0x02C6A` (A/R); `0x32C6A` (main) | **`max_sound_scan`** (in `load_song`) |
-| `fcn.000020a9` | `0x02CA9` | 2 | 32 | `0x02CA9` (A/R); `0x32CA9` (main) | routine — unnamed |
-| `fcn.000020be` | `0x02CBE` | 10 | 70 | `0x02CBE` (A/R); `0x32CBE` (main) | routine — unnamed |
+| `fcn.000020a9` | `0x02CA9` | 2 | 32 | `0x02CA9` (A/R); `0x32CA9` (main) | main **`vsync`** — BDA `[es:0x63]+6` port `0x3DA` bit-3 edge wait, 38 callers (file `0x32CA9`) / mod `0x2CA9` = driver mid-split |
+| `fcn.000020be` | `0x02CBE` | 10 | 70 | `0x02CBE` (A/R); `0x32CBE` (main) | inside `vsync` tail (file `0x32CBE`) / mod `0x2CBE` = driver mid-split |
 | `fcn.00002104` | `0x02D04` | 1 | 8 | `0x02D04` (A/R); `0x32D04` (main) | **`timbre_upload`** (mod `0x404`, Roland) |
 | `fcn.0000214f` | `0x02D4F` | 4 | 55 | `0x02D4F` (A/R); `0x32D4F` (main) | **`timbre_slot_send`** (mod `0x44F`) |
-| `fcn.0000219f` | `0x02D9F` | 1 | 6 | `0x02D9F` (A/R); `0x32D9F` (main) | routine — unnamed |
+| `fcn.0000219f` | `0x02D9F` | 1 | 6 | `0x02D9F` (A/R); `0x32D9F` (main) | mod `0x2D9F` = inside a Roland `mpu_sysex` routine / main `0x32D9F` = inside msg/warn block (`bx=[0x91C2]` gate) |
 | `fcn.0000228c` | `0x02E8C` | 3 | 24 | `0x02E8C` (A/R); `0x32E8C` (main) | chan-idx wrap helper (`[0x1C83]`) |
 | `fcn.000022a4` | `0x02EA4` | 4 | 24 | `0x02EA4` (A/R); `0x32EA4` (main) | sound→block scan (`di=0x170A,cx=0x7F`) |
 | `fcn.000022bc` | `0x02EBC` | 25 | 256 | `0x02EBC` (A/R); `0x32EBC` (main) | **`queue_tick`** head (loop `0x2EDD`) |
-| `fcn.00002321` | `0x02F21` | 1 | 5 | `0x02F21` (A/R); `0x32F21` (main) | routine — unnamed |
-| `fcn.00002324` | `0x02F24` | 1 | 4 | `0x02F24` (A/R); `0x32F24` (main) | routine — unnamed |
-| `fcn.0000232d` | `0x02F2D` | 1 | 1 | `0x02F2D` (A/R); `0x32F2D` (main) | routine — unnamed |
-| `fcn.00002391` | `0x02F91` | 1 | 5 | `0x02F91` (A/R); `0x32F91` (main) | routine — unnamed |
-| `fcn.000023d7` | `0x02FD7` | 1 | 1 | `0x02FD7` (A/R); `0x32FD7` (main) | routine — unnamed |
-| `fcn.000023e7` | `0x02FE7` | 5 | 51 | `0x02FE7` (A/R); `0x32FE7` (main) | routine — unnamed |
+| `fcn.00002321` | `0x02F21` | 1 | 5 | `0x02F21` (A/R); `0x32F21` (main) | `dlg_print_a` — `si=0x78B8`, `bx=0x2A`, `dx=0xB1` → `jmp print_str` (file `0x32F21`) |
+| `fcn.00002324` | `0x02F24` | 1 | 4 | `0x02F24` (A/R); `0x32F24` (main) | `dlg_print_a` shared tail (file `0x32F24`, 6 dlg callers) |
+| `fcn.0000232d` | `0x02F2D` | 1 | 1 | `0x02F2D` (A/R); `0x32F2D` (main) | `dlg_edit_paint` — `0x78C3` row + `call 0xA3BC` line-edit field (file `0x32F2D`) |
+| `fcn.00002391` | `0x02F91` | 1 | 5 | `0x02F91` (A/R); `0x32F91` (main) | `stage_copy` thunk → `0x844B` staging copy (file `0x32F91`; called right after `save_state`) |
+| `fcn.000023d7` | `0x02FD7` | 1 | 1 | `0x02FD7` (A/R); `0x32FD7` (main) | `dlg_rect` — `(0x14,0x5A,8,0x66)` → `jmp [0x1262]` filename-box op (file `0x32FD7`) |
+| `fcn.000023e7` | `0x02FE7` | 5 | 51 | `0x02FE7` (A/R); `0x32FE7` (main) | `dlg_frame` — `[0x91F2]=0xFF`, vsync, `blink_step`, ticker gate, seq, `map_gate`, `mark_sel` (file `0x32FE7`, 7 callers) |
 | `fcn.000023ef` | `0x02FEF` | 74 | 2109 | `0x02FEF` (A/R); `0x32FEF` (main) | **`event_dispatch`** Roland-gate→`0x3604` |
-| `fcn.0000243a` | `0x0303A` | 1 | 13 | `0x0303A` (A/R); `0x3303A` (main) | routine — unnamed |
+| `fcn.0000243a` | `0x0303A` | 1 | 13 | `0x0303A` (A/R); `0x3303A` (main) | `kind_name` — rec `+0xC` kind → name ptr (4/1/7/other → `0x71AE/0x71B9/0x71A3/0x7198`) (file `0x3303A`) |
 | `fcn.000024ac` | `0x030AC` | 50 | 2070 | `0x030AC` (A/R); `0x330AC` (main) | **`event_dispatch_2`** Roland-gate→`0x36BE` |
 | `fcn.0000255c` | `0x0315C` | 1 | 26 | `0x0315C` (A/R); `0x3315C` (main) | midi send pair (`mpu_send`×2) |
-| `fcn.00002689` | `0x03289` | 5 | 65 | `0x03289` (A/R); `0x33289` (main) | routine — unnamed |
-| `fcn.000026ca` | `0x032CA` | 3 | 25 | `0x032CA` (A/R); `0x332CA` (main) | routine — unnamed |
-| `fcn.000026e3` | `0x032E3` | 4 | 61 | `0x032E3` (A/R); `0x332E3` (main) | routine — unnamed |
-| `fcn.0000273b` | `0x0333B` | 7 | 93 | `0x0333B` (A/R); `0x3333B` (main) | routine — unnamed |
-| `fcn.00002745` | `0x03345` | 3 | 40 | `0x03345` (A/R); `0x33345` (main) | routine — unnamed |
-| `fcn.0000274f` | `0x0334F` | 5 | 56 | `0x0334F` (A/R); `0x3334F` (main) | math helper (shl/sub) |
+| `fcn.00002689` | `0x03289` | 5 | 65 | `0x03289` (A/R); `0x33289` (main) | mod **`midi_prog`** — prog-change send w/ `[si+8]=0x2000` bank fix via `mpu_send` pair (file `0x3289`) / main `0x33289` = inside galaxy repaint (`0x6F53` list, `0x6A8E` day, `0x334F` status, seq `0x3CC`) |
+| `fcn.000026ca` | `0x032CA` | 3 | 25 | `0x032CA` (A/R); `0x332CA` (main) | mod **`midi_note_on`** — `0x90+ch`, note, `0x7F` vel via `mpu_send` (file `0x32CA`) / main `0x332CA` = inside shell-exit tail (`0x5EE6`, `[0xA858]=[0x9CC8]`, `jmp 0x2CC5`) |
+| `fcn.000026e3` | `0x032E3` | 4 | 61 | `0x032E3` (A/R); `0x332E3` (main) | mod **`chan_prog_init`** — chan rec init: `[si+0x12]=[si]` prog, `+0xC`/`+0x10` from tables `0x1B00` (file `0x32E3`) / main `0x332E3` = inside `order_mode 0` sfx block (head `0x332DB`) |
+| `fcn.0000273b` | `0x0333B` | 7 | 93 | `0x0333B` (A/R); `0x3333B` (main) | main **`order_mode 2` inner** — `[0x91CB]=2`, str `0x75A5` → `jmp 0x3357` (file `0x3333B` cs:`0x333B`; sfx-free entry replayed by `0x71C4`) / mod `0x333B` = inside chan env-ramp |
+| `fcn.00002745` | `0x03345` | 3 | 40 | `0x03345` (A/R); `0x33345` (main) | main **`order_mode 1` inner** — `[0x91CB]=1`, str `0x758F` → `0x3357` (`0x334F` = mode-0/`0x7579` sibling) / mod `0x3345` = inside env-ramp |
+| `fcn.0000274f` | `0x0334F` | 5 | 56 | `0x0334F` (A/R); `0x3334F` (main) | main **`order_mode 0` inner** — `[0x91CB]=0`, str `0x7579` → `0x3357` tail (file `0x3334F` cs:`0x334F`) / mod `0x334F` = data/`cmp` mid-split |
 | `fcn.000027cf` | `0x033CF` | 3 | 62 | `0x033CF` (A/R); `0x333CF` (main) | **`roland_init`** (doc `0x33D0`) |
 | `fcn.0000280d` | `0x0340D` | 3 | 16 | `0x0340D` (A/R); `0x3340D` (main) | roland-detect wrapper |
-| `fcn.0000281d` | `0x0341D` | 3 | 20 | `0x0341D` (A/R); `0x3341D` (main) | routine — unnamed |
-| `fcn.00002838` | `0x03438` | 3 | 62 | `0x03438` (A/R); `0x33438` (main) | routine — unnamed |
+| `fcn.0000281d` | `0x0341D` | 3 | 20 | `0x0341D` (A/R); `0x3341D` (main) | mod **`midi_chan_reset`** — per-chan `0xB0+di`: `0x7B` all-notes-off, `0x40` sustain-off, `0xE0` pitch-bend centre (file `0x341D`) / main `0x3341D` = inside a port-read loop |
+| `fcn.00002838` | `0x03438` | 3 | 62 | `0x03438` (A/R); `0x33438` (main) | mod `0x3438` = inside `midi_chan_reset` loop / main `0x33438` = **`sidebar_redraw`** dirty-stash `[0x9144/46]`→`[0x9CBC/BE]` + `0x38CE` + `planet_list_paint` |
 | `fcn.00002870` | `0x03470` | 12 | 73 | `0x03470` (A/R); `0x33470` (main) | **`mpu_reset`** |
 | `fcn.000028b9` | `0x034B9` | 3 | 15 | `0x034B9` (A/R); `0x334B9` (main) | **`mpu_sysex`** |
 | `fcn.000028c8` | `0x034C8` | 5 | 44 | `0x034C8` (A/R); `0x334C8` (main) | `mpu_sysex_block` |
@@ -1614,35 +1614,35 @@ routine (init callees, reprint tails, `*DTH.*` loaders).
 | `fcn.0000293d` | `0x0353D` | 1 | 15 | `0x0353D` (A/R); `0x3353D` (main) | **`prog_pit`** |
 | `fcn.00002952` | `0x03552` | 1 | 58 | `0x03552` (A/R); `0x33552` (main) | **`timer_install`** |
 | `fcn.0000298c` | `0x0358C` | 3 | 51 | `0x0358C` (A/R); `0x3358C` (main) | **`timer_uninstall`** |
-| `fcn.00002bc7` | `0x037C7` | 1 | 3 | `0x037C7` (A/R); `0x337C7` (main) | routine — unnamed |
+| `fcn.00002bc7` | `0x037C7` | 1 | 3 | `0x037C7` (A/R); `0x337C7` (main) | main **`count_kinds`** — census `+0xC==0xA`→bp, `==7`→ax over `[0x91B8]` recs (file `0x337C7` cs:`0x37C7` — the census `order_collect` calls) |
 | `fcn.00002bce` | `0x037CE` | 7 | 310 | `0x037CE` (A/R); `0x337CE` (main) | cmd case dispatch (`al` 4→`0x3903`) |
-| `fcn.00002c2c` | `0x0382C` | 4 | 48 | `0x0382C` (A/R); `0x3382C` (main) | routine — unnamed |
-| `fcn.00002cc2` | `0x038C2` | 1 | 4 | `0x038C2` (A/R); `0x338C2` (main) | routine — unnamed |
-| `fcn.00002cce` | `0x038CE` | 1 | 4 | `0x038CE` (A/R); `0x338CE` (main) | routine — unnamed |
-| `fcn.00002d04` | `0x03904` | 1 | 55 | `0x03904` (A/R); `0x33904` (main) | routine — unnamed |
-| `fcn.00002d3b` | `0x0393B` | 3 | 26 | `0x0393B` (A/R); `0x3393B` (main) | routine — unnamed |
-| `fcn.00002d55` | `0x03955` | 6 | 128 | `0x03955` (A/R); `0x33955` (main) | routine — unnamed |
-| `fcn.00002d77` | `0x03977` | 3 | 53 | `0x03977` (A/R); `0x33977` (main) | routine — unnamed |
-| `fcn.00002dd5` | `0x039D5` | 1 | 17 | `0x039D5` (A/R); `0x339D5` (main) | routine — unnamed |
-| `fcn.00002de6` | `0x039E6` | 8 | 142 | `0x039E6` (A/R); `0x339E6` (main) | routine — unnamed |
-| `fcn.00002e47` | `0x03A47` | 1 | 26 | `0x03A47` (A/R); `0x33A47` (main) | routine — unnamed |
-| `fcn.00002e74` | `0x03A74` | 12 | 91 | `0x03A74` (A/R); `0x33A74` (main) | routine — unnamed |
-| `fcn.00002ee9` | `0x03AE9` | 1 | 24 | `0x03AE9` (A/R); `0x33AE9` (main) | routine — unnamed |
-| `fcn.00002f01` | `0x03B01` | 11 | 99 | `0x03B01` (A/R); `0x33B01` (main) | routine — unnamed |
-| `fcn.00002f64` | `0x03B64` | 2 | 12 | `0x03B64` (A/R); `0x33B64` (main) | routine — unnamed |
-| `fcn.00002f70` | `0x03B70` | 3 | 45 | `0x03B70` (A/R); `0x33B70` (main) | routine — unnamed |
-| `fcn.00002f9d` | `0x03B9D` | 7 | 111 | `0x03B9D` (A/R); `0x33B9D` (main) | routine — unnamed |
-| `fcn.0000300c` | `0x03C0C` | 1 | 15 | `0x03C0C` (A/R); `0x33C0C` (main) | routine — unnamed |
+| `fcn.00002c2c` | `0x0382C` | 4 | 48 | `0x0382C` (A/R); `0x3382C` (main) | mod **`note_fnum`** — `[si+0x12]=note`, `fnum=[0x1D60+note*2]` → `[si+0xC]` target (file `0x382C`, caller `0x36AB`) |
+| `fcn.00002cc2` | `0x038C2` | 1 | 4 | `0x038C2` (A/R); `0x338C2` (main) | main `label_print` — `si=0x75BB` at `(0xA,0x61)` → `print_str` thunk (file `0x338C2`, 5 callers) |
+| `fcn.00002cce` | `0x038CE` | 1 | 4 | `0x038CE` (A/R); `0x338CE` (main) | main `hud_sfx_line` — dirty-rect `[0x1298]` + `[0x126C]` far-export sfx + `print_str` (file `0x338CE`) |
+| `fcn.00002d04` | `0x03904` | 1 | 55 | `0x03904` (A/R); `0x33904` (main) | mod **`chan_ptr`** — `si=[0x1FCE]+al·0x40`, `ds=[0x1C81]` (file `0x3904`, caller `0x39E7`) |
+| `fcn.00002d3b` | `0x0393B` | 3 | 26 | `0x0393B` (A/R); `0x3393B` (main) | mod **`opl_init`** — `opl_detect` → `opl_reset` → `[0x19AC]=0`, `[0x2062]=0x7F` (file `0x393B`, callers `0x29B0/0x2BCD`) / main `0x3393B` = inside `enter_galaxy` preamble |
+| `fcn.00002d55` | `0x03955` | 6 | 128 | `0x03955` (A/R); `0x33955` (main) | mod **`opl_reset`** — shadow init `0x3C0C`, globals `0x3977/0x39D5`, `opl_key_off` ×9 (file `0x3955`) / main `0x33955` = inside `enter_galaxy` |
+| `fcn.00002d77` | `0x03977` | 3 | 53 | `0x03977` (A/R); `0x33977` (main) | mod **`opl_rhythm_off`** — `al==1` → `opl_key_off` ch 6/7/8 (file `0x3977`) / main `0x33977` = inside main-loop step (int-`0x33` clamp) |
+| `fcn.00002dd5` | `0x039D5` | 1 | 17 | `0x039D5` (A/R); `0x339D5` (main) | mod **`opl_mode_set`** — shadow `[0x1C86/88/8A]` + `0x3DE7` → `0x3CC5` apply (file `0x39D5`) / main `0x339D5` = ambient-sfx select tail |
+| `fcn.00002de6` | `0x039E6` | 8 | 142 | `0x039E6` (A/R); `0x339E6` (main) | mod **`chan_param_load`** — `[si+0x14]=[0x1E3C]` via `chan_ptr` (file `0x39E6`, caller `0x368D`) / main `0x339E6` = inside ambient-sfx select |
+| `fcn.00002e47` | `0x03A47` | 1 | 26 | `0x03A47` (A/R); `0x33A47` (main) | main **`type_select`** — machine-type `[0x91ED]·0x30+0x9B12` → `[0x9154]` (file `0x33A47`) / mod `0x3A47` = inside patch xlat |
+| `fcn.00002e74` | `0x03A74` | 12 | 91 | `0x03A74` (A/R); `0x33A74` (main) | mod **`chan_mode_fetch`** — `[si+0x14]<6` → `0x1D0E` word table (file `0x3A74`, callers `0x2B77/0x366B/0x373F`) |
+| `fcn.00002ee9` | `0x03AE9` | 1 | 24 | `0x03AE9` (A/R); `0x33AE9` (main) | main **`info_panel`** — stat reprint (file `0x33AE9`) / mod `0x3AE9` = fnum pack → `opl_note_half` |
+| `fcn.00002f01` | `0x03B01` | 11 | 99 | `0x03B01` (A/R); `0x33B01` (main) | mod `0x3B01` = inside note-octave handler (`al-=0xC`, `ah<6`) / main `0x33B01` = inside `info_panel` |
+| `fcn.00002f64` | `0x03B64` | 2 | 12 | `0x03B64` (A/R); `0x33B64` (main) | mod `0x3B64` = inside `chan_mode_fetch` family / main `0x33B64` = inside `info_panel` |
+| `fcn.00002f70` | `0x03B70` | 3 | 45 | `0x03B70` (A/R); `0x33B70` (main) | mod **`mode_param`** — `ah<6`→tbl `0x1E60`, `≥6`→tbl `0x1C99+ah-6` (file `0x3B70`, caller `0x2C5E`) |
+| `fcn.00002f9d` | `0x03B9D` | 7 | 111 | `0x03B9D` (A/R); `0x33B9D` (main) | mod **`opl_bulk_write`** — loop `0x12` flagged regs `0x1D3C` via `0x3C1B` (file `0x3B9D`, caller `0x39A6`) |
+| `fcn.0000300c` | `0x03C0C` | 1 | 15 | `0x03C0C` (A/R); `0x33C0C` (main) | mod **`opl_shadow_init`** — `rep stosb` `0x1E84×0x12`=`0x7F` (file `0x3C0C`, caller `0x3955`) |
 | `fcn.0000301b` | `0x03C1B` | 6 | 549 | `0x03C1B` (A/R); `0x33C1B` (main) | copy/send prologue (`ds=es=cs`) |
-| `fcn.00003066` | `0x03C66` | 1 | 7 | `0x03C66` (A/R); `0x33C66` (main) | routine — unnamed |
+| `fcn.00003066` | `0x03C66` | 1 | 7 | `0x03C66` (A/R); `0x33C66` (main) | mod **`patch_fetch`** — 16B patch rec `0x1E96+ah·0x10`, `+8` field, `0x1E84` xlat (file `0x3C66`) |
 | `fcn.0000306d` | `0x03C6D` | 6 | 128 | `0x03C6D` (A/R); `0x33C6D` (main) | math helper (`shl`×4) |
-| `fcn.000030ad` | `0x03CAD` | 1 | 24 | `0x03CAD` (A/R); `0x33CAD` (main) | routine — unnamed |
-| `fcn.000030c5` | `0x03CC5` | 3 | 22 | `0x03CC5` (A/R); `0x33CC5` (main) | routine — unnamed |
-| `fcn.000030db` | `0x03CDB` | 1 | 1 | `0x03CDB` (A/R); `0x33CDB` (main) | routine — unnamed |
-| `fcn.000030dc` | `0x03CDC` | 2 | 26 | `0x03CDC` (A/R); `0x33CDC` (main) | routine — unnamed |
-| `fcn.000030f6` | `0x03CF6` | 4 | 42 | `0x03CF6` (A/R); `0x33CF6` (main) | routine — unnamed |
-| `fcn.00003120` | `0x03D20` | 1 | 49 | `0x03D20` (A/R); `0x33D20` (main) | routine — unnamed |
-| `fcn.00003151` | `0x03D51` | 1 | 54 | `0x03D51` (A/R); `0x33D51` (main) | routine — unnamed |
+| `fcn.000030ad` | `0x03CAD` | 1 | 24 | `0x03CAD` (A/R); `0x33CAD` (main) | main **`print_credits`** — rec `+0x36/+0x38` dword (dirty `0x4`) (file `0x33CAD`) / mod `0x3CAD` = inside patch pack |
+| `fcn.000030c5` | `0x03CC5` | 3 | 22 | `0x03CC5` (A/R); `0x33CC5` (main) | mod **`opl_apply`** — pending shadow → `opl_write` `0x3EFD` (file `0x3CC5`, callers `0x39E3/0x3C51`) |
+| `fcn.000030db` | `0x03CDB` | 1 | 1 | `0x03CDB` (A/R); `0x33CDB` (main) | main **`print_minerals`** — rec `+0x30`, uimode 2 (dirty `0x8000`) (file `0x33CDB`) |
+| `fcn.000030dc` | `0x03CDC` | 2 | 26 | `0x03CDC` (A/R); `0x33CDC` (main) | mod **`patch_xlat`** — `0x1D3C` gate xlat → patch rec (file `0x3CDC`, caller `0x3C57`) |
+| `fcn.000030f6` | `0x03CF6` | 4 | 42 | `0x03CF6` (A/R); `0x33CF6` (main) | main **`print_energy`** — rec `+0x34`, uimode≠0 (file `0x33CF6`) |
+| `fcn.00003120` | `0x03D20` | 1 | 49 | `0x03D20` (A/R); `0x33D20` (main) | mod **`patch_op1`** — carrier param pack (`+3` shl4 OR `+6`) → xlat `0x1D2A` (file `0x3D20`, caller `0x3C5A`) |
+| `fcn.00003151` | `0x03D51` | 1 | 54 | `0x03D51` (A/R); `0x33D51` (main) | mod **`patch_op2`** — feedback pack (`(0xF-+4)` shl4 OR `+7`) (file `0x3D51`, caller `0x3C5D`) |
 | `fcn.00003187` | `0x03D87` | 9 | 96 | `0x03D87` (A/R); `0x33D87` (main) | chan-record lookup (`bx=ah*0x20`) |
 | `fcn.000031e7` | `0x03DE7` | 5 | 45 | `0x03DE7` (A/R); `0x33DE7` (main) | guard on `[0x1C86]` |
 | `fcn.00003240` | `0x03E40` | 1 | 51 | `0x03E40` (A/R); `0x33E40` (main) | `opl_shadow` reg cache |
@@ -1651,27 +1651,27 @@ routine (init callees, reprint tails, `*DTH.*` loaders).
 | `fcn.000032a4` | `0x03EA4` | 5 | 89 | `0x03EA4` (A/R); `0x33EA4` (main) | **`opl_detect`** |
 | `fcn.000032fd` | `0x03EFD` | 1 | 59 | `0x03EFD` (A/R); `0x33EFD` (main) | **`opl_write`** |
 | `fcn.00003338` | `0x03F38` | 1 | 46 | `0x03F38` (A/R); `0x33F38` (main) | **`opl_delay`** |
-| `fcn.000036c3` | `0x042C3` | 2 | 363 | `0x042C3` (A/R); `0x342C3` (main) | routine — unnamed |
-| `fcn.0000382e` | `0x0442E` | 1 | 2 | `0x0442E` (A/R); `0x3442E` (main) | routine — unnamed |
-| `fcn.000038eb` | `0x044EB` | 1 | 29 | `0x044EB` (A/R); `0x344EB` (main) | routine — unnamed |
+| `fcn.000036c3` | `0x042C3` | 2 | 363 | `0x042C3` (A/R); `0x342C3` (main) | main **`tax_label`** — `(tax-1)·0x16` → label tbl `0x79A4` (file `0x342C3`, 3 callers) / `0x42C3` = module-tail data |
+| `fcn.0000382e` | `0x0442E` | 1 | 2 | `0x0442E` (A/R); `0x3442E` (main) | main **`rec_ptr_idx`** — `bx=(idx-0x38-[0x91B6])·0x3A+[0x9158]` → `[0x918C]` (file `0x3442E`) |
+| `fcn.000038eb` | `0x044EB` | 1 | 29 | `0x044EB` (A/R); `0x344EB` (main) | main — inside `defence_weight` (`+0x29` term, `[0x9CC0]` mul) (file `0x344EB`) |
 | `fcn.0000408b` | `0x04C8B` | 1 | 77 | `0x34C8B` (main) | surface/build region |
 | `fcn.000040d8` | `0x04CD8` | 2 | 892 | `0x34CD8` (main) | surface/build region |
-| `fcn.000042b6` | `0x04EB6` | 1 | 3 | `0x34EB6` (main) | routine — unnamed |
-| `fcn.00004454` | `0x05054` | 2 | 49 | `0x35054` (main) | routine — unnamed |
+| `fcn.000042b6` | `0x04EB6` | 1 | 3 | `0x34EB6` (main) | `blink_prompt` — alternate `0x68CF`/`0x69ED` every `0x20` frames (file `0x34EB6`, caller `0x34C52`) |
+| `fcn.00004454` | `0x05054` | 2 | 49 | `0x35054` (main) | `mach_type` — `bl=[si+0x1E]-1` ×`0x30` → type rec (file `0x35054`, caller `0x3753F`) |
 | `fcn.00004457` | `0x05057` | 1 | 3 | `0x35057` (main) | **`0x5057`** host helper |
 | `fcn.00004485` | `0x05085` | 2 | 358 | `0x35085` (main) | **`0x5085`** host lookup |
-| `fcn.000044a9` | `0x050A9` | 1 | 7 | `0x350A9` (main) | routine — unnamed |
-| `fcn.000045e0` | `0x051E0` | 4 | 739 | `0x351E0` (main) | routine — unnamed |
+| `fcn.000044a9` | `0x050A9` | 1 | 7 | `0x350A9` (main) | `list_click_a` — click hit-test `cx≥0x71` region → `0x5191` reject (file `0x350A9`, caller `0x34126`) |
+| `fcn.000045e0` | `0x051E0` | 4 | 739 | `0x351E0` (main) | inside `rec_select` — `[0x917C]=[si+0x1A]`, dirty OR-`0x3000` (file `0x351E0`) |
 | `fcn.000046dd` | `0x052DD` | 1 | 1 | `0x352DD` (main) | `0x52DD` msg/redraw tail |
-| `fcn.000046fe` | `0x052FE` | 1 | 5 | `0x352FE` (main) | routine — unnamed |
-| `fcn.000048c3` | `0x054C3` | 7 | 558 | `0x354C3` (main) | routine — unnamed |
+| `fcn.000046fe` | `0x052FE` | 1 | 5 | `0x352FE` (main) | `status_line` — `si=0x68DC` at `(0xB,0x5F)` print thunk (file `0x352FE`, 8 callers) |
+| `fcn.000048c3` | `0x054C3` | 7 | 558 | `0x354C3` (main) | inside `build_modal` loop — vsync/tick/menu/`0x701D` poll (file `0x354C3`) |
 | `fcn.00004abf` | `0x056BF` | 1 | 1 | `0x356BF` (main) | `0x56BF` header print |
-| `fcn.00004ac2` | `0x056C2` | 1 | 3 | `0x356C2` (main) | routine — unnamed |
-| `fcn.00004ad2` | `0x056D2` | 12 | 706 | `0x356D2` (main) | routine — unnamed |
+| `fcn.00004ac2` | `0x056C2` | 1 | 3 | `0x356C2` (main) | `stats_header` — 5× `stats_row` (file `0x356C2` = the `0x56BF` 5-line header `build_stats` cites) |
+| `fcn.00004ad2` | `0x056D2` | 12 | 706 | `0x356D2` (main) | `stats_row` — `0x68B1` at `(0x34,dx)`, `dx+=0xA` (file `0x356D2`) |
 | `fcn.00004bbc` | `0x057BC` | 3 | 52 | `0x357BC` (main) | `0x57BC` rebuild helper |
 | `fcn.00004d39` | `0x05939` | 1 | 15 | `0x35939` (main) | `0x3593B` detail loop |
-| `fcn.00004d94` | `0x05994` | 1 | 56 | `0x35994` (main) | routine — unnamed |
-| `fcn.00004dcc` | `0x059CC` | 1 | 31 | `0x359CC` (main) | routine — unnamed |
+| `fcn.00004d94` | `0x05994` | 1 | 56 | `0x35994` (main) | `bay_list_print` — rec `+0x18/+0x1C/+0x20` bay rows at `(5,0x29/0x34/0x3F)` (file `0x35994`, 9 callers) |
+| `fcn.00004dcc` | `0x059CC` | 1 | 31 | `0x359CC` (main) | `mach_name` — idx−1 ×`0x28` → `0x9491` name, `0`→`0x6B2E` "none" (file `0x359CC`, 6 callers) |
 | `fcn.00004deb` | `0x059EB` | 6 | 606 | `0x359EB` (main) | `0x59EB` redraw |
 | `fcn.0000501e` | `0x05C1E` | 1 | 308 | `0x35C1E` (main) | **`0x5C1E`** draw sequencer |
 | `fcn.00005049` | `0x05C49` | 1 | 78 | `0x35C49` (main) | `0x5C49` seq fetch |
@@ -1680,40 +1680,40 @@ routine (init callees, reprint tails, `*DTH.*` loaders).
 | `fcn.000051d3` | `0x05DD3` | 1 | 2 | `0x35DD3` (main) | `0x5DD3` sel_next |
 | `fcn.00005283` | `0x05E83` | 1 | 231 | `0x35E83` (main) | `0x5E83` ratio print |
 | `fcn.000052e6` | `0x05EE6` | 2 | 160 | `0x35EE6` (main) | `0x5EE6` sync_sel |
-| `fcn.00005438` | `0x06038` | 1 | 332 | `0x36038` (main) | routine — unnamed |
+| `fcn.00005438` | `0x06038` | 1 | 332 | `0x36038` (main) | `day_reset` — fleet tail + seq reset + `0x614D` (file `0x36038`, caller `0x36C74`) |
 | `fcn.000055e5` | `0x061E5` | 8 | 1705 | `0x361E5` (main) | `0x61E5` fleet redraw |
 | `fcn.00005c86` | `0x06886` | 2 | 13 | `0x36886` (main) | `0x6886` number print |
-| `fcn.00005c93` | `0x06893` | 1 | 4 | `0x36893` (main) | routine — unnamed |
+| `fcn.00005c93` | `0x06893` | 1 | 4 | `0x36893` (main) | `num_print` — `0x20` pad if <10 then powers-of-10 digits `0x2710..1` (file `0x36893`, 7 callers) |
 | `fcn.00005e8e` | `0x06A8E` | 1 | 68 | `0x36A8E` (main) | **`day_print`** tick/day HUD |
-| `fcn.00005ed2` | `0x06AD2` | 1 | 3 | `0x36AD2` (main) | routine — unnamed |
+| `fcn.00005ed2` | `0x06AD2` | 1 | 3 | `0x36AD2` (main) | `sel_name_print` — `[0x9184]` kind `1`→`0x71B9`, else icon `0x3E`+name (file `0x36AD2`, 3 callers) |
 | `fcn.00005f06` | `0x06B06` | 2 | 68 | `0x36B06` (main) | **`0x6B06`** ticker enqueue |
 | `fcn.00005f4a` | `0x06B4A` | 1 | 69 | `0x36B4A` (main) | **`blink_step`** → `ticker` gate |
 | `fcn.00005f8f` | `0x06B8F` | 1 | 53 | `0x36B8F` (main) | `0x6B8F` ticker |
-| `fcn.00005fc4` | `0x06BC4` | 1 | 315 | `0x36BC4` (main) | routine — unnamed |
+| `fcn.00005fc4` | `0x06BC4` | 1 | 315 | `0x36BC4` (main) | `cmd_pop` — `[bp]==0xFE`→`bp=0x928D`; `dec [0x91C2]`; `[0x915C]=bp` (file `0x36BC4`, caller `0x36C0B`) |
 | `fcn.00006212` | `0x06E12` | 1 | 262 | `0x36E12` (main) | `0x6E12` fleet tail |
 | `fcn.00006318` | `0x06F18` | 1 | 6 | `0x36F18` (main) | msg `0x6F18` |
 | `fcn.0000632d` | `0x06F2D` | 2 | 12 | `0x36F2D` (main) | `0x6F2D` wait |
-| `fcn.00006339` | `0x06F39` | 1 | 26 | `0x36F39` (main) | routine — unnamed |
-| `fcn.00006353` | `0x06F53` | 1 | 60 | `0x36F53` (main) | routine — unnamed |
-| `fcn.000063b8` | `0x06FB8` | 1 | 9 | `0x36FB8` (main) | routine — unnamed |
-| `fcn.000063bf` | `0x06FBF` | 2 | 19 | `0x36FBF` (main) | routine — unnamed |
-| `fcn.000063d2` | `0x06FD2` | 2 | 327 | `0x36FD2` (main) | routine — unnamed |
-| `fcn.0000641d` | `0x0701D` | 1 | 6 | `0x3701D` (main) | routine — unnamed |
-| `fcn.00006519` | `0x07119` | 1 | 171 | `0x37119` (main) | routine — unnamed |
-| `fcn.000065c4` | `0x071C4` | 2 | 1282 | `0x371C4` (main) | routine — unnamed |
+| `fcn.00006339` | `0x06F39` | 1 | 26 | `0x36F39` (main) | `frame_step` — frame step w/ `[0x91CD]==6` → `seq_mix` gate (file `0x36F39`, right after `0x6F2D` wait) |
+| `fcn.00006353` | `0x06F53` | 1 | 60 | `0x36F53` (main) | `planet_list_paint` — rect `[0x1298]` + per-rec kind icon via `[0x126C]` (file `0x36F53`, 3 callers) |
+| `fcn.000063b8` | `0x06FB8` | 1 | 9 | `0x36FB8` (main) | `mach_list_off` — `[0x91E2]=0` → `0x38CE`+list (file `0x36FB8`) |
+| `fcn.000063bf` | `0x06FBF` | 2 | 19 | `0x36FBF` (main) | `mach_list_on` — `[0x91E2]=0xFF` → `0x38CE`+list (file `0x36FBF`, 4 callers) |
+| `fcn.000063d2` | `0x06FD2` | 2 | 327 | `0x36FD2` (main) | `mach_list_paint` — rect + 31-entry `0x9491` scan+print (file `0x36FD2`) |
+| `fcn.0000641d` | `0x0701D` | 1 | 6 | `0x3701D` (main) | `list_click` — modal click hit-test `x≥0x1C,y≥0x83` → row (file `0x3701D` cs:`0x701D` — the `0x701D` poll inside modal loops) |
+| `fcn.00006519` | `0x07119` | 1 | 171 | `0x37119` (main) | `list_click_b` — second-region hit-test (file `0x37119`, caller `0x34C5C`) |
+| `fcn.000065c4` | `0x071C4` | 2 | 1282 | `0x371C4` (main) | `order_mode_redraw` — `[0x91CB]` → `0x333B`/`0x3345`/`0x334F` inner trio (file `0x371C4` cs:`0x71C4`, caller `0x370E2`) |
 | `fcn.000067d9` | `0x073D9` | 1 | 6 | `0x373D9` (main) | **`0x73D9`** tick dispatcher |
 | `fcn.00006ac6` | `0x076C6` | 18 | 2085 | `0x376C6` (main) | `0x76DE` msg pass region |
 | `fcn.00006d70` | `0x07970` | 1 | 18 | `0x37970` (main) | `0x7980` wait-kind region |
-| `fcn.000072eb` | `0x07EEB` | 1 | 186 | `0x37EEB` (main) | routine — unnamed |
+| `fcn.000072eb` | `0x07EEB` | 1 | 186 | `0x37EEB` (main) | **`planet_rolls`** — `rand(0x1194)`→`+0x2A` pop, `rand+0x12C`→`+0x2C`, `+0xC8`→`+0x30`, `+0x15E`→`+0x32` (file `0x37EEB`, caller `0x34767`) |
 | `fcn.000073a5` | `0x07FA5` | 1 | 116 | `0x37FA5` (main) | `0x7FA5` name generator |
 | `fcn.00007419` | `0x08019` | 1 | 33 | `0x38019` (main) | `0x8019` machine spawn |
 | `fcn.0000743a` | `0x0803A` | 1 | 56 | `0x3803A` (main) | `0x803A` per-unit spawn |
-| `fcn.00007472` | `0x08072` | 1 | 4 | `0x38072` (main) | routine — unnamed |
-| `fcn.00007476` | `0x08076` | 1 | 4 | `0x38076` (main) | routine — unnamed |
-| `fcn.0000747a` | `0x0807A` | 1 | 580 | `0x3807A` (main) | routine — unnamed |
+| `fcn.00007472` | `0x08072` | 1 | 4 | `0x38072` (main) | inside `unit_init` — `bp+=0xC0` pre-copy (file `0x38072`) |
+| `fcn.00007476` | `0x08076` | 1 | 4 | `0x38076` (main) | inside `unit_init` — `rand16` odd → `bp=0x9B12` type tbl (file `0x38076`) |
+| `fcn.0000747a` | `0x0807A` | 1 | 580 | `0x3807A` (main) | **`unit_init`** — machine rec `+0x1F`=0x10, `+0xC/+0x14/+0x1E/+0x20` from type rec `[bp]` (file `0x3807A`) |
 | `fcn.000076be` | `0x082BE` | 1 | 200 | `0x382BE` (main) | **`0x82BE`** spy charge |
-| `fcn.0000773b` | `0x0833B` | 1 | 38 | `0x3833B` (main) | routine — unnamed |
-| `fcn.00007761` | `0x08361` | 1 | 146 | `0x38361` (main) | routine — unnamed |
+| `fcn.0000773b` | `0x0833B` | 1 | 38 | `0x3833B` (main) | `sfx_pick` — `rand&0xF` → 6B rec `0x4D5E`, toggle `+4`, `al+=0xB` → `call far [0x1282]` (sound export 6) (file `0x3833B`) |
+| `fcn.00007761` | `0x08361` | 1 | 146 | `0x38361` (main) | `blink_icon` — `[0x91DE]`-gated, 4-frame `[0x91DF]` toggle → draw `0x28` via `[0x125A]` (file `0x38361`) |
 | `fcn.00007786` | `0x08386` | 1 | 36 | `0x38386` (main) | `0x8386` sel helper |
 | `fcn.000077aa` | `0x083AA` | 1 | 36 | `0x383AA` (main) | **`mark_sel`** rec `+5` flag |
 | `fcn.000077ce` | `0x083CE` | 1 | 37 | `0x383CE` (main) | **`load_state`** |
@@ -1722,15 +1722,15 @@ routine (init callees, reprint tails, `*DTH.*` loaders).
 | `fcn.0000784b` | `0x0844B` | 1 | 300 | `0x3844B` (main) | staging copy |
 | `fcn.00007868` | `0x08468` | 1 | 48 | `0x38468` (main) | `0x8468` EGA regs restore |
 | `fcn.00007898` | `0x08498` | 1 | 90 | `0x38498` (main) | `0x8498` EGA map-mask |
-| `fcn.000078f2` | `0x084F2` | 1 | 162 | `0x384F2` (main) | routine — unnamed |
+| `fcn.000078f2` | `0x084F2` | 1 | 162 | `0x384F2` (main) | **`ega_state_swap`** — 5-word `cs:0x5384…8C` ↔ `cs:0x5398…A0` xchg (file `0x384F2`, 6 EGA callers) |
 | `fcn.00007977` | `0x08577` | 1 | 58 | `0x38577` (main) | `0x8577` sfx wrapper |
-| `fcn.00007994` | `0x08594` | 1 | 29 | `0x38594` (main) | routine — unnamed |
+| `fcn.00007994` | `0x08594` | 1 | 29 | `0x38594` (main) | `sfx_blip` — gated far-export call `cl=0xA` via `[cs:0x127C]` (file `0x38594`, 3 callers) |
 | `fcn.000079b1` | `0x085B1` | 1 | 690 | `0x385B1` (main) | **`0x85B1`** title attract |
 | `fcn.00007c63` | `0x08863` | 1 | 30 | `0x38863` (main) | `0x8863` seq-run poll |
-| `fcn.00007c81` | `0x08881` | 1 | 16 | `0x38881` (main) | routine — unnamed |
+| `fcn.00007c81` | `0x08881` | 1 | 16 | `0x38881` (main) | `star_step` — vel-add `[si]+=[si+2]`, `[si+4]+=[si+6]` on `cs:0x4EC4` star recs (file `0x38881`, 2 callers) |
 | `fcn.00007c91` | `0x08891` | 1 | 242 | `0x38891` (main) | `0x8891` starfield |
 | `fcn.00007d83` | `0x08983` | 1 | 47 | `0x38983` (main) | `0x8983` scroll |
-| `fcn.00007db2` | `0x089B2` | 1 | 206 | `0x389B2` (main) | routine — unnamed |
+| `fcn.00007db2` | `0x089B2` | 1 | 206 | `0x389B2` (main) | lone `ret` — end of `scroll` `0x8983` (file `0x389B2`); `0x389B3`/`0x389C3` = `int10/0xB` border pair when `[0x143]==5` (CGA) |
 | `fcn.00007db3` | `0x089B3` | 1 | 16 | `0x389B3` (main) | `0x89B3` DAC/clear |
 | `fcn.00007dc3` | `0x089C3` | 1 | 56 | `0x389C3` (main) | `0x89C3` idiom |
 | `fcn.00007dfb` | `0x089FB` | 1 | 32 | `0x389FB` (main) | int-80 `ah=1/2` |
@@ -1741,8 +1741,8 @@ routine (init callees, reprint tails, `*DTH.*` loaders).
 | `fcn.00007ec0` | `0x08AC0` | 1 | 774 | `0x38AC0` (main) | near `0x38AA7` wrapper |
 | `fcn.000081c6` | `0x08DC6` | 1 | 118 | `0x38DC6` (main) | **`map_gate`** (`cs:0x8DC6`) |
 | `fcn.0000823c` | `0x08E3C` | 1 | 42 | `0x38E3C` (main) | **`int24_swap`** |
-| `fcn.00008266` | `0x08E66` | 1 | 15 | `0x38E66` (main) | routine — unnamed |
-| `fcn.00008275` | `0x08E75` | 1 | 2879 | `0x38E75` (main) | routine — unnamed |
+| `fcn.00008266` | `0x08E66` | 1 | 15 | `0x38E66` (main) | **`vid_op1`** — `[0x9CCA]=1` → `call [0x1278]` → `=0` (file `0x38E66`, caller `0x32E9D` dlg) |
+| `fcn.00008275` | `0x08E75` | 1 | 2879 | `0x38E75` (main) | **`vid_op2`** — `[0x9CCA]=2` → `call [0x1278]` → `=0` (file `0x38E75`, caller `0x32EA5` dlg; size 2879 = runaway through `retf` pad) |
 | `fcn.00008b4c` | `0x0974C` | 1 | 590 | — | data — no code-bearing candidate |
 | `fcn.000094de` | `0x0A0DE` | 9 | 489 | `0x2A0DE` (input/menu) | **`int33_swap`** |
 | `fcn.0000a031` | `0x0AC31` | 6 | 2399 | — | data — no code-bearing candidate |
@@ -1765,6 +1765,98 @@ routine (init callees, reprint tails, `*DTH.*` loaders).
 | `fcn.0000fb45` | `0x10745` | 13 | 65993 | `0x30745` (CGA) | **CGA `lzss_xor`** decoder |
 | `entry0` | `0x31117` (full img) | 65 | 197866 | `0x31D17` (main) | **program entry** (`286B:8A67`) — the whole game |
 
+## Call-site pass — clusters resolved by xref + disasm (GAM-4)
+
+Every `fcn.*` row above is now identified. Near-call sites were resolved
+per segment (main-window `+0x30000`, low-window `+0x20000`, module-side
+literal), then each surviving candidate was disassembled. The named
+clusters, in summary:
+
+- **Detail screen xfers** — `fcn.00001ef7`/`1f20`/`1f49`/`1f72` are the
+  doc'd `xfer_out A–D` (`cs:0x2AF7/0x2B20/0x2B49/0x2B72`): `cx=min(5,src)`
+  packets, unit cargo `+0xA/+0xE/+0x10/+0x12` → planet `+0x2C/+0x30/
+  +0x32/+0x34`. The `unload_all` loop (`cs:0x4E0A`, file `0x34E0A`) calls
+  all four plus `xfer_out_people` (`0x34CD8`) while planet stock <
+  `0x7530` and cargo remains. `fcn.00001d3d` = `xfer_total` reprint used
+  by the four col-`0x30/0x38/0x40/0x48` reprint tails.
+- **`mach_sel 1–3`** — `fcn.00001d82`/`1ee1` sit inside the `0x297E`/
+  `0x2ADD`/`0x2AEA` bay-resolve trio (`0` → msgs `0x69B1`/`0x68C7`).
+- **Order mode labels** — `fcn.0000273b`/`02745` are the sfx-free inner
+  entries `0x333B`/`0x3345` (`[0x91CB]=2/1`, str `0x75A5`/`0x758F`,
+  `jmp 0x3357`) behind `order_mode 0/1/2` (`0x32DB/0x32FB/0x331B`, each
+  prefixed by the `[0x91D3]`-gated click-sfx idiom). `fcn.000065c4`
+  `order_mode_redraw` re-dispatches them by `[0x91CB]` after selection
+  changes.
+- **Save/load dialog helpers** — `fcn.00002321`/`02324`/`0232d`/
+  `023d7`/`023e7`/`02391`: `dlg_print_a` (str `0x78B8`/`0x78C3` at
+  `bx=0x2A`), `dlg_edit_paint` (`call 0xA3BC` line-edit field),
+  `dlg_rect` (`jmp [0x1262]` box `(0x14,0x5A,8,0x66)`), `dlg_frame`
+  (vsync + `blink_step` + ticker gate + seq + `map_gate` + `mark_sel`),
+  and `stage_copy` (thunk → `0x844B`, called right after `save_state`).
+  `vid_op1`/`vid_op2` (`fcn.00008266`/`08275`) wrap `call [0x1278]` with
+  `[0x9CCA]=1/2` sub-op selects, both invoked from the dialog at
+  `0x32E9D`/`0x32EA5`.
+- **Info-panel stat services** — `fcn.000030ad`/`030db`/`030f6` =
+  `print_credits` (`+0x36/0x38` dword, dirty `0x4`), `print_minerals`
+  (`+0x30`, uimode 2, dirty `0x8000`), `print_energy` (`+0x34`,
+  uimode≠0). `fcn.00002838` = `sidebar_redraw` (dirty-stash → `0x38CE`
+  → `planet_list_paint` `0x6F53`); `fcn.000063b8`/`063bf`/`063d2` =
+  `mach_list_off/on`/`mach_list_paint` (`[0x91E2]` toggle + 31-entry
+  `0x9491` scan); `fcn.0000641d`/`06519` = `list_click`/`list_click_b`
+  hit-tests (`0x701D` is the modal click poll).
+- **Simulation helpers** — `fcn.00002bc7` `count_kinds` (the `0x37C7`
+  census `order_collect` calls: `+0xC==0xA`→bp, `==7`→ax);
+  `fcn.000072eb` `planet_rolls` (rand pop `+0x2A`, food `+0x2C`,
+  minerals `+0x30`, fuel `+0x32` — caller `0x34767` galaxy build);
+  `fcn.00007472`/`07476`/`0747a` `unit_init` (machine rec `+0x1F`=0x10,
+  `+0xC/+0x14/+0x1E/+0x20` from the `0x9B12` type table);
+  `fcn.00005fc4` `cmd_pop` (`0x928D` stream, `0xFE` sentinel,
+  `[0x91C2]`--); `fcn.00005438` `day_reset` (fleet tail + seq reset +
+  `0x614D`, caller inside `0x6A7B` day rollover).
+- **Print/render helpers** — `fcn.00005c93` `num_print` (space-pad then
+  powers-of-10 digits `0x2710..1`, 7 callers); `fcn.00005ed2`
+  `sel_name_print`; `fcn.00002cc2` `label_print` (`0x75BB` at
+  `(0xA,0x61)` — the `0x38C2` tail `order_collect` cites);
+  `fcn.00002cce` `hud_sfx_line` (dirty-rect `[0x1298]` + `[0x126C]`
+  export + `print_str`); `fcn.00004ac2`/`04ad2` `stats_header`/
+  `stats_row` (the `0x56BF`/`0x56D2` 5-line header `build_stats` cites);
+  `fcn.00004d94` `bay_list_print`; `fcn.00004dcc` `mach_name`
+  (idx−1×`0x28` → `0x9491`, `0` → `0x6B2E` "none").
+- **Frame/screen services** — `fcn.000020a9` = `vsync` confirmed
+  (BDA `[es:0x63]+6` → port `0x3DA` bit-3 edge wait, 38 callers);
+  `fcn.000042b6` `blink_prompt` (alternates `0x68CF`/`0x69ED` every
+  `0x20` frames); `fcn.00007761` `blink_icon` (4-frame `[0x91DF]`
+  toggle → draw `0x28` via `[0x125A]`); `fcn.00007c81` `star_step`
+  (vel-add on `cs:0x4EC4` star recs — inside `0x8891` starfield);
+  `fcn.000078f2` `ega_state_swap` (5-word `cs:0x5384`↔`cs:0x5398` xchg,
+  6 callers inside the EGA draw path); `fcn.00007db2` — lone `ret` at
+  `0x389B2`; `0x389B3`/`0x389C3` are the `int10/0xB` border pair gated
+  on `[0x143]==5` (CGA).
+- **Sfx helpers** — `fcn.0000773b` `sfx_pick` (`rand&0xF` → 6B rec
+  `0x4D5E`, toggle `+4`, `al=+4+0xB` → `call far [0x1282]` sound
+  export 6); `fcn.00007994` `sfx_blip` (`[0x91D3]`-gated `cl=0xA`
+  `[cs:0x127C]` call — same idiom as ambient select).
+- **A/R module internals** (module side of dual-segment rows) —
+  `fcn.00002689` `midi_prog` (prog change w/ `0x2000` bank fix);
+  `fcn.000026ca` `midi_note_on` (`0x90+ch`, `0x7F` vel);
+  `fcn.0000281d` `midi_chan_reset` (`0xB0+ch`: `0x7B`/`0x40`/`0xE0`);
+  `fcn.000026e3` `chan_prog_init`; `fcn.00002d04` `chan_ptr`
+  (`si=[0x1FCE]+al·0x40`); `fcn.00002d3b` `opl_init`
+  (detect→reset→`[0x19AC]=0`); `fcn.00002d55` `opl_reset`;
+  `fcn.00002d77` `opl_rhythm_off`; `fcn.00002dd5` `opl_mode_set`;
+  `fcn.00002de6` `chan_param_load`; `fcn.00002e74` `chan_mode_fetch`;
+  `fcn.00002f70` `mode_param` (`ah<6`→`0x1E60`, `≥6`→`0x1C99`);
+  `fcn.00002f9d` `opl_bulk_write`; `fcn.0000300c` `opl_shadow_init`;
+  `fcn.00003066` `patch_fetch`; `fcn.000030c5` `opl_apply`;
+  `fcn.000030dc` `patch_xlat`; `fcn.00003120`/`03151` `patch_op1`/`op2`
+  (feedback/carrier packs); `fcn.00002c2c` `note_fnum` (`0x1D60`
+  note→fnum tbl → `[si+0xC]`); `fcn.00001f40` `snd_volume`
+  (clamp `[0x2058]`≤100 → `[0x2055]`, Roland `mpu_sysex`);
+  `fcn.00001fe0` `patch_rec_copy` (8B `0x200B`→`0x2002`).
+- **Data rows** — `fcn.00000dfc` (`0x19FC`) decodes as a descending-word
+  table inside the Tandy module; the `call 0x19fc` sites at
+  `0x288C`/`0x2896` are decodes in the pre-module gap, not real calls.
+
 ## Still unnamed (next passes)
 
 - word[2] of the template (0x9000 MCG / 0x8000 others) — likely a VRAM or
@@ -1776,9 +1868,11 @@ routine (init callees, reprint tails, `*DTH.*` loaders).
   their own file offsets.
 - `protect_check` (`0x2EACD`) entry path — reached through a runtime-built
   hotspot action or the intro chain, not a direct near call.
-- `fcn.*` index (above) covers all 245 `functions.txt` entries, but
-  rizin's monolithic `entry0` still hides most of the game: naming the
-  routines reached through its call graph is the real remaining work.
-  The "routine — unnamed" rows and the dual-segment shadow entries
-  (same `op16` valid in module and main windows) need call-site xrefs
-  to settle which segment rizin actually saw.
+- `fcn.*` index (above) covers all 245 `functions.txt` entries and every
+  row is now named or labelled as a mid-split/data. The open work is no
+  longer the index itself but rizin's monolithic `entry0`: routines
+  reachable only through its call graph (hotspot-action targets,
+  deep helpers never in `functions.txt`) still need naming — the
+  hotspot records' `+0xC` action pointers (`ds:[0x9194]` lists,
+  `0x14`-byte stride; see "Menu service") are the next xref source,
+  alongside `disasm/dispatch_tables.txt`.
