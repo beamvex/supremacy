@@ -48,6 +48,11 @@ use crate::video::Screen;
 use super::audio::{Audio, BOOT_RATE};
 use super::{load::Loader, stars::Stars, Pump};
 
+/// A live input poller — the frontend's stand-in for the async
+/// int-9/int-33 ISRs; `pump_input` runs it before each `ds:` mirror so
+/// blocking loops see fresh host input mid-step.
+pub type InputSrc = Box<dyn FnMut(&mut Pump)>;
+
 /// The concrete host — owns the visible framebuffer and input state.
 pub struct Host {
     /// Mode-laid-out VRAM the calls draw into.
@@ -76,6 +81,9 @@ pub struct Host {
     /// `Call::Load`'s dir + set stem (`set_assets` installs it — the
     /// `ds:0x1208`+ cell → `{stem}{sfx}.{BIN,GPH}` mapping).
     loader: Option<Loader>,
+    /// Live input poller — `window::run` installs one; `pump_input`
+    /// runs it before each `ds:` mirror.
+    input_src: Option<InputSrc>,
 }
 
 impl Host {
@@ -102,6 +110,7 @@ impl Host {
             text_cur: 0,
             stars: Stars::new(0x00C0_FFEE),
             loader: None,
+            input_src: None,
         }
     }
 
@@ -109,5 +118,11 @@ impl Host {
     /// endings' `*DTH`/`*WIN` and the restart's `*IN`/base pairs.
     pub fn set_assets(&mut self, dir: &Path, stem: &str) {
         self.loader = Some(Loader::new(dir.to_path_buf(), stem));
+    }
+
+    /// Install (or clear) the live input poller `pump_input` runs —
+    /// the frontend's stand-in for the async int-9/int-33 ISRs.
+    pub fn set_input(&mut self, src: Option<InputSrc>) {
+        self.input_src = src;
     }
 }

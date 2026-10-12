@@ -155,6 +155,9 @@ impl VmHost for Host {
     }
 
     fn pump_input(&mut self, vm: &mut crate::game::Vm, st: &mut crate::game::State) {
+        if let Some(src) = &mut self.input_src {
+            src(&mut self.pump);
+        }
         self.pump.write(vm, st);
         // Keep the audio layer's [0x91D3] gate byte in sync — the
         // `0x8A80`/`0x8577` wrappers key song/sfx dispatch off it.

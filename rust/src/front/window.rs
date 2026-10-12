@@ -7,6 +7,9 @@
 //! save-name editor's alnum/punct/keypad set) plus the `K`-mode nav
 //! arrows, Enter and Esc.
 
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use minifb::{Key, MouseButton, MouseMode, Scale, Window, WindowOptions};
 
 #[cfg(feature = "audio")]
@@ -115,12 +118,12 @@ pub fn run(g: &mut Game) -> Result<(), minifb::Error> {
     if let Some(o) = &audio {
         g.host.snd.set_rate(o.rate);
     }
+    let win = Rc::new(RefCell::new(win));
+    install_input(g, Rc::clone(&win));
     let mut buf = vec![0u32; W * H];
-    let mut prev: Vec<Key> = Vec::new();
     #[cfg(feature = "audio")]
     let mut pcm: Vec<f32> = Vec::new();
-    while win.is_open() {
-        input(g, &win, &mut prev);
+    while win.borrow().is_open() {
         g.step();
         #[cfg(feature = "audio")]
         if let Some(o) = &audio {
@@ -129,22 +132,37 @@ pub fn run(g: &mut Game) -> Result<(), minifb::Error> {
             o.push(&pcm);
         }
         blit(&mut buf, g);
-        win.update_with_buffer(&buf, W, H)?;
+        win.borrow_mut().update_with_buffer(&buf, W, H)?;
     }
+    g.host.set_input(None);
     Ok(())
+}
+
+/// Install the live input poller on `g.host` — `pump_input` runs it at
+/// every `0x2CA9` boundary (each `Game::step` head and inside every
+/// `vsync`'d wait-loop), so clicks and keys land mid-loop like the
+/// asm's int-9/int-33 ISRs. The poller's `Window::update` is what
+/// actually refreshes minifb's input state between `step`s.
+fn install_input(g: &mut Game, win: Rc<RefCell<Window>>) {
+    let mut prev: Vec<Key> = Vec::new();
+    g.host.set_input(Some(Box::new(move |pump| {
+        let mut w = win.borrow_mut();
+        w.update();
+        input(pump, &w, &mut prev);
+    })));
 }
 
 /// Poll minifb → pump — cursor (already buffer-space), button edges,
 /// make/break scancodes.
 #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-fn input(g: &mut Game, win: &Window, prev: &mut Vec<Key>) {
+fn input(pump: &mut super::Pump, win: &Window, prev: &mut Vec<Key>) {
     let (mx, my) = win.get_mouse_pos(MouseMode::Clamp).unwrap_or_default();
-    g.host.pump.move_to(mx.max(0.) as u16, my.max(0.) as u16);
-    g.host.pump.set_buttons(
+    pump.move_to(mx.max(0.) as u16, my.max(0.) as u16);
+    pump.set_buttons(
         win.get_mouse_down(MouseButton::Left),
         win.get_mouse_down(MouseButton::Right),
     );
-    keys(&mut g.host.pump, win, prev);
+    keys(pump, win, prev);
 }
 
 /// Make/break scancodes for the mapped keys that changed since last

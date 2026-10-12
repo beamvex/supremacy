@@ -3,6 +3,7 @@
 //! (file `0x38BC0`–`0x38C62` / `0x38D18`–`0x38DC1`).
 
 use super::super::super::consts::{BUTTONS, KEY_PEND, SEQ_PTR};
+use super::super::super::menu;
 use super::super::super::seq::seq_step;
 use super::super::super::title::title_step;
 use super::super::super::vhost::Call;
@@ -68,9 +69,11 @@ impl End {
     /// `Ph::Input` — the `0x8C3F`/`0x8D9E` poll: one `0x8891` frame
     /// until `[0x9CDA] == 1` or `0x1E2E` pops a key; then `0x2F91`
     /// (`call 0x844B` — the stage restore) + the `0x1D35` restart
-    /// head → `Ph::Title`.
+    /// head → `Ph::Title`. The asm's `[0x9CDA]` is ISR-fed; the port
+    /// runs the `0xA1CA` synth so a click lands.
     pub(super) fn input(self, c: &mut Ctx) -> Self {
         fx::stars(c);
+        menu::keys(c);
         let key = c.host.svc(Call::KeyPop).to_le_bytes()[0];
         if c.vm.r16(c.st, a!(BUTTONS)) != 1 && key == 0 {
             return self;

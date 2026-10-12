@@ -29,6 +29,6 @@ mod text;
 #[cfg(feature = "minifb")]
 pub mod window;
 
-pub use host::Host;
+pub use host::{Host, InputSrc};
 pub use pump::Pump;
 pub use runner::{Game, Phase};

@@ -10,7 +10,7 @@ use super::super::consts::{
 };
 use super::super::vhost::Call;
 use super::super::vops::{vsync, Ctx};
-use super::super::{dialog, dlg_io, init, text};
+use super::super::{dialog, dlg_io, init, menu, text};
 use super::snd;
 
 /// `u16` casts for the `ds:` slot constants.
@@ -50,7 +50,7 @@ fn poll(c: &mut Ctx, held: bool) {
     loop {
         vsync(c);
         c.host.svc(Call::Native(0xA369));
-        c.host.svc(Call::Native(0xA1CA));
+        menu::keys(c);
         if (c.vm.r16(c.st, a!(BUTTONS)) & 1 != 0) == held {
             break;
         }

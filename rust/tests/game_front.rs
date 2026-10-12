@@ -218,6 +218,73 @@ fn pump_latches_synthetic_codes() {
     assert_eq!(c.vm.r16(c.st, u16::try_from(BUTTONS).unwrap()), 1);
 }
 
+/// `pump_input` must re-read the host-side pump state — the port's
+/// stand-in for the int-9/int-33 ISRs that feed the `ds:` cells
+/// mid-loop. Without the live poller, blocking wait-loops see only
+/// what was queued at `Game::step` entry.
+#[test]
+fn pump_input_runs_the_live_poller() {
+    let mut h = host();
+    h.set_input(Some(Box::new(|p| {
+        p.move_to(7, 9);
+        p.set_buttons(true, false);
+    })));
+    let (mut vm, mut st) = (Vm::new(), gsim::galaxy());
+    h.pump_input(&mut vm, &mut st);
+    assert_eq!(
+        (
+            vm.r16(&st, u16::try_from(CUR_X).unwrap()),
+            vm.r16(&st, u16::try_from(CUR_Y).unwrap()),
+            vm.r8(&st, u16::try_from(KEY_PEND).unwrap()),
+            vm.r8(&st, u16::try_from(KEY_CODE).unwrap())
+        ),
+        (7, 9, 1, 0x7E)
+    );
+}
+
+/// `map_click`'s `{vsync, 0xA369, 0xA1CA}` wait-loops poll `[0x9CDA]`
+/// mid-step: the `0xA1CA` key service must run (it was a dropped
+/// `Call::Native`, which hung the loop) and `pump_input` must deliver
+/// fresh edges — this hangs when either half is missing.
+#[test]
+fn map_click_sees_input_inside_its_wait_loop() {
+    let mut g = Game::new(
+        img(),
+        load_set(&game_dir(), "MCG", heap_segment()).unwrap(),
+        from_dac(&img()[DAC_OFS..DAC_OFS + 768]),
+        Video::Mcga,
+        Sound::PcSpeaker,
+        false,
+        3,
+        0x42,
+        Box::new(supremacy::platform::MemFs::new()),
+    );
+    // The host feed: first release whatever was held (poll-wait 1),
+    // then press inside the `[0x111..=0x132] × [0x13..=0x2B]` map
+    // region (poll-wait 2) — like a user releasing the dispatching
+    // click then clicking the minimap.
+    let mut n = 0usize;
+    g.host.set_input(Some(Box::new(move |p| {
+        n += 1;
+        if n > 1 {
+            p.move_to(0x120, 0x20);
+            p.set_buttons(true, false);
+        } else {
+            p.set_buttons(false, false);
+        }
+    })));
+    let mut c = g.ctx();
+    game::dispatch_action(&mut c, 0x23C2); // map_click
+    assert_eq!(
+        (
+            c.vm.r16(c.st, u16::try_from(CUR_X).unwrap()),
+            c.vm.r16(c.st, u16::try_from(CUR_Y).unwrap()),
+            c.vm.r16(c.st, u16::try_from(BUTTONS).unwrap())
+        ),
+        (0x120, 0x20, 1)
+    );
+}
+
 #[test]
 fn game_enters_shell_and_galaxy_exits_on_right_click() {
     let mut g = Game::new(
