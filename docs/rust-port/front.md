@@ -113,8 +113,10 @@ the new-game menu actions that `jmp 0x395B` aren't decoded yet.
 
 `run(g)` — a `320×200` `minifb` window at `Scale::X4`, `set_target_fps(30)`:
 per frame `input()` polls cursor/buttons/keys into the pump (scancodes
-are set-1: arrows `0x48`/`0x50`/`0x4B`/`0x4D`, Enter `0x1C`, Esc `0x01`,
-Space `0x39`, Backspace `0x0E`; break = `scan | 0x80`), `g.step()`, then
+are set-1: the whole `ds:0x7CBD` keymap — alnum rows, `-`/`=`/`;`/`\`/
+`,`/`.`/`/`/space, keypad digits and the edit cluster — plus the
+`K`-mode nav arrows `0x48`/`0x50`/`0x4B`/`0x4D`, Enter `0x1C`, Esc
+`0x01`; break = `scan | 0x80`), `g.step()`, then
 `blit` expands `Screen::pixels()` through `Palette::rgb` into
 `0xRRGGBB` `u32`s for `update_with_buffer`. With the `audio`
 feature a cpal `audio::Out` stream is opened first (rate negotiated

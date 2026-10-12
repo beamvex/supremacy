@@ -3,7 +3,9 @@
 //!
 //! Loop body: read minifb state → [`super::Pump`] → `step` → expand the
 //! mode-laid-out VRAM through the palette → `update_with_buffer`.
-//! Scancodes are set-1 (arrows/Enter/Esc for the `K`-mode nav path).
+//! Scancodes are set-1 — [`SCAN`] covers the `ds:0x7CBD` keymap (the
+//! save-name editor's alnum/punct/keypad set) plus the `K`-mode nav
+//! arrows, Enter and Esc.
 
 use minifb::{Key, MouseButton, MouseMode, Scale, Window, WindowOptions};
 
@@ -17,16 +19,79 @@ const H: usize = 200;
 /// per `step`).
 const FPS: u32 = 30;
 
-/// `minifb` key → DOS set-1 scancode.
+/// `minifb` key → DOS set-1 scancode — every code the game's
+/// `ds:0x7CBD` keymap and the K-mode nav path consume (arrows, Enter,
+/// Esc, the line editor's alnum/punct/keypad set).
 const SCAN: &[(Key, u8)] = &[
+    (Key::Escape, 0x01),
+    (Key::Key1, 0x02),
+    (Key::Key2, 0x03),
+    (Key::Key3, 0x04),
+    (Key::Key4, 0x05),
+    (Key::Key5, 0x06),
+    (Key::Key6, 0x07),
+    (Key::Key7, 0x08),
+    (Key::Key8, 0x09),
+    (Key::Key9, 0x0A),
+    (Key::Key0, 0x0B),
+    (Key::Minus, 0x0C),
+    (Key::Equal, 0x0D),
+    (Key::Backspace, 0x0E),
+    (Key::Q, 0x10),
+    (Key::W, 0x11),
+    (Key::E, 0x12),
+    (Key::R, 0x13),
+    (Key::T, 0x14),
+    (Key::Y, 0x15),
+    (Key::U, 0x16),
+    (Key::I, 0x17),
+    (Key::O, 0x18),
+    (Key::P, 0x19),
+    (Key::Enter, 0x1C),
+    (Key::NumPadEnter, 0x1C),
+    (Key::A, 0x1E),
+    (Key::S, 0x1F),
+    (Key::D, 0x20),
+    (Key::F, 0x21),
+    (Key::G, 0x22),
+    (Key::H, 0x23),
+    (Key::J, 0x24),
+    (Key::K, 0x25),
+    (Key::L, 0x26),
+    (Key::Semicolon, 0x27),
+    (Key::Backslash, 0x2B),
+    (Key::Z, 0x2C),
+    (Key::X, 0x2D),
+    (Key::C, 0x2E),
+    (Key::V, 0x2F),
+    (Key::B, 0x30),
+    (Key::N, 0x31),
+    (Key::M, 0x32),
+    (Key::Comma, 0x33),
+    (Key::Period, 0x34),
+    (Key::Slash, 0x35),
+    (Key::Space, 0x39),
     (Key::Up, 0x48),
     (Key::Down, 0x50),
     (Key::Left, 0x4B),
     (Key::Right, 0x4D),
-    (Key::Enter, 0x1C),
-    (Key::Escape, 0x01),
-    (Key::Space, 0x39),
-    (Key::Backspace, 0x0E),
+    (Key::Home, 0x47),
+    (Key::NumPad7, 0x47),
+    (Key::NumPad8, 0x48),
+    (Key::PageUp, 0x49),
+    (Key::NumPad9, 0x49),
+    (Key::NumPad4, 0x4B),
+    (Key::NumPad5, 0x4C),
+    (Key::NumPad6, 0x4D),
+    (Key::End, 0x4F),
+    (Key::NumPad1, 0x4F),
+    (Key::NumPad2, 0x50),
+    (Key::PageDown, 0x51),
+    (Key::NumPad3, 0x51),
+    (Key::Insert, 0x52),
+    (Key::NumPad0, 0x52),
+    (Key::Delete, 0x53),
+    (Key::NumPadDot, 0x53),
 ];
 
 /// Run `g` until the window closes.
