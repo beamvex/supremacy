@@ -97,8 +97,9 @@ pub trait VmHost {
     /// Perform one host-side effect; return the `ax`/`bl` answer word.
     fn svc(&mut self, call: Call) -> u16;
     /// Fetch a word from the code segment — the `cs:[si]` reads the
-    /// draw sequencer at `cs:0x5C1E` makes. The shell maps `cs:` to
-    /// file offsets (`+0x30000` for the game-code segment).
+    /// draw sequencer at `cs:0x5C1E` makes. The shell maps `cs:` near
+    /// offsets to file offsets (`+0x292B0`, the real `CS = 0x286B`
+    /// base — not the `file − 0x30000` label space).
     fn cs_word(&mut self, _ofs: u16) -> u16 {
         0
     }

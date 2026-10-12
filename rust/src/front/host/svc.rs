@@ -7,12 +7,12 @@ use crate::game::{Call, VmHost, SND_ON};
 use super::super::{font, text};
 use super::Host;
 
-/// `cs:` → file offset for the game-code segment (`0x5C1E` region).
-const CS_OFS: usize = 0x30000;
-/// `cs:` → file offset for the MCGA video-template segment —
-/// `cs:0x58DA` = file `0x2EB8A`, `cs:0x5C1E` = file `0x2EECE`
-/// (`dispatch_tables.txt`); template `cs:` refs like the `0x1384` DAC
-/// triplet live in this space, not the game-code one.
+/// `cs:` near offset → file offset — the real code segment
+/// (`CS = 0x286B` + the `0xC00` MZ header): `cs:0x58DA` = file
+/// `0x2EB8A`, `cs:0x5C1E` = file `0x2EECE` (`dispatch_tables.txt`).
+/// Every runtime `cs:` value lives in this space — the `0x1384` DAC
+/// triplet, the dispatch targets and the `[0x9198]` seq streams. The
+/// `file − 0x30000` `cs:` names elsewhere in the docs are labels only.
 const TPL_OFS: usize = 0x292B0;
 /// `cs:0x1384` in template space — the 3-byte DAC triplet `0x2EDA8`
 /// programs reg 0 with (file `0x2A634`; ships zeroed = black).
@@ -129,7 +129,7 @@ impl VmHost for Host {
     }
 
     fn cs_word(&mut self, ofs: u16) -> u16 {
-        let i = CS_OFS + usize::from(ofs);
+        let i = TPL_OFS + usize::from(ofs);
         u16::from_le_bytes([
             self.img.get(i).copied().unwrap_or(0),
             self.img.get(i + 1).copied().unwrap_or(0),

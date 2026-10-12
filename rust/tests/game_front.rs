@@ -127,7 +127,8 @@ fn slots_clear_and_program_dac() {
 fn cs_word_reads_the_code_segment() {
     let mut h = host();
     let i = img();
-    let want = u16::from_le_bytes([i[0x31384], i[0x31385]]);
+    // real `cs:0x1384` = file `0x2A634` — the DAC0 triplet.
+    let want = u16::from_le_bytes([i[0x2A634], i[0x2A635]]);
     assert_eq!(h.cs_word(0x1384), want);
 }
 

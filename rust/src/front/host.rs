@@ -27,7 +27,8 @@
 //!   and palette flushes are presentation details the window's
 //!   per-frame blit supersedes (GAM-7/GAM-9).
 //!
-//! `cs:` word reads map `+0x30000` like the rest of the port. The
+//! `cs:` word reads map `+0x292B0` — the real code-segment base, not
+//! the `file − 0x30000` label space the docs name functions with. The
 //! `VmHost` impl and per-call bodies live in [`svc`].
 
 mod svc;

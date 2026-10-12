@@ -20,9 +20,13 @@ impl Screen {
     /// Port of the four per-mode routines (`decompiled/FUNCTIONS.md`): the
     /// `ds:[0x1298]` dirty-region call is region bookkeeping, not clipping,
     /// so it's omitted; `ofs_para ≥ 0xA000` can't occur post-fixup and is
-    /// dropped the same way MCG drops it.
+    /// dropped the same way MCG drops it. An out-of-range `idx` is a
+    /// no-op — the asm's `idx * 0xC` wraps to a wild `ds:` record read
+    /// rather than faulting.
     pub fn draw_image(&mut self, set: &AssetSet, idx: usize) {
-        let rec = set.records[idx];
+        let Some(&rec) = set.records.get(idx) else {
+            return;
+        };
         let (Some(kind), src) = (draw_kind(&rec), set.stream(idx)) else {
             return;
         };
