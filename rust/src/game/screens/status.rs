@@ -65,7 +65,7 @@ fn body(c: &mut Ctx) {
     c.host.svc(Call::Slot(0x125C, 0));
     c.host.svc(Call::Native(0x89C3));
     c.host.svc(Call::Image(2));
-    c.host.svc(Call::Present(6));
+    c.host.svc_st(Call::Present(6), c.vm, c.st);
     install(c, 0x9D5E, 0x9D60, 0x13, 6);
     c.vm.w16(c.st, a!(SEL_REC), c.vm.r16(c.st, a!(REC_CUR)));
     let name = c.vm.r16(c.st, a!(REC_CUR)) + 0xE;

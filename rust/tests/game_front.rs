@@ -12,7 +12,7 @@ use supremacy::game::{
     self, Call, Ctx, NullHost, Rng, Vm, VmHost, BUTTONS, CUR_X, CUR_Y, HOT_COUNT, KEY_CODE,
     KEY_PEND, UIMODE,
 };
-use supremacy::palette::{from_dac, DAC_OFS};
+use supremacy::palette::{from_dac, DAC_OFS, ROWS_OFS, WORK_OFS};
 use supremacy::video::Screen;
 
 fn img() -> Vec<u8> {
@@ -121,6 +121,57 @@ fn slots_clear_and_program_dac() {
     h.svc(Call::Slot(0x1260, 0));
     // template `cs:0x1384` = file 0x2A634, ships zeroed → black.
     assert_eq!(h.pal.rgb(0), [0, 0, 0]);
+}
+
+/// `Present(dx)` — the `0x2ED30` composite: regs `1..=31` from row
+/// `dx` of `ds:0x4394`, regs `0x21..=0xFF` from `ds:0x4095` colours
+/// `33..`, every nonzero component through the `ds:[0x9CA1]` shade.
+/// Expected values cross-checked against the DOS-side DAC dump
+/// `difftest/out/P05.BIN` (a `Present(0xD)` attract frame).
+#[test]
+fn present_stages_the_screen_palette() {
+    let mut h = host();
+    let i = img();
+    let (vm, st) = (Vm::new(), gsim::galaxy());
+    assert_eq!(h.pal.rgb(1), scaled(&i, DAC_OFS + 3)); // master pre-state
+    h.svc_st(Call::Present(0xD), &vm, &st);
+    for n in 1..=0x1F_usize {
+        assert_eq!(h.pal.rgb(n), scaled(&i, ROWS_OFS + 0xD * 0x60 + n * 3));
+    }
+    for n in 0x21..=0xFF_usize {
+        assert_eq!(h.pal.rgb(n), scaled(&i, WORK_OFS + n * 3));
+    }
+    // `P05.BIN` spot checks (the dump is raw 6-bit).
+    assert_eq!(h.pal.rgb(1).map(|v| v >> 2), [4, 0, 0]);
+    assert_eq!(h.pal.rgb(33).map(|v| v >> 2), [60, 60, 60]);
+    assert_eq!(h.pal.rgb(255).map(|v| v >> 2), [63, 63, 0]);
+}
+
+/// `Present(6)` — the `dx == 6` branch stages the whole `ds:0x4994`
+/// master (regs `1..=0xFF`), no `pal_adj`; its `add al,[0x9ca1]` has
+/// no zero-gate, so blank components take the shade too.
+#[test]
+fn present_six_stages_the_master_table() {
+    let mut h = host();
+    let i = img();
+    let (vm, mut st) = (Vm::new(), gsim::galaxy());
+    st.set_byte(0x9CA1, 0xF); // scenario shade — clamped at 0x3F
+    h.svc_st(Call::Present(6), &vm, &st);
+    for n in 1..=0xFF_usize {
+        let want = (1..4)
+            .map(|k| {
+                let v = i[DAC_OFS + n * 3 + k - 1].wrapping_add(0xF).min(0x3F);
+                u8::try_from(u16::from(v) * 255 / 63).unwrap()
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(h.pal.rgb(n), [want[0], want[1], want[2]], "reg {n}");
+    }
+}
+
+fn scaled(i: &[u8], ofs: usize) -> [u8; 3] {
+    <[u8; 3]>::try_from(&i[ofs..ofs + 3])
+        .unwrap_or_default()
+        .map(|v| u8::try_from(u16::from(v) * 255 / 63).unwrap_or(0))
 }
 
 #[test]

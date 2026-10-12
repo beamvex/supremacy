@@ -148,10 +148,12 @@ fn boot_from_ds_dump_restores_state() {
 #[test]
 fn boot_from_dos_dump_normalises_op_table() {
     let img = read(&root().join("decompiled/GAME.unpacked.exe"));
-    let mut ds = read(&root().join("difftest/out/D01.BIN"));
-    ds.extend(read(&root().join("difftest/out/D02.BIN")));
-    // The live dump carries relocated far pointers — near offsets the
-    // port must normalise to `cs:` labels on restore.
+    // The probe's `dump ds` artefact needs a DOSBox-X pass, so stand
+    // in with the shipped dgroup image: it already carries the live
+    // dump's relocated far pointers (`DS_BASE` is verified against a
+    // real dump) — near offsets `from_dumps` must normalise to `cs:`
+    // labels on restore.
+    let ds = img[supremacy::game::DS_BASE..supremacy::game::DS_BASE + 0x10000].to_vec();
     assert_eq!(u16::from_le_bytes([ds[0x50E3], ds[0x50E4]]), 0xE4B9);
     let set = load_set(&game_dir(), "MCG", heap_segment()).unwrap();
     let pal = from_dac(&img[DAC_OFS..DAC_OFS + 768]);

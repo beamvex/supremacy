@@ -55,7 +55,7 @@ fn draw(c: &mut Ctx) {
     c.host.svc(Call::Slot(0x125C, 0));
     c.host.svc(Call::Native(0x89C3));
     c.host.svc(Call::Image(0x29));
-    c.host.svc(Call::Present(3));
+    c.host.svc_st(Call::Present(3), c.vm, c.st);
 }
 
 /// The `0x29D9` machine header (file `0x329D9`–`0x32ADC`): list

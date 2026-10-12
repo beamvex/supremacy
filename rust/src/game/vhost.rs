@@ -27,7 +27,11 @@ pub enum Call {
     Chan(u16, u8),
     /// The `0x41`-iteration `[0x924D]` flash loop in `cs:0x7A45`.
     Flash,
-    /// `call word [0x125E]` with `dx` — template slot (palette flush).
+    /// `call word [0x125E]` with `dx` — template slot (palette
+    /// present): row `dx` of the `ds:0x4394` table into DAC `1..=31`
+    /// (`dx == 6` = the full `ds:0x4994` master), then `pal_adj` —
+    /// the routine also reads the `ds:[0x9CA1]` shade cell, so hosts
+    /// dispatch it through [`VmHost::svc_st`].
     Present(u16),
     /// `call 0x5C97` — redraw the selected planet panel.
     PlanetPanel,
@@ -96,6 +100,13 @@ pub enum Call {
 pub trait VmHost {
     /// Perform one host-side effect; return the `ax`/`bl` answer word.
     fn svc(&mut self, call: Call) -> u16;
+    /// `svc` for calls whose asm body reads `ds:` cells the [`Call`]
+    /// doesn't carry — the palette slots' `ds:[0x9CA1]` shade byte
+    /// (`[0x125E]` present, `[0x128E]` fade). Forwards to `svc` — hosts
+    /// with no palette model needn't see the state.
+    fn svc_st(&mut self, call: Call, _vm: &Vm, _st: &State) -> u16 {
+        self.svc(call)
+    }
     /// Fetch a word from the code segment — the `cs:[si]` reads the
     /// draw sequencer at `cs:0x5C1E` makes. The shell maps `cs:` near
     /// offsets to file offsets (`+0x292B0`, the real `CS = 0x286B`

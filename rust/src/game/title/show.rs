@@ -64,11 +64,12 @@ impl Title {
             _ => (0, 0x9F6),
         };
         match k {
-            2 => _ = c.host.svc(Call::Slot(0x128E, 8)),
+            2 => _ = c.host.svc_st(Call::Slot(0x128E, 8), c.vm, c.st),
             _ => fx::refresh(c),
         }
         c.host.svc(Call::Image(img));
-        c.host.svc(Call::Present(if k == 3 { 0xD } else { 8 }));
+        c.host
+            .svc_st(Call::Present(if k == 3 { 0xD } else { 8 }), c.vm, c.st);
         c.vm.w16(c.st, a!(SEQ_PERIOD), 8);
         c.vm.w16(c.st, a!(SEQ_PTR), ptr);
         self.at(Ph::Seq(k))
@@ -93,7 +94,7 @@ impl Title {
     fn credits_head(self, c: &mut Ctx) -> Self {
         fx::refresh(c);
         vsync(c);
-        c.host.svc(Call::Present(9));
+        c.host.svc_st(Call::Present(9), c.vm, c.st);
         c.host.svc(Call::Slot(0x1292, 9));
         Self {
             n: 0x63,

@@ -57,7 +57,7 @@ impl End {
     /// `Ph::Input` (file `0x38C13`–`0x38C38` / `0x38D72`–`0x38D97`).
     fn post_seq(self, c: &mut Ctx) -> Self {
         fx::refresh(c);
-        c.host.svc(Call::Present(9));
+        c.host.svc_st(Call::Present(9), c.vm, c.st);
         fx::text_page(c, 0x58F2);
         c.vm.w16(c.st, a!(BUTTONS), 0);
         c.vm.w8(c.st, a!(KEY_PEND), 0);
@@ -77,7 +77,7 @@ impl End {
         }
         c.vm.stage_load(c.st);
         fx::refresh(c);
-        c.host.svc(Call::Present(9));
+        c.host.svc_st(Call::Present(9), c.vm, c.st);
         tail::restart_head(c);
         self.at(Ph::Title)
     }

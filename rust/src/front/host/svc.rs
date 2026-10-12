@@ -1,8 +1,9 @@
-//! `impl VmHost for Host` — the `svc` dispatch plus the per-call bodies
-//! the arms need (`rect`, `int33`, `dac0`, `load`, `menu_text`,
-//! `star`).
+//! `impl VmHost for Host` — the `svc`/`svc_st` dispatch plus the
+//! per-call bodies the arms need (`rect`, `int33`, `dac_flush`,
+//! `load`, `menu_text`, `star`).
 
 use crate::game::{Call, VmHost, SND_ON};
+use crate::palette::from_dac;
 
 use super::super::{font, text};
 use super::Host;
@@ -11,12 +12,16 @@ use super::Host;
 /// (`CS = 0x286B` + the `0xC00` MZ header): `cs:0x58DA` = file
 /// `0x2EB8A`, `cs:0x5C1E` = file `0x2EECE` (`dispatch_tables.txt`).
 /// Every runtime `cs:` value lives in this space — the `0x1384` DAC
-/// triplet, the dispatch targets and the `[0x9198]` seq streams. The
+/// table, the dispatch targets and the `[0x9198]` seq streams. The
 /// `file − 0x30000` `cs:` names elsewhere in the docs are labels only.
 const TPL_OFS: usize = 0x292B0;
-/// `cs:0x1384` in template space — the 3-byte DAC triplet `0x2EDA8`
-/// programs reg 0 with (file `0x2A634`; ships zeroed = black).
-const DAC0: usize = 0x1384 + TPL_OFS;
+/// `cs:0x1384` in template space — the 768-byte DAC table the
+/// `[0x1258]`/`[0x1260]` flushes program all 256 regs from (file
+/// `0x2A634`; ships zeroed and nothing writes it = instant black).
+const PAL_BUF: usize = 0x1384 + TPL_OFS;
+/// `ds:[0x9CA1]` — the palette shade offset `0x2ED30`/`0x2F1CF` add to
+/// every nonzero component (lives in the saveable `State` block).
+const SHADE: u16 = 0x9CA1;
 
 impl Host {
     /// The `[0x1262]` popup frame — `(ax,bx)`/`(cx,dx)` are the opposing
@@ -75,15 +80,16 @@ impl Host {
             .step(usize::from(cx), &mut |x, y| self.scr.put_pixel(x, y, ink));
     }
 
-    /// The `0x2EDA8` DAC write — template `cs:0x1384` triplet, 6-bit→8.
-    /// MCGA-only: the EGA/TGA slots are `int 10/AX=1002` palette-register
-    /// writes (`0x30038`/`0x31AF8`, covered by the fixed palettes) and
-    /// CGA's is `int 10/AH=5 AL=1` page select (`0x3081E`, one buffer).
-    fn dac0(&mut self) {
-        let c = self.img.get(DAC0..DAC0 + 3).unwrap_or(&[]);
-        for (k, &v) in c.iter().enumerate() {
-            self.pal.colors[0][k] = u8::try_from(u16::from(v) * 255 / 63).unwrap_or(0xFF);
-        }
+    /// `[0x1258]`/`[0x1260]` (`0x2EDBB`/`0x2EDA8`) — `int 10/AX=1012`
+    /// over `CX=0x100` regs from `cs:0x1384` (the earlier reg-0 note
+    /// misread `CX`). The template ships the buffer zeroed — the
+    /// refresh pairs use it as an instant fade-to-black before the
+    /// next `Present`. MCGA-only: the EGA/TGA slots are `int 10/AX=1002`
+    /// palette-register writes (`0x30038`/`0x31AF8`, covered by the
+    /// fixed palettes) and CGA's is `int 10/AH=5 AL=1` page select
+    /// (`0x3081E`, one buffer).
+    fn dac_flush(&mut self) {
+        self.pal = from_dac(self.img.get(PAL_BUF..PAL_BUF + 0x300).unwrap_or(&[]));
     }
 }
 
@@ -96,9 +102,9 @@ impl VmHost for Host {
             Call::Mouse(ax, cx, dx) => self.int33(ax, cx, dx),
             Call::KeyPop => return u16::from(self.pump.pop_key().unwrap_or(0)),
             Call::Slot(0x125C, _) => self.scr.buf.fill(0),
-            Call::Slot(0x1260, _) => {
+            Call::Slot(0x1258 | 0x1260, _) => {
                 if self.scr.mode.programs_palette() {
-                    self.dac0();
+                    self.dac_flush();
                 }
             }
             Call::Sound(cl) => self.snd.sound(cl),
@@ -124,6 +130,18 @@ impl VmHost for Host {
             | Call::Native(_)
             | Call::Ui(_)
             | Call::Draw(..) => self.dropped += 1,
+        }
+        0
+    }
+
+    fn svc_st(&mut self, call: Call, vm: &crate::game::Vm, st: &crate::game::State) -> u16 {
+        if !self.scr.mode.programs_palette() {
+            return self.svc(call);
+        }
+        match call {
+            Call::Present(dx) => self.pal.present(&self.img, dx, vm.r8(st, SHADE)),
+            Call::Slot(0x128E, _) => self.pal.pal_fade(&self.img, vm.r8(st, SHADE)),
+            _ => return self.svc(call),
         }
         0
     }

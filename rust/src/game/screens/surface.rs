@@ -81,7 +81,7 @@ fn draw(c: &mut Ctx) {
     c.host.svc(Call::Slot(0x125C, 0));
     c.host.svc(Call::Native(0x89B3));
     c.host.svc(Call::Image(0x57));
-    c.host.svc(Call::Present(7));
+    c.host.svc_st(Call::Present(7), c.vm, c.st);
 }
 
 /// `0x40B1` — the `SEL_MACH`/dirty/`SEQ` clears (file `0x340B1`–

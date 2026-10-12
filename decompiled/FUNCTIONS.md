@@ -1287,9 +1287,15 @@ build,fleet,status,surface,misc}.rs` per family, `selrec::sync_sel`/
   wraps to `0x928D`), `[0x91C2] += 1` (cap `0x80`).
 - `[0x125C]` `0x2EB6F` — the `rep stosw` region fill (clear screen,
   `ax` colour).
-- `[0x1260]` `0x2EDA8` — `int 10/AX=1012` DAC reg 0 from the template
-  `cs:0x1384` triplet (template segment maps `cs:`→file `+0x292B0`,
-  distinct from the game-code `+0x30000`).
+- `[0x1260]` `0x2EDA8` — `int 10/AX=1012`, `BX=0`, `CX=0x100`: all 256
+  DAC regs from the `cs:0x1384` buffer (template segment maps
+  `cs:`→file `+0x292B0`, distinct from the game-code `+0x30000`). The
+  buffer ships zeroed and has no writers — an instant fade-to-black
+  ahead of the next `[0x125E]` present. `[0x1258]` (`0x2EDBB`) is the
+  same flush; `[0x125E]` (`0x2ED30`) stages row `dx` of `ds:0x4394`
+  into regs `1..=31` (`dx==6` = the `ds:0x4994` master into
+  `1..=0xFF`) with `+ds:[0x9CA1]`/clamp `0x3F`, then `pal_adj`
+  (`0x2F1CF`, regs `0x21..=0xFF` from `ds:0x4095` colours `33..`).
 
 Rust port: `game::{text, num}` (`print_str`, `enqueue`, `put`,
 `num_pad`, `num`, `num32`) — all `Call::Text/Print/Num` sites rewired

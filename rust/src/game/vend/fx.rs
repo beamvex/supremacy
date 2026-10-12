@@ -81,7 +81,7 @@ pub(super) fn reveal(c: &mut Ctx, dx: u16, stream: u16) {
     c.vm.w8(c.st, a!(KEY_PEND), 0);
     c.host.svc(Call::Image(0));
     c.vm.w8(c.st, SHADE, 0);
-    c.host.svc(Call::Present(dx));
+    c.host.svc_st(Call::Present(dx), c.vm, c.st);
     c.vm.w8(c.st, SHADE, 0xF);
     c.vm.w8(c.st, a!(SEQ_PERIOD), 8);
     c.vm.w16(c.st, a!(SEQ_PTR), stream);

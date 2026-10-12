@@ -96,7 +96,7 @@ pub(super) fn install(c: &mut Ctx) {
     c.vm.w16(c.st, PICK_VAR, 0);
     fx::refresh(c);
     c.host.svc(Call::Image(2));
-    c.host.svc(Call::Present(0xB));
+    c.host.svc_st(Call::Present(0xB), c.vm, c.st);
     c.host.svc(Call::Native(0x89B2));
 }
 
@@ -124,10 +124,10 @@ pub fn scenario_next(c: &mut Ctx) {
     fx::refresh(c);
     c.host.svc(Call::Image(img));
     if c.vm.r16(c.st, PICK_VAR) != 0 {
-        c.host.svc(Call::Present(0xA));
+        c.host.svc_st(Call::Present(0xA), c.vm, c.st);
         c.host.svc(Call::Native(0x89B2));
     } else {
-        c.host.svc(Call::Present(0xB));
+        c.host.svc_st(Call::Present(0xB), c.vm, c.st);
     }
 }
 

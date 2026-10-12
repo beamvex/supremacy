@@ -19,13 +19,13 @@ use super::{load_bin, load_gph, CELL_BIN, CELL_GPH, CELL_IN_BIN, CELL_IN_GPH, EN
 /// then `title::enter` — the `0x85B1` attract entry.
 pub(crate) fn restart_head(c: &mut Ctx) {
     c.vm.w8(c.st, END_CODE, 0);
-    c.host.svc(Call::Present(0));
+    c.host.svc_st(Call::Present(0), c.vm, c.st);
     c.host.svc(Call::Mouse(0x14, 0x1E, 0));
     c.host.svc(Call::Slot(0x1258, 0));
     load_bin(c, CELL_IN_BIN);
     load_gph(c, CELL_IN_GPH);
     c.host.svc(Call::Slot(0x125C, 0));
-    c.host.svc(Call::Present(0));
+    c.host.svc_st(Call::Present(0), c.vm, c.st);
     c.host.svc(Call::Mouse(0x14, 0x1F, 0));
     title::enter(c);
 }

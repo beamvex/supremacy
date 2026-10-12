@@ -76,7 +76,7 @@ fn refresh(c: &mut Ctx) {
     c.host.svc(Call::Slot(0x125C, 0));
     c.host.svc(Call::Mouse(8, 0x90, 0xBC));
     select::select_type(c);
-    c.host.svc(Call::Present(5));
+    c.host.svc_st(Call::Present(5), c.vm, c.st);
 }
 
 /// The ambient-sound select (file `0x339A1`–`0x33A04`) — the selected

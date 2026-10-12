@@ -8,10 +8,15 @@
 //!   all four mode variants (MCG linear, EGA plane streams, CGA/TGA
 //!   banked) live in [`crate::video`].
 //! - `[0x125C]` `0x2EB6F` → the `rep stosw` region fill — clears `es`.
-//! - `[0x1260]` `0x2EDA8` → `int 10/AX=1012` DAC reg 0 from `cs:0x1384`
-//!   (MCGA only — the other modes' slots are `int 10/AX=1002` palette
-//!   writes and the CGA `AH=5` page select, no-ops under the fixed
-//!   `Palette::{ega16,cga}` model).
+//! - `[0x1258]`/`[0x1260]` `0x2EDBB`/`0x2EDA8` → `int 10/AX=1012` over
+//!   all 256 regs from the `cs:0x1384` buffer (MCGA only — the other
+//!   modes' slots are `int 10/AX=1002` palette writes and the CGA
+//!   `AH=5` page select, no-ops under the fixed `Palette::{ega16,cga}`
+//!   model).
+//! - `[0x125E]` `0x2ED30`/`[0x128E]` `0x2F540` → `Palette::present`/
+//!   `pal_fade` — the row-table + `ds:0x4095` composite with the
+//!   `ds:[0x9CA1]` shade, dispatched via `svc_st` so the routine's
+//!   `ds:` read resolves (GAM-41).
 //! - `[0x1262]`/`[0x1268]` → the popup frame through
 //!   [`Screen::put_pixel`] / the glyph put via `font::draw`, which
 //!   replays the mode's packed/planar record merge byte-for-byte.
@@ -23,9 +28,9 @@
 //!   (GAM-33).
 //! - `Call::Text` → `front/text.rs` — the `menu_text` page walk;
 //!   `Call::Stars` → `front/stars.rs` — the `cs:0x4EC4` starfield.
-//! - `[0x1264]`/`[0x125E]`/`[0x1266]` stay stubs — the refresh-list copy
-//!   and palette flushes are presentation details the window's
-//!   per-frame blit supersedes (GAM-7/GAM-9).
+//! - `[0x1264]`/`[0x1266]` stay stubs — the refresh-list copies are
+//!   presentation details the window's per-frame blit supersedes
+//!   (GAM-7/GAM-9).
 //!
 //! `cs:` word reads map `+0x292B0` — the real code-segment base, not
 //! the `file − 0x30000` label space the docs name functions with. The

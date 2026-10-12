@@ -64,7 +64,7 @@ fn body(c: &mut Ctx) {
     c.host.svc(Call::Slot(0x125C, 0));
     c.host.svc(Call::Native(0x89C3));
     c.host.svc(Call::Image(0x29));
-    c.host.svc(Call::Present(2));
+    c.host.svc_st(Call::Present(2), c.vm, c.st);
     snd(c, 0xA, 8);
     c.vm.w16(c.st, a!(SEQ_PTR), 0);
     c.vm.w16(c.st, 0x91C4, 0);

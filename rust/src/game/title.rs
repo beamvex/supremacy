@@ -96,7 +96,7 @@ pub fn enter(c: &mut Ctx) {
     c.vm.w8(c.st, fx::STAR_AUX, 0);
     fx::refresh(c);
     c.host.svc(Call::Image(0));
-    c.host.svc(Call::Present(0xD));
+    c.host.svc_st(Call::Present(0xD), c.vm, c.st);
     fx::seq_arm(c, 0x9F6);
     c.vm.title_done = false;
     c.vm.title = Some(Title {

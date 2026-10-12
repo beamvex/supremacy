@@ -33,7 +33,7 @@ pub fn disaster(c: &mut Ctx) -> Flow {
         c.host.svc(Call::Sound(0x15));
     }
     c.host.svc(Call::Flash);
-    c.host.svc(Call::Present(0));
+    c.host.svc_st(Call::Present(0), c.vm, c.st);
     c.host.svc(Call::PlanetPanel);
     text::enqueue(c, 0x5DAE);
     let rec = faction_rec(c);

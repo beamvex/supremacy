@@ -119,9 +119,9 @@ pub(super) fn head(c: &mut Ctx, e: Ending) {
     c.host.svc(Call::SndReset);
     c.host.svc(Call::Song(seg));
     c.host.svc(Call::Sound(0));
-    c.host.svc(Call::Slot(0x128E, 8));
+    c.host.svc_st(Call::Slot(0x128E, 8), c.vm, c.st);
     fx::refresh(c);
     vsync(c);
-    c.host.svc(Call::Present(9));
+    c.host.svc_st(Call::Present(9), c.vm, c.st);
     c.host.svc(Call::Slot(0x1292, 9));
 }
