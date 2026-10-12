@@ -218,16 +218,16 @@ fn pump_latches_synthetic_codes() {
     assert_eq!(c.vm.r16(c.st, u16::try_from(BUTTONS).unwrap()), 1);
 }
 
-/// `pump_input` must re-read the host-side pump state — the port's
-/// stand-in for the int-9/int-33 ISRs that feed the `ds:` cells
-/// mid-loop. Without the live poller, blocking wait-loops see only
-/// what was queued at `Game::step` entry.
+/// `pump_input` must run the live vsync hook — the port's stand-in
+/// for the int-9/int-33 ISRs and retrace that feed the `ds:` cells
+/// mid-loop. Without it, blocking wait-loops see only what was queued
+/// at `Game::step` entry and never present their framebuffer.
 #[test]
 fn pump_input_runs_the_live_poller() {
     let mut h = host();
-    h.set_input(Some(Box::new(|p| {
-        p.move_to(7, 9);
-        p.set_buttons(true, false);
+    h.set_vsync(Some(Box::new(|h| {
+        h.pump.move_to(7, 9);
+        h.pump.set_buttons(true, false);
     })));
     let (mut vm, mut st) = (Vm::new(), gsim::galaxy());
     h.pump_input(&mut vm, &mut st);
@@ -264,13 +264,13 @@ fn map_click_sees_input_inside_its_wait_loop() {
     // region (poll-wait 2) — like a user releasing the dispatching
     // click then clicking the minimap.
     let mut n = 0usize;
-    g.host.set_input(Some(Box::new(move |p| {
+    g.host.set_vsync(Some(Box::new(move |h| {
         n += 1;
         if n > 1 {
-            p.move_to(0x120, 0x20);
-            p.set_buttons(true, false);
+            h.pump.move_to(0x120, 0x20);
+            h.pump.set_buttons(true, false);
         } else {
-            p.set_buttons(false, false);
+            h.pump.set_buttons(false, false);
         }
     })));
     let mut c = g.ctx();
@@ -313,6 +313,32 @@ fn game_enters_shell_and_galaxy_exits_on_right_click() {
     g.step(); // 0x7D → press(2) → frame exit → shell_enter
     assert_eq!(g.phase, Phase::Shell);
     assert_eq!(g.st.byte(UIMODE), 0);
+}
+
+/// `Game::new` must boot the shipped state block — the record
+/// templates it carries are what `endgame` scans for kind-`7`/`0xA`
+/// (`new_game` only patches around them; a zeroed block reads as
+/// "every planet gone" and fires the defeat ending ~0xFA ticks in,
+/// leaving the game trapped in the outro starfield).
+#[test]
+fn fresh_galaxy_runs_past_the_endgame_monitor() {
+    let mut g = Game::new(
+        img(),
+        load_set(&game_dir(), "MCG", heap_segment()).unwrap(),
+        from_dac(&img()[DAC_OFS..DAC_OFS + 768]),
+        Video::Mcga,
+        Sound::PcSpeaker,
+        false,
+        3,
+        0x42,
+        Box::new(supremacy::platform::MemFs::new()),
+    );
+    g.enter_galaxy();
+    for _ in 0..0x140 {
+        g.step();
+        assert!(g.vm.end.is_none(), "ending fired on a fresh galaxy");
+    }
+    assert_eq!(g.phase, Phase::Galaxy);
 }
 
 /// The real `*IN` boot — `Game::new_title` on the shipped image uses

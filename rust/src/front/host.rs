@@ -48,10 +48,13 @@ use crate::video::Screen;
 use super::audio::{Audio, BOOT_RATE};
 use super::{load::Loader, stars::Stars, Pump};
 
-/// A live input poller — the frontend's stand-in for the async
-/// int-9/int-33 ISRs; `pump_input` runs it before each `ds:` mirror so
-/// blocking loops see fresh host input mid-step.
-pub type InputSrc = Box<dyn FnMut(&mut Pump)>;
+/// A live vsync hook — the frontend's stand-in for the async
+/// int-9/int-33 ISRs plus the retrace the `0x2CA9` routine waits on.
+/// `pump_input` runs it before each `ds:` mirror so blocking loops
+/// (the screen `frame_loop`s, dialogs, `map_click`'s waits — all of
+/// which never return to `window::run`'s present call) still see
+/// fresh host input *and* present their framebuffer mid-step.
+pub type VsyncSrc = Box<dyn FnMut(&mut Host)>;
 
 /// The concrete host — owns the visible framebuffer and input state.
 pub struct Host {
@@ -81,9 +84,9 @@ pub struct Host {
     /// `Call::Load`'s dir + set stem (`set_assets` installs it — the
     /// `ds:0x1208`+ cell → `{stem}{sfx}.{BIN,GPH}` mapping).
     loader: Option<Loader>,
-    /// Live input poller — `window::run` installs one; `pump_input`
+    /// Live vsync hook — `window::run` installs one; `pump_input`
     /// runs it before each `ds:` mirror.
-    input_src: Option<InputSrc>,
+    vsync_src: Option<VsyncSrc>,
 }
 
 impl Host {
@@ -110,7 +113,7 @@ impl Host {
             text_cur: 0,
             stars: Stars::new(0x00C0_FFEE),
             loader: None,
-            input_src: None,
+            vsync_src: None,
         }
     }
 
@@ -120,9 +123,10 @@ impl Host {
         self.loader = Some(Loader::new(dir.to_path_buf(), stem));
     }
 
-    /// Install (or clear) the live input poller `pump_input` runs —
-    /// the frontend's stand-in for the async int-9/int-33 ISRs.
-    pub fn set_input(&mut self, src: Option<InputSrc>) {
-        self.input_src = src;
+    /// Install (or clear) the live vsync hook `pump_input` runs —
+    /// the frontend's stand-in for the async int-9/int-33 ISRs and
+    /// the retrace the `0x2CA9` wait models.
+    pub fn set_vsync(&mut self, src: Option<VsyncSrc>) {
+        self.vsync_src = src;
     }
 }

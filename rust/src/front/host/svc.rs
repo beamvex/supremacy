@@ -155,8 +155,9 @@ impl VmHost for Host {
     }
 
     fn pump_input(&mut self, vm: &mut crate::game::Vm, st: &mut crate::game::State) {
-        if let Some(src) = &mut self.input_src {
-            src(&mut self.pump);
+        if let Some(mut src) = self.vsync_src.take() {
+            src(self);
+            self.vsync_src.get_or_insert(src);
         }
         self.pump.write(vm, st);
         // Keep the audio layer's [0x91D3] gate byte in sync — the

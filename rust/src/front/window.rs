@@ -1,11 +1,14 @@
 //! The `minifb` window — presents the [`Screen`][crate::video::Screen]
-//! per frame and pumps cursor/buttons/keys back through [`Game::step`].
+//! per vsync and pumps cursor/buttons/keys back through [`Game::step`].
 //!
-//! Loop body: read minifb state → [`super::Pump`] → `step` → expand the
-//! mode-laid-out VRAM through the palette → `update_with_buffer`.
-//! Scancodes are set-1 — [`SCAN`] covers the `ds:0x7CBD` keymap (the
-//! save-name editor's alnum/punct/keypad set) plus the `K`-mode nav
-//! arrows, Enter and Esc.
+//! All the work happens in the [`super::Host::set_vsync`] hook —
+//! `pump_input` runs it at every `0x2CA9` boundary (each `Game::step`
+//! head and inside every `vsync`'d wait/frame loop), so the nested
+//! screen `frame_loop`s and dialogs that never return to this
+//! function's outer loop still present their framebuffer and receive
+//! input. Scancodes are set-1 — [`SCAN`] covers the `ds:0x7CBD`
+//! keymap (the save-name editor's alnum/punct/keypad set) plus the
+//! `K`-mode nav arrows, Enter and Esc.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -15,6 +18,8 @@ use minifb::{Key, MouseButton, MouseMode, Scale, Window, WindowOptions};
 #[cfg(feature = "audio")]
 use super::audio::Out;
 use super::Game;
+use crate::palette::Palette;
+use crate::video::Screen;
 
 const W: usize = 320;
 const H: usize = 200;
@@ -119,8 +124,7 @@ pub fn run(g: &mut Game) -> Result<(), minifb::Error> {
         g.host.snd.set_rate(o.rate);
     }
     let win = Rc::new(RefCell::new(win));
-    install_input(g, Rc::clone(&win));
-    let mut buf = vec![0u32; W * H];
+    install_vsync(g, Rc::clone(&win));
     #[cfg(feature = "audio")]
     let mut pcm: Vec<f32> = Vec::new();
     while win.borrow().is_open() {
@@ -131,24 +135,29 @@ pub fn run(g: &mut Game) -> Result<(), minifb::Error> {
             g.host.snd.render(&mut pcm);
             o.push(&pcm);
         }
-        blit(&mut buf, g);
-        win.borrow_mut().update_with_buffer(&buf, W, H)?;
     }
-    g.host.set_input(None);
+    g.host.set_vsync(None);
     Ok(())
 }
 
-/// Install the live input poller on `g.host` — `pump_input` runs it at
+/// Install the live vsync hook on `g.host` — `pump_input` runs it at
 /// every `0x2CA9` boundary (each `Game::step` head and inside every
-/// `vsync`'d wait-loop), so clicks and keys land mid-loop like the
-/// asm's int-9/int-33 ISRs. The poller's `Window::update` is what
-/// actually refreshes minifb's input state between `step`s.
-fn install_input(g: &mut Game, win: Rc<RefCell<Window>>) {
+/// `vsync`'d wait/frame-loop), so both the frame present and fresh
+/// input land mid-step like the asm's int-9/int-33 ISRs + retrace.
+/// `update_with_buffer` pumps the event queue, presents and
+/// rate-limits in one call; the input read that follows sees the
+/// just-pumped state. A closed window exits the process — the nested
+/// game loops never return here to check `is_open` themselves.
+fn install_vsync(g: &mut Game, win: Rc<RefCell<Window>>) {
     let mut prev: Vec<Key> = Vec::new();
-    g.host.set_input(Some(Box::new(move |pump| {
+    let mut buf = vec![0u32; W * H];
+    g.host.set_vsync(Some(Box::new(move |host| {
         let mut w = win.borrow_mut();
-        w.update();
-        input(pump, &w, &mut prev);
+        blit(&mut buf, &host.scr, &host.pal);
+        if w.update_with_buffer(&buf, W, H).is_err() || !w.is_open() {
+            std::process::exit(0);
+        }
+        input(&mut host.pump, &w, &mut prev);
     })));
 }
 
@@ -157,11 +166,12 @@ fn install_input(g: &mut Game, win: Rc<RefCell<Window>>) {
 #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
 fn input(pump: &mut super::Pump, win: &Window, prev: &mut Vec<Key>) {
     let (mx, my) = win.get_mouse_pos(MouseMode::Clamp).unwrap_or_default();
-    pump.move_to(mx.max(0.) as u16, my.max(0.) as u16);
-    pump.set_buttons(
+    let (l, r) = (
         win.get_mouse_down(MouseButton::Left),
         win.get_mouse_down(MouseButton::Right),
     );
+    pump.move_to(mx.max(0.) as u16, my.max(0.) as u16);
+    pump.set_buttons(l, r);
     keys(pump, win, prev);
 }
 
@@ -180,9 +190,9 @@ fn keys(pump: &mut super::Pump, win: &Window, prev: &mut Vec<Key>) {
 }
 
 /// Expand VRAM → packed `0xRRGGBB` through the palette.
-fn blit(buf: &mut [u32], g: &Game) {
-    for (i, &p) in g.host.scr.pixels().iter().enumerate() {
-        let [r, gr, b] = g.host.pal.rgb(usize::from(p));
+fn blit(buf: &mut [u32], scr: &Screen, pal: &Palette) {
+    for (i, &p) in scr.pixels().iter().enumerate() {
+        let [r, gr, b] = pal.rgb(usize::from(p));
         buf[i] = u32::from(r) << 16 | u32::from(gr) << 8 | u32::from(b);
     }
 }

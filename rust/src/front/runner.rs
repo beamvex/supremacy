@@ -90,14 +90,17 @@ impl Game {
         files: Box<dyn DosFiles>,
     ) -> Self {
         let mut g = Self::bundle(img, set, pal, video, sound, k_mode, seed, files);
-        g.st = State::from_image(&g.host.img);
         title_enter(&mut g.ctx());
         g
     }
 
-    /// The shared bundle — `Vm`/`Host` from the image, `Rng`, `files`,
-    /// `phase` shell, and the `[0x143]` BIOS-mode word the mode
-    /// select's template copy writes (the attract's MCGA slide gate).
+    /// The shared bundle — `Vm`/`Host`/`State` from the image, `Rng`,
+    /// `files`, `phase` shell, and the `[0x143]` BIOS-mode word the
+    /// mode select's template copy writes (the attract's MCGA slide
+    /// gate). The state block ships populated — the galaxy presets'
+    /// record templates (kinds, names) live in it and `new_game` only
+    /// patches around them, so a zeroed block would leave `endgame`
+    /// seeing no kind-`7`/`0xA` records and firing an ending.
     #[allow(clippy::too_many_arguments)]
     fn bundle(
         img: Vec<u8>,
@@ -111,7 +114,7 @@ impl Game {
     ) -> Self {
         let mut g = Self {
             vm: Vm::from_image(&img),
-            st: State::new(),
+            st: State::from_image(&img),
             rng: Rng::new(seed),
             host: Host::new(Screen::new(video), pal, set, img, k_mode, sound),
             files,

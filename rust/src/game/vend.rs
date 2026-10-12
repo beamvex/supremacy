@@ -84,12 +84,14 @@ pub fn endgame(c: &mut Ctx) -> Option<Ending> {
     }
 }
 
-/// `cs:0x37C7` — scan the planet records, returning `(kind7, kindA)`
-/// counts (`ax`/`bp` in the asm).
+/// `cs:0x37C7` — scan the records, returning `(kind7, kindA)` counts
+/// (`ax`/`bp` in the asm). `cx = [0x91B8]` under `dec/jns` runs
+/// `n + 1` iterations — the appended faction record at index `n` is
+/// included, so a shipped `{7, 4…, 0xA}` template never reads empty.
 fn count_kinds(c: &mut Ctx) -> (u16, u16) {
     let n = c.vm.r16(c.st, a!(REC_COUNT));
     let (mut a7, mut aa) = (0u16, 0u16);
-    for i in 0..n {
+    for i in 0..=n {
         match kind_of(c, c.vm.rec_ofs(c.st, i)) {
             7 => a7 = a7.wrapping_add(1),
             0xA => aa = aa.wrapping_add(1),
