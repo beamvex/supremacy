@@ -315,6 +315,36 @@ fn game_enters_shell_and_galaxy_exits_on_right_click() {
     assert_eq!(g.st.byte(UIMODE), 0);
 }
 
+/// GAM-47 — the `0x2E21` save/load dialog action must run its
+/// `0x2E60` modal loop. When only the enter head ran, the `0xB05C`
+/// list stayed installed with no `[0x9CDA]&2` test anywhere, so a
+/// right-click could never reinstall the shell's `0xA0AC` list —
+/// the dialog was a dead end off the home screen. The live vsync
+/// hook feeds the right-button edge mid-loop.
+#[test]
+fn save_dialog_right_click_returns_to_the_shell() {
+    let mut g = Game::new(
+        img(),
+        load_set(&game_dir(), "MCG", heap_segment()).unwrap(),
+        from_dac(&img()[DAC_OFS..DAC_OFS + 768]),
+        Video::Mcga,
+        Sound::PcSpeaker,
+        false,
+        3,
+        0x42,
+        Box::new(supremacy::platform::MemFs::new()),
+    );
+    assert_eq!(g.st.word(HOT_LIST), 0xA0AC);
+    g.host.set_vsync(Some(Box::new(|h| {
+        h.pump.set_buttons(false, true);
+    })));
+    let mut c = g.ctx();
+    game::dispatch_action(&mut c, 0x2E21);
+    assert_eq!(c.vm.r16(c.st, u16::try_from(HOT_LIST).unwrap()), 0xA0AC);
+    assert_eq!(c.vm.r16(c.st, u16::try_from(HOT_COUNT).unwrap()), 0x31);
+    assert_eq!(c.vm.r8(c.st, u16::try_from(UIMODE).unwrap()), 0);
+}
+
 /// `Game::new` must boot the shipped state block — the record
 /// templates it carries are what `endgame` scans for kind-`7`/`0xA`
 /// (`new_game` only patches around them; a zeroed block reads as

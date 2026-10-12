@@ -137,6 +137,17 @@ pub fn dlg_close(c: &mut Ctx) {
     main_list(c);
 }
 
+/// `cs:0x2E21` as the menu action runs it — the enter head, the
+/// `0x2E60` modal loop until `[0x9CDA] & 2`, then the `0x2E7A` close
+/// (file `0x32E21`–`0x32E93`). The loop is what lets a right-click
+/// leave the dialog: without it the `0xB05C` list stayed installed
+/// and the shell's `0xA0AC` list never came back (GAM-47).
+pub fn dlg_open(c: &mut Ctx) {
+    dlg_enter(c);
+    while !dlg_step(c) {}
+    dlg_close(c);
+}
+
 /// `cs:0x2F9B` — the two-option confirm: title + body prints, the
 /// `0xB098` list, then a modal wait on `[0x91DA]` written by the
 /// `0x2F01`/`0x2F08`/`0x2F95` actions; closes back into `0x2EEE`

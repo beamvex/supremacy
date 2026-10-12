@@ -79,9 +79,9 @@ pub use cells::*;
 pub use consts::*;
 pub use day::day_tick;
 pub use defence::defence_tick;
-pub use dialog::{confirm, dlg_close, dlg_enter, dlg_step, dlg_text, pump};
+pub use dialog::{confirm, dlg_close, dlg_enter, dlg_open, dlg_step, dlg_text, pump};
 pub use dlg_io::{
-    act_cancel, act_no, act_stage, act_yes, input_name, load_game, save_game, Loaded,
+    act_cancel, act_load, act_no, act_stage, act_yes, input_name, load_game, save_game, Loaded,
 };
 pub use fleet::{ship_tick, ShipOut};
 pub use frame::{frame_step, Frame};

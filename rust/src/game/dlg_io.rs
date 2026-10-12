@@ -41,6 +41,21 @@ pub enum Loaded {
     D,
 }
 
+impl Loaded {
+    /// The 5-byte banner the switch arm writes at `ds:0x582B` —
+    /// `0x685A`/`0x6847`/`0x6834`/`0x6821` (file `0x36821`–`0x3686A`;
+    /// the galaxy preset names, little-endian word stores).
+    #[must_use]
+    pub const fn banner(self) -> &'static [u8; 5] {
+        match self {
+            Self::A => b"WOTOK",
+            Self::B => b"SMINE",
+            Self::C => b"KRART",
+            Self::D => b"RORN ",
+        }
+    }
+}
+
 /// `cs:0x2E94` — the load action (file `0x32E94`–`0x32ED1`): prompt +
 /// filename input, `0x8E66` pre-load, `0x83CE` state load (carry →
 /// `0x7929` error print and `None`), `0x8E75` post-load, panel +
@@ -63,6 +78,19 @@ pub fn load_game(c: &mut Ctx) -> Option<Loaded> {
         2 => Loaded::C,
         _ => Loaded::D,
     })
+}
+
+/// `cs:0x2E94` as the menu action runs it — `load_game`, then on a
+/// good load the `[0x91E5]` switch `jmp`s to a banner arm that writes
+/// 5 bytes at `ds:0x582B` and `ret`s back into the `0x2E60` loop
+/// (file `0x36821`–`0x3686B`).
+pub fn act_load(c: &mut Ctx) {
+    let Some(l) = load_game(c) else {
+        return;
+    };
+    for (i, &ch) in l.banner().iter().enumerate() {
+        c.vm.w8(c.st, 0x582B + u16::try_from(i).unwrap_or(0), ch);
+    }
 }
 
 /// `cs:0x2ED2` — the save action (file `0x32ED2`–`0x32EE6`): prompt +

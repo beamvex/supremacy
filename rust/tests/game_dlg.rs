@@ -30,6 +30,26 @@ fn dlg_step_exits_on_right_click() {
     assert_eq!(r.r16(game::HOT_LIST), 0xA0AC); // main list restored
 }
 
+/// GAM-47 — dispatching `0x2E21` must run the `0x2E60` modal loop and
+/// the `0x2E7A` close, not just the `0x2E21` enter head. The head
+/// alone left the 3-record `0xB05C` list installed with nothing
+/// testing `[0x9CDA]&2`, so no input could reach the shell's `0xA0AC`
+/// list again — the dialog was a dead end off the home screen.
+#[test]
+fn dlg_action_modal_restores_the_main_list() {
+    let mut r = Rig::new();
+    r.w16(game::HOT_LIST, 0xA0AC);
+    r.w16(game::HOT_COUNT, 0x31);
+    r.w8(game::KEY_PEND, 1);
+    r.w8(game::KEY_CODE, 0x7D); // right-button down
+    game::dispatch_action(&mut r.ctx(), 0x2E21);
+    assert_eq!(r.r16(game::HOT_LIST), 0xA0AC);
+    assert_eq!(r.r16(game::HOT_COUNT), 0x31);
+    assert_eq!(r.r16(game::HOT_SEL), r.r16(0xA0AA));
+    assert!(r.host.0.contains(&Call::Image(0x12B))); // dialog opened
+    assert!(r.host.0.contains(&Call::Slot(0x1272, 0))); // and closed
+}
+
 #[test]
 fn save_game_ok_prints_saved() {
     let mut r = Rig::new();
@@ -68,6 +88,21 @@ fn load_game_switches_on_91e5() {
     assert_eq!(r.r8(0x9CCA), 0); // slot-mode brackets cleared
     assert_eq!(r.r16(0x91E5), 2); // block loaded into state
     assert!(r.host.0.contains(&Call::PlanetPanel));
+}
+
+/// The `0x2E94` tail — a good load runs the `[0x91E5]` switch arm,
+/// which writes the 5-byte preset banner at `ds:0x582B` before
+/// `ret`ing into the `0x2E60` loop (`Loaded::C` → `0x6834` → "KRART").
+#[test]
+fn act_load_writes_the_preset_banner() {
+    let mut r = Rig::new();
+    let mut blk = vec![0u8; 0x1F8B];
+    blk[usize::from(0x91E5u16) - 0x7D39..][..2].copy_from_slice(&2u16.to_le_bytes());
+    r.files.files.insert("S".to_owned(), blk);
+    r.keys(&[0x1F, 0x1C]); // "S" + Enter
+    game::act_load(&mut r.ctx());
+    let got: Vec<u8> = (0..5).map(|i| r.r8(0x582B + i)).collect();
+    assert_eq!(got, b"KRART");
 }
 
 #[test]

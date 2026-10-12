@@ -25,8 +25,8 @@ macro_rules! a {
 /// records carry.
 pub fn dispatch_action(c: &mut Ctx, t: u16) {
     match t {
-        0x2E21 | 0x9B71 => dialog::dlg_enter(c),
-        0x2E94 | 0x9BE4 => drop(dlg_io::load_game(c)),
+        0x2E21 | 0x9B71 => dialog::dlg_open(c),
+        0x2E94 | 0x9BE4 => dlg_io::act_load(c),
         0x2ED2 | 0x9C22 => {
             dlg_io::save_game(c);
         }
