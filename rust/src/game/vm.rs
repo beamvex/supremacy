@@ -2,30 +2,33 @@
 //!
 //! Memory model: the interpreter runs over the whole `ds` space, which
 //! the port splits three ways — [`Vm::low`] is `ds:0x0000..0x7D39`
-//! (event scripts, the `ds:0x50E3` op table, the `ds:0x5183` event
-//! slots, message strings and VM flag cells), [`State`] covers
+//! (event scripts at `0x51FB`+, the `ds:0x50E3` op table, the
+//! `ds:0x5183` event slots, message strings and VM flag cells),
+//! [`State`] covers
 //! `ds:0x7D39..0x9CC4` (the saveable block), and [`Vm::hi`] covers the
 //! rest (`ds:0x9CC4..=0xFFFF`, menu records and scratch).
 //!
 //! Dispatch: tick codes `0x38+2N .. 0x56+2N` index the 4-byte event
 //! table at `ds:0x5183`; word 0 is the script `si`. Each opcode word is
-//! an offset into the op table at `ds:0x50E3` (runtime-initialised —
-//! the shipped image holds stale bytes there); the table yields a `cs:`
+//! an offset into the op table at `ds:0x50E3` — the image ships it as
+//! `{ofs, 0x286B}` far pointers, and [`jtab::fix`] rewrites `ofs` into
+//! the port's `cs:` label space at load; the table yields a `cs:`
 //! handler address. Handlers either `jmp 0x7758` (continue) or `ret`
 //! (suspend). **`si` is never written back** — a suspended event simply
 //! re-runs from its entry next tick, so scripts are guard+action rules
 //! whose state lives in `ds` flag cells, not in the instruction pointer.
 
-use super::consts::{REC_BASE, REC_STRIDE, STATE_LEN, STATE_OFS};
-use super::keymap;
+use super::consts::{DS_BASE, REC_BASE, REC_STRIDE, STATE_LEN, STATE_OFS};
 use super::state::State;
 use super::title::Title;
 use super::vend::End;
+use super::{jtab, keymap};
 
-/// `ds:0x50E3` — op jump table base (file `0x37760`).
+/// `ds:0x50E3` — op jump table base (dispatch at file `0x37760`; the
+/// table itself ships at file `0x15783`).
 pub const JT_BASE: u16 = 0x50E3;
-/// `ds:0x5183` — event table, 4-byte `{cur, base}` entries (file
-/// `0x37750`).
+/// `ds:0x5183` — event table, 4-byte `{cur, base}` entries (dispatch
+/// reads it at file `0x37750`; it ships at file `0x15823`).
 pub const TAB_BASE: u16 = 0x5183;
 /// `ds:` offset where [`Vm::hi`] starts (`0x9CC4`, just past the save
 /// block).
@@ -95,25 +98,22 @@ impl Vm {
         vm
     }
 
-    /// Load `ds:0x0000..0x9CC4` space from the unpacked exe — the low
-    /// region ships scripts/strings at file `0x10CA0+`.
+    /// Load `ds:0x0000..0x9CC4` space from the unpacked exe — `ds:0`
+    /// sits at file [`DS_BASE`]. The loaded low region already holds
+    /// the shipped op table, event slots, scripts and keymap at their
+    /// runtime `ds:` offsets; the op-table near offsets are then
+    /// normalised into `cs:` labels by [`jtab::fix`].
     #[must_use]
     pub fn from_image(img: &[u8]) -> Self {
         let mut vm = Self::new();
-        let n = LOW_LEN.min(img.len().saturating_sub(0x10CA0));
-        vm.low[..n].copy_from_slice(&img[0x10CA0..0x10CA0 + n]);
-        let src = HI_OFS + 0x10CA0;
+        let n = LOW_LEN.min(img.len().saturating_sub(DS_BASE));
+        vm.low[..n].copy_from_slice(&img[DS_BASE..DS_BASE + n]);
+        let src = HI_OFS + DS_BASE;
         let n = (0x10000 - HI_OFS).min(img.len().saturating_sub(src));
         vm.hi[..n].copy_from_slice(&img[src..src + n]);
-        let lo = STATE_OFS + 0x10CA0;
+        let lo = STATE_OFS + DS_BASE;
         vm.stage.copy_from_slice(&img[lo..lo + STATE_LEN]);
-        // The asm copies `ds:0x76BF` → `ds:0x7CBD` at init (the site
-        // isn't located); use the image's own bytes when they're real.
-        let n = keymap::KEYMAP_N * 2;
-        if img.len() >= keymap::KEYMAP_SRC + 0x10CA0 + n {
-            vm.low
-                .copy_within(keymap::KEYMAP_SRC..keymap::KEYMAP_SRC + n, keymap::KEYMAP);
-        }
+        jtab::fix(&mut vm.low, usize::from(JT_BASE));
         vm
     }
 

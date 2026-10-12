@@ -28,9 +28,9 @@ mod ega;
 mod mcg;
 mod tga;
 
-/// File offset of `ds:0` — dgroup segment `0xFAA` (entry and the puts'
-/// callers do `mov ds,0xFAA`) × 16 plus the `0xC00`-byte MZ header.
-const DS: usize = 0x106A0;
+/// File offset of `ds:0` — shared with the `game` module's
+/// [`DS_BASE`][crate::game::DS_BASE].
+use crate::game::DS_BASE as DS;
 
 /// `sub al,0x20` index + table read — `ds:tab[idx]` + `base`, `None`
 /// when `img` is too short to hold the entry (never for the real exe).

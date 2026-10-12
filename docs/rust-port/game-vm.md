@@ -4,8 +4,9 @@
 
 The interpreter runs over the whole `ds` space, split three ways:
 
-- `low: Box<[u8]>` — `ds:0x0000..0x7D39`: event scripts, the `ds:0x50E3`
-  op table, the `ds:0x5183` event slots, message strings, VM flag cells.
+- `low: Box<[u8]>` — `ds:0x0000..0x7D39`: event scripts (`0x51FB`+),
+  the `ds:0x50E3` op table, the `ds:0x5183` event slots, message
+  strings, VM flag cells.
 - `State` — `ds:0x7D39..0x9CC4` (the saveable block).
 - `hi: Box<[u8]>` — `ds:0x9CC4..=0xFFFF`: menu records and scratch.
 
@@ -16,14 +17,19 @@ the port steps them one unit per frame) and `stage` (the heap segment
 the `0x8432`/`0x844B` routines copy the save block into/out of,
 `ds:0x3829` in the asm).
 
-Key addresses: `JT_BASE = 0x50E3` (op jump table — runtime-initialised,
-the shipped image holds stale bytes), `TAB_BASE = 0x5183` (4-byte
+Key addresses: `JT_BASE = 0x50E3` (op jump table — 40 far pointers
+`{ofs, 0x286B}` shipped in the image; `ofs` is a near offset in the
+`0x292B0`-based code segment), `TAB_BASE = 0x5183` (4-byte
 `{cur, base}` event entries), `HI_OFS = 0x9CC4`, `LOW_LEN = 0x7D39`,
-`KEYMAP = 0x7CBD` (`KEYMAP_N = 0x3E` pairs), `KEYMAP_SRC = 0x76BF`.
+`KEYMAP = 0x7CBD` (`KEYMAP_N = 0x3E` pairs).
 
-- `from_image(img)` — loads `ds:0..0x9CC4` from file `0x10CA0+`, seeds
-  `stage` from the shipped save block, and copies the image's keymap
-  `0x76BF → 0x7CBD` when the bytes are present.
+- `from_image(img)` — loads `ds:0..0x9CC4` from file `ds_ofs + DS_BASE`
+  (`0x106A0`), seeds `stage` from the shipped save block, then
+  `jtab::fix` rewrites each op-table `ofs` (`file − 0x292B0` near
+  offset) into the port's `cs:` label space (`file − 0x30000`,
+  `−0x6D50`). The shipped image already holds the real op table, event
+  slots, scripts and keymap at their runtime `ds:` offsets — a live
+  `ds` dump of the original confirms byte-identical content.
 - `r8`/`r16`/`w8`/`w16` — byte/word access across the three regions
   (routed by offset; unaligned-safe LE).
 - `stage_save`/`stage_load` — the `0x8432`/`0x844B` block copies
@@ -36,8 +42,10 @@ the shipped image holds stale bytes), `TAB_BASE = 0x5183` (4-byte
 ## Dispatch (`vops.rs`)
 
 Tick codes `0x38+2N .. 0x56+2N` index the `ds:0x5183` event table; word
-0 is the script `si`. Each opcode word indexes `JT_BASE` for a `cs:`
-handler address. `Flow`: `Cont` = `jmp 0x7758` (fetch next), `Ret` =
+0 is the script `si`. Each opcode word indexes `JT_BASE` for a handler
+address (the shipped image stores `{ofs, 0x286B}` far pointers —
+`jtab::fix` normalises `ofs` to `cs:` labels at load; op words step by
+4). `Flow`: `Cont` = `jmp 0x7758` (fetch next), `Ret` =
 `ret` (suspend). **`si` is never written back** — a suspended event
 re-runs from its entry next tick, so scripts are guard+action rules
 whose state lives in `ds` cells, not the instruction pointer.

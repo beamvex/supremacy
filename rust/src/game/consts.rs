@@ -1,6 +1,15 @@
 //! `ds:` offsets and sizes for the saveable state block — the real
 //! addresses the asm uses, so `State` accessors take `ds:` values.
 
+/// File offset of `ds:0` in `GAME.unpacked.exe` — dgroup segment
+/// `0xFAA` (the `mov ds,0xFAA` the entry stub and the `0x2Exxx` puts
+/// run) × 16 plus the `0xC00`-byte MZ header. Verified against a live
+/// DOS dump: the runtime `ds:0x50E3` op table, `ds:0x5183` event slots,
+/// `ds:0x51FB`+ event scripts and the `ds:0x7CBD` keymap all land at
+/// `img[ofs + 0x106A0]` (an earlier `0x10CA0` read the image `0x600`
+/// bytes late).
+pub const DS_BASE: usize = 0x106A0;
+
 /// `ds:` offset where the save block starts (`dx` in the read/write calls,
 /// file `0x383E1`/`0x38415`).
 pub const STATE_OFS: usize = 0x7D39;

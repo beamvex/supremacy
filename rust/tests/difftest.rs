@@ -146,6 +146,31 @@ fn boot_from_ds_dump_restores_state() {
 }
 
 #[test]
+fn boot_from_dos_dump_normalises_op_table() {
+    let img = read(&root().join("decompiled/GAME.unpacked.exe"));
+    let mut ds = read(&root().join("difftest/out/D01.BIN"));
+    ds.extend(read(&root().join("difftest/out/D02.BIN")));
+    // The live dump carries relocated far pointers — near offsets the
+    // port must normalise to `cs:` labels on restore.
+    assert_eq!(u16::from_le_bytes([ds[0x50E3], ds[0x50E4]]), 0xE4B9);
+    let set = load_set(&game_dir(), "MCG", heap_segment()).unwrap();
+    let pal = from_dac(&img[DAC_OFS..DAC_OFS + 768]);
+    let g = dt::from_dumps(
+        img,
+        set,
+        pal,
+        Video::Mcga,
+        Sound::PcSpeaker,
+        true,
+        &ds,
+        0x42,
+        Box::new(MemFs::new()),
+    );
+    assert_eq!(g.vm.r16(&g.st, 0x50E3), 0x7769);
+    assert_eq!(g.vm.r16(&g.st, 0x50E3 + 0x9C), 0x7C30);
+}
+
+#[test]
 fn dosbox_e2e_is_gated_on_tools() {
     let e2e = std::env::var_os("DIFFTEST_E2E").is_some();
     let probe = root().join("difftest/probe.com");

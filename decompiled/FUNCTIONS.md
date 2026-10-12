@@ -11,7 +11,7 @@ function-level findings; every address below was verified by disassembling
 | file offset | 0 | `GAME.unpacked.exe` bytes |
 | load image | file − 0xC00 | MZ header is 0xC00 bytes; `disasm/functions.txt` uses this |
 | `cs:` near offset | file − 0x292B0 | main code segment CS = 0x286B |
-| `ds:`/`dgroup` offset | file − 0x10CA0 | dgroup base = 0xFAA paragraphs |
+| `ds:`/`dgroup` offset | file − 0x106A0 | dgroup 0xFAA×16 + 0xC00 MZ header (live-dump verified) |
 
 ## Mode parameter templates
 
@@ -451,7 +451,7 @@ The savegame is a **raw memory dump**, not a structured format: the same
   ("  \xFDFORMAT COMPLETE.\xFD...", planet names like STARNAM29), then
   the `0x3A`-stride record array (anchored by the galaxy preset), scalars
   and menu state. Initial contents ship in the image at file
-  `0x189D9`–`0x1A963` (file ofs = `ds:` + `0x10CA0`).
+  `0x183D9`–`0x1A363` (file ofs = `ds:` + `0x106A0`).
 
 ## PRNG — `cs:0x55B2` (file `0x2E862`–`0x2E93B`)
 
@@ -669,8 +669,9 @@ loop (file `0x339F0` region). The byte selects the work:
   via `0x686C` (space-padded `u16` print, `cmp ax,0x2710` region).
 - `0xAA` (`0x3738`): `or byte,0x80` over the `0xFF`-terminated sprite
   pending-flag bytes at `ds:0x7562` — marks all sprites dirty for the
-  `0xC1..0xF7` redraw pass (the shipped image's string bytes there are
-  stale workspace, not the live table).
+  `0xC1..0xF7` redraw pass (the shipped image's bytes there already
+  match the live `ds` dump — the earlier "stale" note was an artifact
+  of the `+0x10CA0` mis-mapping).
 
 ### Orders popup — `0xF9` → `cs:0x4309` (file `0x34309`–`0x3442D`)
 
@@ -683,8 +684,8 @@ kind `7` → `0`, kind `0xA` → `1`, other kinds → fallback print
 `bx`-th `0x1E`-byte entry at `ds:0x4EBA`, clears `[0x91A0]`/`[0x91D7]`,
 `lodsw`-copies word → `[0x9198]` + 12 words → `[0x9255..0x926C]` +
 byte → `[0x91D6]`, refresh `[0x1264]`, `0x7D0` spin, `call 0x5C49`,
-`[0x91F4] = 0`. The `ds:0x4F50`-region strings live in runtime-built
-menu workspace — the shipped bytes there are stale script slots.
+`[0x91F4] = 0`. The `ds:0x4F50`-region strings ("CLICK HERE FOR …")
+ship in the image — verified byte-identical to a live `ds` dump.
 
 ### Endgame monitor — `0xFA` → `cs:0x82E5` (file `0x382E5`–`0x38338`)
 

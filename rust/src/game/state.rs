@@ -1,4 +1,4 @@
-use super::consts::{REC_BASE, REC_COUNT, REC_STRIDE, STATE_LEN, STATE_OFS};
+use super::consts::{DS_BASE, REC_BASE, REC_COUNT, REC_STRIDE, STATE_LEN, STATE_OFS};
 
 /// The saveable game-state block — the exact `0x1F8B` bytes at
 /// `ds:0x7D39..0x9CC4` the save routine writes whole (file `0x383F3`)
@@ -24,11 +24,11 @@ impl State {
     }
 
     /// Build from the unpacked exe's data — the `0x1F8B` bytes at file
-    /// `0x189D9` (`ds:0x7D39`) are the shipped initial state.
+    /// `0x183D9` (`ds:0x7D39` + [`DS_BASE`]) are the shipped initial state.
     #[must_use]
     pub fn from_image(img: &[u8]) -> Self {
         let mut st = Self::new();
-        let lo = STATE_OFS + 0x10CA0;
+        let lo = STATE_OFS + DS_BASE;
         st.block.copy_from_slice(&img[lo..lo + STATE_LEN]);
         st
     }

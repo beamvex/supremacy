@@ -15,17 +15,20 @@ use super::op::{Op, Rec};
 use super::snap::snapshot;
 
 /// Replay `ops` against `g`, writing port artefacts under `dir`.
-/// Returns the number of `step()`s run.
+/// Returns the tick reached.
 ///
 /// `from_tick` skips ops scheduled at/before it — the boot-from-dump
 /// path uses the tick of the boot dumps so inputs already folded into
-/// the snapshot aren't replayed.
+/// the snapshot aren't replayed. The restored snapshot *is* the state
+/// at `from_tick`, so the tick counter starts there: artefact ops at
+/// `from_tick` re-emit without stepping, and later ops step
+/// `tick − from_tick` frames to match the original's timeline.
 ///
 /// # Errors
 /// Propagates `dir` creation and artefact-write `io` failures.
 pub fn run(g: &mut Game, ops: &[Rec], dir: &Path, from_tick: u16, settle: u16) -> io::Result<u16> {
     fs::create_dir_all(dir)?;
-    let mut step = 0u16;
+    let mut step = from_tick;
     for r in ops {
         if r.tick <= from_tick && !artefact(r.op) {
             continue; // inputs/pokes already folded into the boot dump

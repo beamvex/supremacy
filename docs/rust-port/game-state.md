@@ -13,7 +13,7 @@ to/from the loader heap segment.
   subtract `STATE_OFS` internally: `word`/`set_word`, `dword`/
   `set_dword`, `byte`/`set_byte` (all little-endian).
 - `from_image(img)` — the shipped initial state at file
-  `STATE_OFS + 0x10CA0`.
+  `STATE_OFS + DS_BASE` (`0x183D9`).
 - `rec_ofs(i)` — `cs:0x5E3A` accessor: `[0x9158] + i·0x3A`.
 - `planets()` — `[0x91B8]` = planet count = index of the appended
   player-faction record.
@@ -174,10 +174,13 @@ leaked handle, `open_write`, `write` the whole `0x1F8B` block, `close`;
 
 `KEYMAP_BYTES`: 124 shipped bytes = 62 `{code, out}` pairs used by the
 `0xE66E` line editor and the `0x32BA8` yes/no poll; shipped at
-`ds:0x76BF` (file `0x1835F`), copied to `0x7CBD` at init (the runtime
-slot overlays warning-string bytes refreshed by `[0x1278]` reloads).
+`ds:0x7CBD` itself (file `0x1835D`), ending exactly at the save block
+`0x7D39`. (The earlier `ds:0x76BF` "source" + init-copy story was an
+artifact of the stale `+0x10CA0` file mapping — a live `ds` dump shows
+the map already at `0x7CBD`.)
 `out` classes: `0` exit, `1` backspace, `2` pad-with-spaces+exit,
 otherwise the char to append while `[0x4FCB] < [0x4FCC]`. Table order:
-erase keys (`0x0E`/`0x70`/`0x53`), pad keys (`0x1C`/`0x74`), digits,
-keypad, `-`/`=`, QWERTY rows, `0x2C..0x35` row, space, `0x5B` exit.
+Esc (`0x01`→exit), erase keys (`0x0E`/`0x70`/`0x53`), pad keys
+(`0x1C`/`0x74`), digits, keypad, `-`/`=`, QWERTY rows, `0x2C..0x35`
+row, space, `0x47`/`0x56` `'['` entries.
 First match wins (e.g. `0x47` is shadowed by keypad-7).

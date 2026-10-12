@@ -193,6 +193,24 @@ fn rand_planet_stores_a_record() {
 }
 
 #[test]
+fn shipped_op_table_maps_to_handlers() {
+    // The image ships the `ds:0x50E3` table as `{ofs, 0x286B}` far
+    // pointers (`ofs` = `file − 0x292B0`); `Vm::from_image` rewrites
+    // them into `cs:` labels (`file − 0x30000`).
+    let img = common::read(&common::root().join("decompiled/GAME.unpacked.exe"));
+    let vm = Vm::from_image(&img);
+    let st = State::new();
+    assert_eq!(vm.r16(&st, JT_BASE), 0x7769); // op 0x00 → wait_b
+    assert_eq!(vm.r16(&st, JT_BASE + 0x10), 0x7774); // op 0x10 → print
+    assert_eq!(vm.r16(&st, JT_BASE + 0x9C), 0x7C30); // op 0x9C → wait_ripe
+                                                     // The `ds:0x5183` event slots ship real script pointers.
+    assert_eq!(vm.r16(&st, TAB_BASE), 0x51FB);
+    assert_eq!(vm.r16(&st, TAB_BASE + 29 * 4), 0x574D);
+    // And the scripts themselves sit right after the slots.
+    assert_eq!(vm.r16(&st, 0x51FB), 0x0000); // ev0: wait byte[p]
+}
+
+#[test]
 fn tick_dispatches_script_events() {
     let mut st = common::gsim::galaxy();
     let n = u8::try_from(st.word(game::REC_TOTAL)).unwrap();

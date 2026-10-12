@@ -67,11 +67,13 @@ All numbers in doc comments are real addresses in one of three spaces
 |---|---|---|
 | file offset | byte offset in `GAME.unpacked.exe` | — |
 | `cs:` near offset | inside the main code segment | file − `0x292B0` |
-| `ds:`/`dgroup` offset | inside the data segment | file − `0x10CA0` |
+| `ds:`/`dgroup` offset | inside the data segment | file − `0x106A0` |
 
 The port keeps game data addressed by `ds:` offsets exactly as the asm
 uses them. `Vm::from_image`/`State::from_image` therefore read the image
-at `ds_ofs + 0x10CA0`. The frontend `Host` maps `cs:` reads to file
+at `ds_ofs + DS_BASE` (`0x106A0` — dgroup `0xFAA` × 16 + the `0xC00`
+MZ header; verified against a DOS dump of the running original). The
+frontend `Host` maps `cs:` reads to file
 offsets by adding `0x30000` (game code) or `0x292B0` (video-template
 segment).
 

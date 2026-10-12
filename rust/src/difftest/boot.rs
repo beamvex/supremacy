@@ -40,10 +40,14 @@ pub fn from_dumps(
     g
 }
 
-/// Overlay a `ds` dump onto the port's three-region memory model.
+/// Overlay a `ds` dump onto the port's three-region memory model. The
+/// dump's op-table entries carry the relocated near offsets, so
+/// `jtab::fix` normalises them into `cs:` labels the same way
+/// [`Vm::from_image`][crate::game::Vm::from_image] does.
 fn restore(g: &mut Game, ds: &[u8]) {
     let lo = g.vm.low.len().min(ds.len());
     g.vm.low[..lo].copy_from_slice(&ds[..lo]);
+    crate::game::jtab::fix(&mut g.vm.low, usize::from(crate::game::JT_BASE));
     let blk = 0x7D39..0x9CC4;
     if ds.len() >= blk.end {
         g.st.block.copy_from_slice(&ds[blk]);
