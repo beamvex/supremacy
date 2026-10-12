@@ -8,7 +8,7 @@
 //! (`select_galaxy` + `new_game`). Savegames land in the game dir
 //! (`--galaxy` skips the shell's new-game action).
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use supremacy::args::parse;
@@ -36,13 +36,13 @@ fn main() -> ExitCode {
         eprintln!("usage: supremacy-run <GAME-dir> [V] [K] [S] [--set S] [--exe f] [--preset N] [--seed N] [--galaxy]");
         return ExitCode::from(2);
     };
-    run(PathBuf::from(dir), pos, stem, exe, preset, seed, galaxy)
+    run(Path::new(dir), &pos, stem, exe, preset, seed, galaxy)
 }
 
 #[allow(clippy::too_many_arguments)]
 fn run(
-    dir: PathBuf,
-    pos: Vec<String>,
+    dir: &Path,
+    pos: &[String],
     stem: Option<String>,
     exe: Option<PathBuf>,
     preset: Option<usize>,
@@ -52,38 +52,38 @@ fn run(
     let tail = tail_bytes(pos.get(1), pos.get(2), pos.get(3));
     let cfg = parse(&tail);
     let stem = stem.unwrap_or_else(|| cfg.video.stem().to_owned());
-    let img = match load_img(&dir, exe) {
+    let img = match load_img(dir, exe) {
         Ok(i) => i,
-        Err(e) => return fail("exe", e),
+        Err(e) => return fail("exe", &e),
     };
     // Title boot runs on the `*IN` intro set — the asm's start-up loads
     // it before `0x85B1`; `--preset`/`--galaxy` go straight to base.
-    let boot = if preset.is_none() && !galaxy {
+    let boot_set = if preset.is_none() && !galaxy {
         format!("{stem}IN")
     } else {
         stem.clone()
     };
-    let set = match load_set(&dir, &boot, 0x3A22) {
+    let set = match load_set(dir, &boot_set, 0x3A22) {
         Ok(s) => s,
-        Err(e) => return fail(&boot, e),
+        Err(e) => return fail(&boot_set, &e),
     };
     let pal = palette(&img, cfg.video);
-    boot(dir, stem, img, set, pal, &cfg, preset, seed, galaxy)
+    boot(dir, &stem, img, set, pal, cfg, preset, seed, galaxy)
 }
 
 #[allow(clippy::too_many_arguments)]
 fn boot(
-    dir: PathBuf,
-    stem: String,
+    dir: &Path,
+    stem: &str,
     img: Vec<u8>,
     set: supremacy::assets::AssetSet,
     pal: Palette,
-    cfg: &supremacy::args::Config,
+    cfg: supremacy::args::Config,
     preset: Option<usize>,
     seed: u32,
     galaxy: bool,
 ) -> ExitCode {
-    let files = Box::new(supremacy::platform::HostFs::new(dir.clone()));
+    let files = Box::new(supremacy::platform::HostFs::new(dir.to_path_buf()));
     let mut g = if preset.is_none() && !galaxy {
         Game::new_title(
             img,
@@ -92,6 +92,7 @@ fn boot(
             cfg.video,
             cfg.sound,
             cfg.keyboard_mouse,
+            seed,
             files,
         )
     } else {
@@ -109,13 +110,13 @@ fn boot(
     };
     // `Call::Load`'s `ds:0x1208`+ cell mapping — the endings' `*DTH`/
     // `*WIN` and the restart tail's `*IN`/base pairs.
-    g.host.set_assets(&dir, &stem);
+    g.host.set_assets(dir, stem);
     if galaxy {
         g.enter_galaxy();
     }
     match window::run(&mut g) {
         Ok(()) => ExitCode::SUCCESS,
-        Err(e) => fail("minifb", std::io::Error::other(e)),
+        Err(e) => fail("minifb", &std::io::Error::other(e)),
     }
 }
 
@@ -138,7 +139,7 @@ fn load_img(dir: &std::path::Path, exe: Option<PathBuf>) -> std::io::Result<Vec<
     std::fs::read(exe.unwrap_or_else(|| dir.join("../decompiled/GAME.unpacked.exe")))
 }
 
-fn fail(what: &str, e: std::io::Error) -> ExitCode {
+fn fail(what: &str, e: &std::io::Error) -> ExitCode {
     eprintln!("{what}: {e}");
     ExitCode::FAILURE
 }
