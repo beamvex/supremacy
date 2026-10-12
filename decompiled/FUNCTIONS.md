@@ -1423,6 +1423,294 @@ Entry stub (file `0x31D17` for the record): `int21/AH=1A` (set DTA),
 `0x385B1`, `[0x9C9A]=1`, `mouse_hook`, `0x3228C`, `0x32228`,
 `input_install`, `jmp 0x3305B` (new-game init).
 
+## fcn.* index — all 245 rizin-recovered functions
+
+`disasm/functions.txt` (rizin `aaa`) lists 244 `fcn.*`/`int.*` entries
+plus `entry0`. The entries are **not** a flat function list: rizin works
+in a 16-bit offset space, so each entry's address wraps modulo `0x10000`
+back onto the image's low 64 KB even when the real routine lives in the
+main window (`0x30000`–`0x38E90`).
+
+The resolution rule that fits all verified anchors (~60 exact matches to
+the routines named above: tick dispatcher, `load_state`, `int33_swap`,
+`rand16`, `pal_adj`, the LZSS decoders, …):
+
+- **`op16` = `fcn` address + `0xC00`** — the 16-bit operand space; this
+  is exactly the `cs:` value this document uses for main/low-window
+  code, and the file offset for the three sound modules.
+- **true file = `op16 + k·0x10000`** for whichever `k` (0–3) lands on a
+  code-bearing region:
+  - `k=0` — module routines: PC `0x0CF8`–`0x1202`, Tandy `0x1950`–
+    `0x1E64`, A/R driver `0x290A`–`0x3F38`
+  - `k=2` — low-window code islands `0x2A0DE`+ / `0x2E652`+ and the
+    mode-code blocks `0x2EB6F`–`0x31D17`
+  - `k=3` — the main game window `0x30000`–`0x38E90`
+- `entry0` is the exception — a full image offset (`0x31117` → file
+  `0x31D17`), anchored by the MZ header.
+
+Because each `op16` can shadow a routine in more than one segment, the
+"code files" column lists every candidate that falls inside a known code
+region (e.g. `fcn.000010ac` is both the Tandy `stop` at `0x1CAC` and an
+`int9_isr` interior at `0x31CAC`; bb/size are rizin's attributed counts).
+Entries with no code-bearing candidate are data (song records, bitmaps,
+tables) decoded as code.
+
+By `op16` band: 10 PC-module (`0xCF8`–`0x1202`), 32 Tandy-module
+(`0x19DB`–`0x2741`), 93 A/R-driver (`0x290A`–`0x44EB`), 103 upper-band
+(`0x4970`+, resolving to main-window `0x34970`+ for `op16 < 0x8E90` or
+low-window `0x292B0`+ for `op16 ≥ 0x92B0`), 6 data-only, plus `entry0`. The Tandy-band rows past file
+`0x1E64` and many A/R-band rows are module-*tail data* whose code
+candidate is the `+0x30000` shadow — those rows name the main-window
+routine (init callees, reprint tails, `*DTH.*` loaders).
+
+| fcn | op16 | bb | size | code files | identification |
+|---|---|---|---|---|---|
+| `fcn.000000f8` | `0x00CF8` | 1 | 17 | `0x00CF8` (PC); `0x30CF8` (CGA) | CGA routine |
+| `fcn.000001a9` | `0x00DA9` | 1 | 22 | `0x00DA9` (PC); `0x30DA9` (CGA) | `song` ptr-copy loop (inside `0x161`) |
+| `fcn.00000311` | `0x00F11` | 1 | 10 | `0x00F11` (PC); `0x30F11` (CGA) | op `0x86` tail |
+| `fcn.00000330` | `0x00F30` | 2 | 13 | `0x00F30` (PC); `0x30F30` (CGA) | op `0x8A` tail (`di==0x134`→`[0x2C]`=0) |
+| `fcn.0000033d` | `0x00F3D` | 14 | 76 | `0x00F3D` (PC); `0x30F3D` (CGA) | **`step`** PC chan decoder |
+| `fcn.00000389` | `0x00F89` | 1 | 2 | `0x00F89` (PC); `0x30F89` (CGA) | `note` tail (mid-insn) |
+| `fcn.000003bd` | `0x00FBD` | 19 | 139 | `0x00FBD` (PC); `0x30FBD` (CGA) | **`voice`** PC env/mix |
+| `fcn.000003cb` | `0x00FCB` | 3 | 123 | `0x00FCB` (PC); `0x30FCB` (CGA) | `voice` env-fold branch (mid-insn) |
+| `fcn.00000548` | `0x01148` | 3 | 44 | `0x01148` (PC); `0x31148` (TGA) | **TGA `lzss`** opaque decoder |
+| `fcn.00000602` | `0x01202` | 3 | 87 | `0x01202` (PC); `0x31202` (TGA) | **TGA `lzss_xor`** decoder |
+| `fcn.00000ddb` | `0x019DB` | 3 | 215 | `0x019DB` (Tandy); `0x319DB` (TGA) | TGA `map_draw` region |
+| `fcn.00000dfc` | `0x019FC` | 1 | 3 | `0x019FC` (Tandy); `0x319FC` (TGA) | routine — unnamed |
+| `fcn.00000f18` | `0x01B18` | 3 | 30 | `0x01B18` (Tandy); `0x31B18` (TGA) | `song` chan-init loop tail |
+| `fcn.00000f3e` | `0x01B3E` | 1 | 45 | `0x01B3E` (Tandy); `0x31B3E` (TGA) | `sfx` rec-copy body |
+| `fcn.00001002` | `0x01C02` | 8 | 41 | `0x01C02` (Tandy); `0x31C02` (TGA) | **`step`** Tandy chan decoder |
+| `fcn.0000102b` | `0x01C2B` | 3 | 129 | `0x01C2B` (Tandy); `0x31C2B` (TGA) | `step` `≥0xA0` twin-add |
+| `fcn.00001072` | `0x01C72` | 5 | 53 | `0x01C72` (Tandy); `0x31C72` (TGA) | `note` body |
+| `fcn.000010ac` | `0x01CAC` | 3 | 17 | `0x01CAC` (Tandy); `0x31CAC` (TGA) | **`stop`** Tandy |
+| `fcn.000011ae` | `0x01DAE` | 17 | 240 | `0x01DAE` (Tandy); `0x31DAE` (main) | **`render`** Tandy mixer |
+| `fcn.000011b5` | `0x01DB5` | 1 | 8 | `0x01DB5` (Tandy); `0x31DB5` (main) | `render` latch gate |
+| `fcn.000011d1` | `0x01DD1` | 19 | 175 | `0x01DD1` (Tandy); `0x31DD1` (main) | `render` vol-write site (→`0x3ED`) |
+| `fcn.00001205` | `0x01E05` | 1 | 21 | `0x01E05` (Tandy); `0x31E05` (main) | `write_freq` SN 10-bit pair |
+| `fcn.0000121a` | `0x01E1A` | 2 | 20 | `0x01E1A` (Tandy); `0x31E1A` (main) | `env` |
+| `fcn.0000122e` | `0x01E2E` | 2 | 12 | `0x01E2E` (Tandy); `0x31E2E` (main) | `env` cont |
+| `fcn.00001264` | `0x01E64` | 6 | 42 | `0x01E64` (Tandy); `0x31E64` (main) | **`int9_swap`** |
+| `fcn.0000128e` | `0x01E8E` | 1 | 2 | `0x01E8E` (Tandy); `0x31E8E` (main) | **`install_drivers`** |
+| `fcn.0000147e` | `0x0207E` | 1 | 16 | `0x0207E` (Tandy); `0x3207E` (main) | init callee (post-DTA) |
+| `fcn.0000148f` | `0x0208F` | 1 | 2 | `0x0208F` (Tandy); `0x3208F` (main) | asset-load block (`0x3208E`) |
+| `fcn.000014f2` | `0x020F2` | 1 | 40 | `0x020F2` (Tandy); `0x320F2` (main) | loader/`ofs_para` fixup region |
+| `fcn.0000155b` | `0x0215B` | 1 | 7 | `0x0215B` (Tandy); `0x3215B` (main) | `.BIN` chunk-read tail |
+| `fcn.000015bf` | `0x021BF` | 1 | 15 | `0x021BF` (Tandy); `0x321BF` (main) | `*DTH.*` arm loader (endgame A) |
+| `fcn.00001628` | `0x02228` | 1 | 44 | `0x02228` (Tandy); `0x32228` (main) | init callee `0x32228` |
+| `fcn.0000168c` | `0x0228C` | 6 | 105 | `0x0228C` (Tandy); `0x3228C` (main) | init callee `0x3228C` |
+| `int.000016f5` | `0x022F5` | 3 | 13 | `0x022F5` (Tandy); `0x322F5` (main) | init callee `0x322F5` |
+| `fcn.00001759` | `0x02359` | 52 | 436 | `0x02359` (Tandy); `0x32359` (main) | init callee `0x32359` (52 bb) |
+| `fcn.000019e2` | `0x025E2` | 1 | 1 | `0x025E2` (Tandy); `0x325E2` (main) | `0x25E2` modal print enqueue |
+| `fcn.000019eb` | `0x025EB` | 42 | 317 | `0x025EB` (Tandy); `0x325EB` (main) | inside modal printer |
+| `fcn.00001a04` | `0x02604` | 1 | 28 | `0x02604` (Tandy); `0x32604` (main) | `0x2604` xfer tail |
+| `fcn.00001a2c` | `0x0262C` | 2 | 6 | `0x0262C` (Tandy); `0x3262C` (main) | `0x262C` capacity helper |
+| `fcn.00001a84` | `0x02684` | 5 | 106 | `0x02684` (Tandy); `0x32684` (main) | `0x2684` reprint tail |
+| `fcn.00001ac1` | `0x026C1` | 33 | 128 | `0x026C1` (Tandy); `0x326C1` (main) | `0x26C1` reprint tail |
+| `fcn.00001b41` | `0x02741` | 1 | 2 | `0x02741` (Tandy); `0x32741` (main) | `0x2741` reprint tail |
+| `fcn.00001d0a` | `0x0290A` | 11 | 415 | `0x0290A` (A/R); `0x3290A` (main) | int-80 entry jump-table tail |
+| `fcn.00001d3d` | `0x0293D` | 1 | 36 | `0x0293D` (A/R); `0x3293D` (main) | routine — unnamed |
+| `fcn.00001d61` | `0x02961` | 1 | 33 | `0x02961` (A/R); `0x32961` (main) | routine — unnamed |
+| `fcn.00001d82` | `0x02982` | 7 | 74 | `0x02982` (A/R); `0x32982` (main) | routine — unnamed |
+| `fcn.00001dd9` | `0x029D9` | 4 | 21 | `0x029D9` (A/R); `0x329D9` (main) | pre-`select_sound` thunk (`select_sound`=file `0x29EE`) |
+| `fcn.00001ee1` | `0x02AE1` | 3 | 22 | `0x02AE1` (A/R); `0x32AE1` (main) | routine — unnamed |
+| `fcn.00001ef7` | `0x02AF7` | 1 | 3 | `0x02AF7` (A/R); `0x32AF7` (main) | routine — unnamed |
+| `fcn.00001f05` | `0x02B05` | 5 | 27 | `0x02B05` (A/R); `0x32B05` (main) | guard helper (`[0x2060]`==0 → `ret`) |
+| `fcn.00001f20` | `0x02B20` | 1 | 9 | `0x02B20` (A/R); `0x32B20` (main) | routine — unnamed |
+| `fcn.00001f40` | `0x02B40` | 3 | 48 | `0x02B40` (A/R); `0x32B40` (main) | routine — unnamed |
+| `fcn.00001f49` | `0x02B49` | 3 | 22 | `0x02B49` (A/R); `0x32B49` (main) | routine — unnamed |
+| `fcn.00001f72` | `0x02B72` | 3 | 22 | `0x02B72` (A/R); `0x32B72` (main) | routine — unnamed |
+| `fcn.00001f86` | `0x02B86` | 3 | 45 | `0x02B86` (A/R); `0x32B86` (main) | driver routine (pusha prologue) |
+| `fcn.00001fb3` | `0x02BB3` | 3 | 45 | `0x02BB3` (A/R); `0x32BB3` (main) | driver routine (pusha prologue) |
+| `fcn.00001fe0` | `0x02BE0` | 8 | 138 | `0x02BE0` (A/R); `0x32BE0` (main) | routine — unnamed |
+| `fcn.0000206a` | `0x02C6A` | 5 | 23 | `0x02C6A` (A/R); `0x32C6A` (main) | **`max_sound_scan`** (in `load_song`) |
+| `fcn.000020a9` | `0x02CA9` | 2 | 32 | `0x02CA9` (A/R); `0x32CA9` (main) | routine — unnamed |
+| `fcn.000020be` | `0x02CBE` | 10 | 70 | `0x02CBE` (A/R); `0x32CBE` (main) | routine — unnamed |
+| `fcn.00002104` | `0x02D04` | 1 | 8 | `0x02D04` (A/R); `0x32D04` (main) | **`timbre_upload`** (mod `0x404`, Roland) |
+| `fcn.0000214f` | `0x02D4F` | 4 | 55 | `0x02D4F` (A/R); `0x32D4F` (main) | **`timbre_slot_send`** (mod `0x44F`) |
+| `fcn.0000219f` | `0x02D9F` | 1 | 6 | `0x02D9F` (A/R); `0x32D9F` (main) | routine — unnamed |
+| `fcn.0000228c` | `0x02E8C` | 3 | 24 | `0x02E8C` (A/R); `0x32E8C` (main) | chan-idx wrap helper (`[0x1C83]`) |
+| `fcn.000022a4` | `0x02EA4` | 4 | 24 | `0x02EA4` (A/R); `0x32EA4` (main) | sound→block scan (`di=0x170A,cx=0x7F`) |
+| `fcn.000022bc` | `0x02EBC` | 25 | 256 | `0x02EBC` (A/R); `0x32EBC` (main) | **`queue_tick`** head (loop `0x2EDD`) |
+| `fcn.00002321` | `0x02F21` | 1 | 5 | `0x02F21` (A/R); `0x32F21` (main) | routine — unnamed |
+| `fcn.00002324` | `0x02F24` | 1 | 4 | `0x02F24` (A/R); `0x32F24` (main) | routine — unnamed |
+| `fcn.0000232d` | `0x02F2D` | 1 | 1 | `0x02F2D` (A/R); `0x32F2D` (main) | routine — unnamed |
+| `fcn.00002391` | `0x02F91` | 1 | 5 | `0x02F91` (A/R); `0x32F91` (main) | routine — unnamed |
+| `fcn.000023d7` | `0x02FD7` | 1 | 1 | `0x02FD7` (A/R); `0x32FD7` (main) | routine — unnamed |
+| `fcn.000023e7` | `0x02FE7` | 5 | 51 | `0x02FE7` (A/R); `0x32FE7` (main) | routine — unnamed |
+| `fcn.000023ef` | `0x02FEF` | 74 | 2109 | `0x02FEF` (A/R); `0x32FEF` (main) | **`event_dispatch`** Roland-gate→`0x3604` |
+| `fcn.0000243a` | `0x0303A` | 1 | 13 | `0x0303A` (A/R); `0x3303A` (main) | routine — unnamed |
+| `fcn.000024ac` | `0x030AC` | 50 | 2070 | `0x030AC` (A/R); `0x330AC` (main) | **`event_dispatch_2`** Roland-gate→`0x36BE` |
+| `fcn.0000255c` | `0x0315C` | 1 | 26 | `0x0315C` (A/R); `0x3315C` (main) | midi send pair (`mpu_send`×2) |
+| `fcn.00002689` | `0x03289` | 5 | 65 | `0x03289` (A/R); `0x33289` (main) | routine — unnamed |
+| `fcn.000026ca` | `0x032CA` | 3 | 25 | `0x032CA` (A/R); `0x332CA` (main) | routine — unnamed |
+| `fcn.000026e3` | `0x032E3` | 4 | 61 | `0x032E3` (A/R); `0x332E3` (main) | routine — unnamed |
+| `fcn.0000273b` | `0x0333B` | 7 | 93 | `0x0333B` (A/R); `0x3333B` (main) | routine — unnamed |
+| `fcn.00002745` | `0x03345` | 3 | 40 | `0x03345` (A/R); `0x33345` (main) | routine — unnamed |
+| `fcn.0000274f` | `0x0334F` | 5 | 56 | `0x0334F` (A/R); `0x3334F` (main) | math helper (shl/sub) |
+| `fcn.000027cf` | `0x033CF` | 3 | 62 | `0x033CF` (A/R); `0x333CF` (main) | **`roland_init`** (doc `0x33D0`) |
+| `fcn.0000280d` | `0x0340D` | 3 | 16 | `0x0340D` (A/R); `0x3340D` (main) | roland-detect wrapper |
+| `fcn.0000281d` | `0x0341D` | 3 | 20 | `0x0341D` (A/R); `0x3341D` (main) | routine — unnamed |
+| `fcn.00002838` | `0x03438` | 3 | 62 | `0x03438` (A/R); `0x33438` (main) | routine — unnamed |
+| `fcn.00002870` | `0x03470` | 12 | 73 | `0x03470` (A/R); `0x33470` (main) | **`mpu_reset`** |
+| `fcn.000028b9` | `0x034B9` | 3 | 15 | `0x034B9` (A/R); `0x334B9` (main) | **`mpu_sysex`** |
+| `fcn.000028c8` | `0x034C8` | 5 | 44 | `0x034C8` (A/R); `0x334C8` (main) | `mpu_sysex_block` |
+| `fcn.000028f5` | `0x034F5` | 5 | 25 | `0x034F5` (A/R); `0x334F5` (main) | **`mpu_cmd`** |
+| `fcn.0000290e` | `0x0350E` | 3 | 17 | `0x0350E` (A/R); `0x3350E` (main) | **`mpu_send`** |
+| `fcn.0000291f` | `0x0351F` | 3 | 13 | `0x0351F` (A/R); `0x3351F` (main) | **`mpu_read`** |
+| `fcn.0000293d` | `0x0353D` | 1 | 15 | `0x0353D` (A/R); `0x3353D` (main) | **`prog_pit`** |
+| `fcn.00002952` | `0x03552` | 1 | 58 | `0x03552` (A/R); `0x33552` (main) | **`timer_install`** |
+| `fcn.0000298c` | `0x0358C` | 3 | 51 | `0x0358C` (A/R); `0x3358C` (main) | **`timer_uninstall`** |
+| `fcn.00002bc7` | `0x037C7` | 1 | 3 | `0x037C7` (A/R); `0x337C7` (main) | routine — unnamed |
+| `fcn.00002bce` | `0x037CE` | 7 | 310 | `0x037CE` (A/R); `0x337CE` (main) | cmd case dispatch (`al` 4→`0x3903`) |
+| `fcn.00002c2c` | `0x0382C` | 4 | 48 | `0x0382C` (A/R); `0x3382C` (main) | routine — unnamed |
+| `fcn.00002cc2` | `0x038C2` | 1 | 4 | `0x038C2` (A/R); `0x338C2` (main) | routine — unnamed |
+| `fcn.00002cce` | `0x038CE` | 1 | 4 | `0x038CE` (A/R); `0x338CE` (main) | routine — unnamed |
+| `fcn.00002d04` | `0x03904` | 1 | 55 | `0x03904` (A/R); `0x33904` (main) | routine — unnamed |
+| `fcn.00002d3b` | `0x0393B` | 3 | 26 | `0x0393B` (A/R); `0x3393B` (main) | routine — unnamed |
+| `fcn.00002d55` | `0x03955` | 6 | 128 | `0x03955` (A/R); `0x33955` (main) | routine — unnamed |
+| `fcn.00002d77` | `0x03977` | 3 | 53 | `0x03977` (A/R); `0x33977` (main) | routine — unnamed |
+| `fcn.00002dd5` | `0x039D5` | 1 | 17 | `0x039D5` (A/R); `0x339D5` (main) | routine — unnamed |
+| `fcn.00002de6` | `0x039E6` | 8 | 142 | `0x039E6` (A/R); `0x339E6` (main) | routine — unnamed |
+| `fcn.00002e47` | `0x03A47` | 1 | 26 | `0x03A47` (A/R); `0x33A47` (main) | routine — unnamed |
+| `fcn.00002e74` | `0x03A74` | 12 | 91 | `0x03A74` (A/R); `0x33A74` (main) | routine — unnamed |
+| `fcn.00002ee9` | `0x03AE9` | 1 | 24 | `0x03AE9` (A/R); `0x33AE9` (main) | routine — unnamed |
+| `fcn.00002f01` | `0x03B01` | 11 | 99 | `0x03B01` (A/R); `0x33B01` (main) | routine — unnamed |
+| `fcn.00002f64` | `0x03B64` | 2 | 12 | `0x03B64` (A/R); `0x33B64` (main) | routine — unnamed |
+| `fcn.00002f70` | `0x03B70` | 3 | 45 | `0x03B70` (A/R); `0x33B70` (main) | routine — unnamed |
+| `fcn.00002f9d` | `0x03B9D` | 7 | 111 | `0x03B9D` (A/R); `0x33B9D` (main) | routine — unnamed |
+| `fcn.0000300c` | `0x03C0C` | 1 | 15 | `0x03C0C` (A/R); `0x33C0C` (main) | routine — unnamed |
+| `fcn.0000301b` | `0x03C1B` | 6 | 549 | `0x03C1B` (A/R); `0x33C1B` (main) | copy/send prologue (`ds=es=cs`) |
+| `fcn.00003066` | `0x03C66` | 1 | 7 | `0x03C66` (A/R); `0x33C66` (main) | routine — unnamed |
+| `fcn.0000306d` | `0x03C6D` | 6 | 128 | `0x03C6D` (A/R); `0x33C6D` (main) | math helper (`shl`×4) |
+| `fcn.000030ad` | `0x03CAD` | 1 | 24 | `0x03CAD` (A/R); `0x33CAD` (main) | routine — unnamed |
+| `fcn.000030c5` | `0x03CC5` | 3 | 22 | `0x03CC5` (A/R); `0x33CC5` (main) | routine — unnamed |
+| `fcn.000030db` | `0x03CDB` | 1 | 1 | `0x03CDB` (A/R); `0x33CDB` (main) | routine — unnamed |
+| `fcn.000030dc` | `0x03CDC` | 2 | 26 | `0x03CDC` (A/R); `0x33CDC` (main) | routine — unnamed |
+| `fcn.000030f6` | `0x03CF6` | 4 | 42 | `0x03CF6` (A/R); `0x33CF6` (main) | routine — unnamed |
+| `fcn.00003120` | `0x03D20` | 1 | 49 | `0x03D20` (A/R); `0x33D20` (main) | routine — unnamed |
+| `fcn.00003151` | `0x03D51` | 1 | 54 | `0x03D51` (A/R); `0x33D51` (main) | routine — unnamed |
+| `fcn.00003187` | `0x03D87` | 9 | 96 | `0x03D87` (A/R); `0x33D87` (main) | chan-record lookup (`bx=ah*0x20`) |
+| `fcn.000031e7` | `0x03DE7` | 5 | 45 | `0x03DE7` (A/R); `0x33DE7` (main) | guard on `[0x1C86]` |
+| `fcn.00003240` | `0x03E40` | 1 | 51 | `0x03E40` (A/R); `0x33E40` (main) | `opl_shadow` reg cache |
+| `fcn.00003273` | `0x03E73` | 1 | 28 | `0x03E73` (A/R); `0x33E73` (main) | `opl_note_half` (`ah+=0xA0`→`opl_write`) |
+| `fcn.00003290` | `0x03E90` | 1 | 19 | `0x03E90` (A/R); `0x33E90` (main) | **`opl_key_off`** |
+| `fcn.000032a4` | `0x03EA4` | 5 | 89 | `0x03EA4` (A/R); `0x33EA4` (main) | **`opl_detect`** |
+| `fcn.000032fd` | `0x03EFD` | 1 | 59 | `0x03EFD` (A/R); `0x33EFD` (main) | **`opl_write`** |
+| `fcn.00003338` | `0x03F38` | 1 | 46 | `0x03F38` (A/R); `0x33F38` (main) | **`opl_delay`** |
+| `fcn.000036c3` | `0x042C3` | 2 | 363 | `0x042C3` (A/R); `0x342C3` (main) | routine — unnamed |
+| `fcn.0000382e` | `0x0442E` | 1 | 2 | `0x0442E` (A/R); `0x3442E` (main) | routine — unnamed |
+| `fcn.000038eb` | `0x044EB` | 1 | 29 | `0x044EB` (A/R); `0x344EB` (main) | routine — unnamed |
+| `fcn.0000408b` | `0x04C8B` | 1 | 77 | `0x34C8B` (main) | surface/build region |
+| `fcn.000040d8` | `0x04CD8` | 2 | 892 | `0x34CD8` (main) | surface/build region |
+| `fcn.000042b6` | `0x04EB6` | 1 | 3 | `0x34EB6` (main) | routine — unnamed |
+| `fcn.00004454` | `0x05054` | 2 | 49 | `0x35054` (main) | routine — unnamed |
+| `fcn.00004457` | `0x05057` | 1 | 3 | `0x35057` (main) | **`0x5057`** host helper |
+| `fcn.00004485` | `0x05085` | 2 | 358 | `0x35085` (main) | **`0x5085`** host lookup |
+| `fcn.000044a9` | `0x050A9` | 1 | 7 | `0x350A9` (main) | routine — unnamed |
+| `fcn.000045e0` | `0x051E0` | 4 | 739 | `0x351E0` (main) | routine — unnamed |
+| `fcn.000046dd` | `0x052DD` | 1 | 1 | `0x352DD` (main) | `0x52DD` msg/redraw tail |
+| `fcn.000046fe` | `0x052FE` | 1 | 5 | `0x352FE` (main) | routine — unnamed |
+| `fcn.000048c3` | `0x054C3` | 7 | 558 | `0x354C3` (main) | routine — unnamed |
+| `fcn.00004abf` | `0x056BF` | 1 | 1 | `0x356BF` (main) | `0x56BF` header print |
+| `fcn.00004ac2` | `0x056C2` | 1 | 3 | `0x356C2` (main) | routine — unnamed |
+| `fcn.00004ad2` | `0x056D2` | 12 | 706 | `0x356D2` (main) | routine — unnamed |
+| `fcn.00004bbc` | `0x057BC` | 3 | 52 | `0x357BC` (main) | `0x57BC` rebuild helper |
+| `fcn.00004d39` | `0x05939` | 1 | 15 | `0x35939` (main) | `0x3593B` detail loop |
+| `fcn.00004d94` | `0x05994` | 1 | 56 | `0x35994` (main) | routine — unnamed |
+| `fcn.00004dcc` | `0x059CC` | 1 | 31 | `0x359CC` (main) | routine — unnamed |
+| `fcn.00004deb` | `0x059EB` | 6 | 606 | `0x359EB` (main) | `0x59EB` redraw |
+| `fcn.0000501e` | `0x05C1E` | 1 | 308 | `0x35C1E` (main) | **`0x5C1E`** draw sequencer |
+| `fcn.00005049` | `0x05C49` | 1 | 78 | `0x35C49` (main) | `0x5C49` seq fetch |
+| `fcn.00005097` | `0x05C97` | 1 | 219 | `0x35C97` (main) | `0x5C97` seq reset |
+| `fcn.00005152` | `0x05D52` | 5 | 129 | `0x35D52` (main) | routine — unnamed |
+| `fcn.000051d3` | `0x05DD3` | 1 | 2 | `0x35DD3` (main) | `0x5DD3` sel_next |
+| `fcn.00005283` | `0x05E83` | 1 | 231 | `0x35E83` (main) | `0x5E83` ratio print |
+| `fcn.000052e6` | `0x05EE6` | 2 | 160 | `0x35EE6` (main) | `0x5EE6` sync_sel |
+| `fcn.00005438` | `0x06038` | 1 | 332 | `0x36038` (main) | routine — unnamed |
+| `fcn.000055e5` | `0x061E5` | 8 | 1705 | `0x361E5` (main) | `0x61E5` fleet redraw |
+| `fcn.00005c86` | `0x06886` | 2 | 13 | `0x36886` (main) | `0x6886` number print |
+| `fcn.00005c93` | `0x06893` | 1 | 4 | `0x36893` (main) | routine — unnamed |
+| `fcn.00005e8e` | `0x06A8E` | 1 | 68 | `0x36A8E` (main) | routine — unnamed |
+| `fcn.00005ed2` | `0x06AD2` | 1 | 3 | `0x36AD2` (main) | routine — unnamed |
+| `fcn.00005f06` | `0x06B06` | 2 | 68 | `0x36B06` (main) | **`0x6B06`** ticker enqueue |
+| `fcn.00005f4a` | `0x06B4A` | 1 | 69 | `0x36B4A` (main) | routine — unnamed |
+| `fcn.00005f8f` | `0x06B8F` | 1 | 53 | `0x36B8F` (main) | `0x6B8F` ticker |
+| `fcn.00005fc4` | `0x06BC4` | 1 | 315 | `0x36BC4` (main) | routine — unnamed |
+| `fcn.00006212` | `0x06E12` | 1 | 262 | `0x36E12` (main) | `0x6E12` fleet tail |
+| `fcn.00006318` | `0x06F18` | 1 | 6 | `0x36F18` (main) | msg `0x6F18` |
+| `fcn.0000632d` | `0x06F2D` | 2 | 12 | `0x36F2D` (main) | `0x6F2D` wait |
+| `fcn.00006339` | `0x06F39` | 1 | 26 | `0x36F39` (main) | routine — unnamed |
+| `fcn.00006353` | `0x06F53` | 1 | 60 | `0x36F53` (main) | routine — unnamed |
+| `fcn.000063b8` | `0x06FB8` | 1 | 9 | `0x36FB8` (main) | routine — unnamed |
+| `fcn.000063bf` | `0x06FBF` | 2 | 19 | `0x36FBF` (main) | routine — unnamed |
+| `fcn.000063d2` | `0x06FD2` | 2 | 327 | `0x36FD2` (main) | routine — unnamed |
+| `fcn.0000641d` | `0x0701D` | 1 | 6 | `0x3701D` (main) | routine — unnamed |
+| `fcn.00006519` | `0x07119` | 1 | 171 | `0x37119` (main) | routine — unnamed |
+| `fcn.000065c4` | `0x071C4` | 2 | 1282 | `0x371C4` (main) | routine — unnamed |
+| `fcn.000067d9` | `0x073D9` | 1 | 6 | `0x373D9` (main) | **`0x73D9`** tick dispatcher |
+| `fcn.00006ac6` | `0x076C6` | 18 | 2085 | `0x376C6` (main) | `0x76DE` msg pass region |
+| `fcn.00006d70` | `0x07970` | 1 | 18 | `0x37970` (main) | `0x7980` wait-kind region |
+| `fcn.000072eb` | `0x07EEB` | 1 | 186 | `0x37EEB` (main) | routine — unnamed |
+| `fcn.000073a5` | `0x07FA5` | 1 | 116 | `0x37FA5` (main) | `0x7FA5` name generator |
+| `fcn.00007419` | `0x08019` | 1 | 33 | `0x38019` (main) | `0x8019` machine spawn |
+| `fcn.0000743a` | `0x0803A` | 1 | 56 | `0x3803A` (main) | `0x803A` per-unit spawn |
+| `fcn.00007472` | `0x08072` | 1 | 4 | `0x38072` (main) | routine — unnamed |
+| `fcn.00007476` | `0x08076` | 1 | 4 | `0x38076` (main) | routine — unnamed |
+| `fcn.0000747a` | `0x0807A` | 1 | 580 | `0x3807A` (main) | routine — unnamed |
+| `fcn.000076be` | `0x082BE` | 1 | 200 | `0x382BE` (main) | **`0x82BE`** spy charge |
+| `fcn.0000773b` | `0x0833B` | 1 | 38 | `0x3833B` (main) | routine — unnamed |
+| `fcn.00007761` | `0x08361` | 1 | 146 | `0x38361` (main) | routine — unnamed |
+| `fcn.00007786` | `0x08386` | 1 | 36 | `0x38386` (main) | `0x8386` sel helper |
+| `fcn.000077aa` | `0x083AA` | 1 | 36 | `0x383AA` (main) | `0x83AA` tail |
+| `fcn.000077ce` | `0x083CE` | 1 | 37 | `0x383CE` (main) | **`load_state`** |
+| `fcn.000077f3` | `0x083F3` | 1 | 63 | `0x383F3` (main) | **`save_state`** |
+| `fcn.00007832` | `0x08432` | 1 | 54 | `0x38432` (main) | staging copy (`0x8432` seed) |
+| `fcn.0000784b` | `0x0844B` | 1 | 300 | `0x3844B` (main) | staging copy |
+| `fcn.00007868` | `0x08468` | 1 | 48 | `0x38468` (main) | `0x8468` EGA regs restore |
+| `fcn.00007898` | `0x08498` | 1 | 90 | `0x38498` (main) | `0x8498` EGA map-mask |
+| `fcn.000078f2` | `0x084F2` | 1 | 162 | `0x384F2` (main) | routine — unnamed |
+| `fcn.00007977` | `0x08577` | 1 | 58 | `0x38577` (main) | `0x8577` sfx wrapper |
+| `fcn.00007994` | `0x08594` | 1 | 29 | `0x38594` (main) | routine — unnamed |
+| `fcn.000079b1` | `0x085B1` | 1 | 690 | `0x385B1` (main) | **`0x85B1`** title attract |
+| `fcn.00007c63` | `0x08863` | 1 | 30 | `0x38863` (main) | `0x8863` seq-run poll |
+| `fcn.00007c81` | `0x08881` | 1 | 16 | `0x38881` (main) | routine — unnamed |
+| `fcn.00007c91` | `0x08891` | 1 | 242 | `0x38891` (main) | `0x8891` starfield |
+| `fcn.00007d83` | `0x08983` | 1 | 47 | `0x38983` (main) | `0x8983` scroll |
+| `fcn.00007db2` | `0x089B2` | 1 | 206 | `0x389B2` (main) | routine — unnamed |
+| `fcn.00007db3` | `0x089B3` | 1 | 16 | `0x389B3` (main) | `0x89B3` DAC/clear |
+| `fcn.00007dc3` | `0x089C3` | 1 | 56 | `0x389C3` (main) | `0x89C3` idiom |
+| `fcn.00007dfb` | `0x089FB` | 1 | 32 | `0x389FB` (main) | int-80 `ah=1/2` |
+| `fcn.00007e1b` | `0x08A1B` | 1 | 32 | `0x38A1B` (main) | int-80 `ah=0x32/0x33` |
+| `fcn.00007e3b` | `0x08A3B` | 1 | 32 | `0x38A3B` (main) | int-80 sfx `al` arm |
+| `fcn.00007e5b` | `0x08A5B` | 1 | 37 | `0x38A5B` (main) | int-80 `ah=1/2`+far |
+| `fcn.00007e80` | `0x08A80` | 1 | 64 | `0x38A80` (main) | int-80 `ah=2/0` (`[0x91D3]`-gated) |
+| `fcn.00007ec0` | `0x08AC0` | 1 | 774 | `0x38AC0` (main) | near `0x38AA7` wrapper |
+| `fcn.000081c6` | `0x08DC6` | 1 | 118 | `0x38DC6` (main) | **`map_gate`** (`cs:0x8DC6`) |
+| `fcn.0000823c` | `0x08E3C` | 1 | 42 | `0x38E3C` (main) | **`int24_swap`** |
+| `fcn.00008266` | `0x08E66` | 1 | 15 | `0x38E66` (main) | routine — unnamed |
+| `fcn.00008275` | `0x08E75` | 1 | 2879 | `0x38E75` (main) | routine — unnamed |
+| `fcn.00008b4c` | `0x0974C` | 1 | 590 | — | data — no code-bearing candidate |
+| `fcn.000094de` | `0x0A0DE` | 9 | 489 | `0x2A0DE` (input/menu) | **`int33_swap`** |
+| `fcn.0000a031` | `0x0AC31` | 6 | 2399 | — | data — no code-bearing candidate |
+| `fcn.0000a990` | `0x0B590` | 1 | 1767 | — | data — no code-bearing candidate |
+| `fcn.0000b077` | `0x0BC77` | 1 | 2941 | — | data — no code-bearing candidate |
+| `fcn.0000c9c3` | `0x0D5C3` | 4 | 619 | — | data — no code-bearing candidate |
+| `fcn.0000d828` | `0x0E428` | 11 | 1445 | — | data — no code-bearing candidate |
+| `fcn.0000dd3c` | `0x0E93C` | 1 | 102 | `0x2E93C` (edit/rand) | **`rand16`** |
+| `fcn.0000ddcd` | `0x0E9CD` | 2 | 97 | `0x2E9CD` (edit/rand) | inside `rand16` tail |
+| `fcn.0000de12` | `0x0EA12` | 1 | 3 | `0x2EA12` (edit/rand) | **`seq_push`** |
+| `fcn.0000de2e` | `0x0EA2E` | 37 | 1953 | `0x2EA2E` (edit/rand) | **`seq_mix`** |
+| `fcn.0000dfef` | `0x0EBEF` | 1 | 1 | `0x2EBEF` (MCG) | **MCG `lzss`** opaque decoder |
+| `fcn.0000e5cf` | `0x0F1CF` | 14 | 843 | `0x2F1CF` (MCG) | **`pal_adj`** `[0x1284]` |
+| `fcn.0000e857` | `0x0F457` | 1 | 6 | `0x2F457` (MCG) | route-overlay pair |
+| `fcn.0000e8e3` | `0x0F4E3` | 1 | 54 | `0x2F4E3` (MCG) | `tile_blit` |
+| `fcn.0000e919` | `0x0F519` | 21 | 1860 | `0x2F519` (MCG) | `tile_clear` |
+| `fcn.0000f05d` | `0x0FC5D` | 4 | 584 | `0x2FC5D` (EGA) | **EGA `lzss`** opaque decoder |
+| `fcn.0000f79c` | `0x1039C` | 1 | 9 | `0x3039C` (EGA) | EGA code (near `[0x127A]` `0x30329`) |
+| `fcn.0000f995` | `0x10595` | 1 | 432 | `0x30595` (EGA) | EGA region code |
+| `fcn.0000fb45` | `0x10745` | 13 | 65993 | `0x30745` (CGA) | **CGA `lzss_xor`** decoder |
+| `entry0` | `0x31117` (full img) | 65 | 197866 | `0x31D17` (main) | **program entry** (`286B:8A67`) — the whole game |
+
 ## Still unnamed (next passes)
 
 - word[2] of the template (0x9000 MCG / 0x8000 others) — likely a VRAM or
@@ -1434,7 +1722,9 @@ Entry stub (file `0x31D17` for the record): `int21/AH=1A` (set DTA),
   their own file offsets.
 - `protect_check` (`0x2EACD`) entry path — reached through a runtime-built
   hotspot action or the intro chain, not a direct near call.
-- `fcn.*` map from `disasm/functions.txt` (image-offset space; entry0 =
-  file 0x31D17) — GAM-28 covered the low segment (`0x2A0DE`–`0x2EB6E` +
-  the mode-code blocks that live there); upper-window `fcn.*` entries
-  still ahead.
+- `fcn.*` index (above) covers all 245 `functions.txt` entries, but
+  rizin's monolithic `entry0` still hides most of the game: naming the
+  routines reached through its call graph is the real remaining work.
+  The "routine — unnamed" rows and the dual-segment shadow entries
+  (same `op16` valid in module and main windows) need call-site xrefs
+  to settle which segment rizin actually saw.
