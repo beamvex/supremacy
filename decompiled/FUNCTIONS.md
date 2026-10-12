@@ -875,8 +875,61 @@ install, `sti`).
 2 → `0x3CAD` (faction credits reprint), bit 15 → `0x3CDB`, `0x9146` bit
 1 → `0x3CF6` — and clears the bit in the live word.
 
+### UI shell — `cs:0x2CC5` (file `0x32CC5`–`0x32D85`)
+
+The uimode-0 menu-screen frame loop the galaxy loop `jmp`s back to on
+`[0x9CDA] & 2`. Every screen-entry and menu-action tail also lands here
+(`jmp 0x2CC5`/`0x2D27`), so this is effectively the top-level loop the
+whole game idles in between screens.
+
+- `0x2CC5`/`0x2CEE` — the two re-entry tails. Each opens with the
+  `[0x91D3] != 0xFF`-gated sfx block (`0x8A5B`, `al=3` `0x8A3B`,
+  `cl=0xA` → `call far [cs:0x127C]`). `0x2CC5` then clears
+  `[0x91EA]`/`[0x91E8]` and `pop ax`s — discarding the caller's return
+  address a `jmp [si+0xC]` action abandons — into `0x2CEE`, which
+  repaints: `call [0x1260]` (DAC), `call [0x125C]` (fill), `0x89B3`,
+  `dx=0` `call [0x125A]` (backdrop image 0), `dx=0` `call [0x125E]`,
+  then `call [0x1272]` — the mode's backdrop save (MCG `cs:0x5DBC`,
+  file `0x2F06C`): registers rect `(0xA0,0x130,0x5B,0xBE)` dirty via
+  `[0x1298]`, `rep movsw`s a `0x48`-word × `0x63`-row block
+  `ss:0x1012` → `ds:0x7260`, `call 0x11C9`.
+- `0x2D27` — setup half (the re-entry point that keeps the backdrop):
+  `[0x928B] = [0x91A6]`; `call [0x1264]` refresh; installs the shell
+  hotspot list — `[0x9CC8] = [0xA0AA]`, `[0x9194] = 0xA0AC`,
+  `[0x91A8] = 0x31`; `uimode [0x91CD] = 0`; `0x5C97` seq reset;
+  `0x83AA` `mark_sel` (below); `0x6A8E` `day_print` (below); `0xA3BC`;
+  `call [0x1278]` `map_draw`; `0xA36A` `input_install`.
+- `0x2D5B` — the frame loop (**no exit test**; menu actions `jmp` out):
+  `0x2CA9` vsync → `0x5C1E` sequencer → `0xA369` stub → `0xA10F`
+  menu service → `0x73D9` tick → `0x83AA` mark → `0x5D52` `row_click`
+  (below) → `0x6B4A` blink (below) → `0x8DC6` `map_gate` → `call 0x6B8F`
+  ticker when `[0x91D1] == 0` → `inc [0x91D4]` → `jmp 0x2D5B`.
+- `0x2D86`/`0x2D97` fall right after the loop — the `blink` /
+  `status_report` shell-list actions (see "Shell list `ds:0xA0AC`").
+
+Loop-body callees named here (file offsets):
+
+- `0x36A8E` `day_print` — picks a column/row by `uimode` (`0` →
+  `0x35,0xB`; `3` → `0x15,0x12`; `4` → `0x1D,0x3A`), prints
+  `[0x91BA]` via `0x6893`, a `/` glyph via `[0x1268]`, then `[0x91BC]`
+  via `0x68A8` — the tick/day HUD counter.
+- `0x35D52` `row_click` — on `[0x9CDA] & 1` inside the planet-list
+  column (`x 0xA9..0xB4`, `y ≥ 0x11`): `idx = (y−0x11) >> (3 −
+  [0x91E4])`, guarded `idx ≤ [0x91C6]`; `idx == [0x9164]` → `ret`,
+  else `0x8386` + `bx = idx` → `jmp 0x5E03` (the shared
+  select-record path `sel_prev`/`sel_next` use).
+- `0x36B4A` `blink_step` — `[0x91D1] == 0` → `jz 0x6B8F` (falls into
+  the ticker); `[0x91F3] == 0x11` → the blink print: alternating
+  strings `0x77E3`/`0x77AA` at `(0x4D,0x67)` on `[0x91D4] & 7 ∈
+  {0,5}` via `0x6709` (other phases `ret`); else `[0x91F3]++`;
+  `[0x91F2] != 0` and post-inc paths dec `[0x91D1]` + `call [0x1270]`.
+- `0x383AA` `mark_sel` — `bx = [0x9164]`, `si = [0x9158]`:
+  `byte [bx·0x3A + si + 5] = 1` — sets the selected record's `+5`
+  flag.
+
 Rust port: `game::{frame_step, Frame, seq_step, select_type,
-menu_service}` plus private `panel`; new `Call::{Slot,Image,Sfx,Mouse}`
+menu_service}` plus private `panel`; `shell::{shell_enter, shell_step,
+re_enter}` for `0x2CC5`/`0x2D27`; new `Call::{Slot,Image,Sfx,Mouse}`
 and `VmHost::cs_word`; tests in
 `rust/tests/{game_loop,game_seq,game_menu}.rs`.
 
@@ -1622,7 +1675,7 @@ routine (init callees, reprint tails, `*DTH.*` loaders).
 | `fcn.0000501e` | `0x05C1E` | 1 | 308 | `0x35C1E` (main) | **`0x5C1E`** draw sequencer |
 | `fcn.00005049` | `0x05C49` | 1 | 78 | `0x35C49` (main) | `0x5C49` seq fetch |
 | `fcn.00005097` | `0x05C97` | 1 | 219 | `0x35C97` (main) | `0x5C97` seq reset |
-| `fcn.00005152` | `0x05D52` | 5 | 129 | `0x35D52` (main) | routine — unnamed |
+| `fcn.00005152` | `0x05D52` | 5 | 129 | `0x35D52` (main) | **`row_click`** planet-list pick |
 | `fcn.000051d3` | `0x05DD3` | 1 | 2 | `0x35DD3` (main) | `0x5DD3` sel_next |
 | `fcn.00005283` | `0x05E83` | 1 | 231 | `0x35E83` (main) | `0x5E83` ratio print |
 | `fcn.000052e6` | `0x05EE6` | 2 | 160 | `0x35EE6` (main) | `0x5EE6` sync_sel |
@@ -1630,10 +1683,10 @@ routine (init callees, reprint tails, `*DTH.*` loaders).
 | `fcn.000055e5` | `0x061E5` | 8 | 1705 | `0x361E5` (main) | `0x61E5` fleet redraw |
 | `fcn.00005c86` | `0x06886` | 2 | 13 | `0x36886` (main) | `0x6886` number print |
 | `fcn.00005c93` | `0x06893` | 1 | 4 | `0x36893` (main) | routine — unnamed |
-| `fcn.00005e8e` | `0x06A8E` | 1 | 68 | `0x36A8E` (main) | routine — unnamed |
+| `fcn.00005e8e` | `0x06A8E` | 1 | 68 | `0x36A8E` (main) | **`day_print`** tick/day HUD |
 | `fcn.00005ed2` | `0x06AD2` | 1 | 3 | `0x36AD2` (main) | routine — unnamed |
 | `fcn.00005f06` | `0x06B06` | 2 | 68 | `0x36B06` (main) | **`0x6B06`** ticker enqueue |
-| `fcn.00005f4a` | `0x06B4A` | 1 | 69 | `0x36B4A` (main) | routine — unnamed |
+| `fcn.00005f4a` | `0x06B4A` | 1 | 69 | `0x36B4A` (main) | **`blink_step`** → `ticker` gate |
 | `fcn.00005f8f` | `0x06B8F` | 1 | 53 | `0x36B8F` (main) | `0x6B8F` ticker |
 | `fcn.00005fc4` | `0x06BC4` | 1 | 315 | `0x36BC4` (main) | routine — unnamed |
 | `fcn.00006212` | `0x06E12` | 1 | 262 | `0x36E12` (main) | `0x6E12` fleet tail |
@@ -1661,7 +1714,7 @@ routine (init callees, reprint tails, `*DTH.*` loaders).
 | `fcn.0000773b` | `0x0833B` | 1 | 38 | `0x3833B` (main) | routine — unnamed |
 | `fcn.00007761` | `0x08361` | 1 | 146 | `0x38361` (main) | routine — unnamed |
 | `fcn.00007786` | `0x08386` | 1 | 36 | `0x38386` (main) | `0x8386` sel helper |
-| `fcn.000077aa` | `0x083AA` | 1 | 36 | `0x383AA` (main) | `0x83AA` tail |
+| `fcn.000077aa` | `0x083AA` | 1 | 36 | `0x383AA` (main) | **`mark_sel`** rec `+5` flag |
 | `fcn.000077ce` | `0x083CE` | 1 | 37 | `0x383CE` (main) | **`load_state`** |
 | `fcn.000077f3` | `0x083F3` | 1 | 63 | `0x383F3` (main) | **`save_state`** |
 | `fcn.00007832` | `0x08432` | 1 | 54 | `0x38432` (main) | staging copy (`0x8432` seed) |
