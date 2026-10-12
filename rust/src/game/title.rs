@@ -77,16 +77,16 @@ macro_rules! a {
     };
 }
 
-/// `0x85B1`–`0x8629` — the attract entry: scenario chain + index init,
-/// the `0xA3BC` buttons-only hook, input-latch clears and the
+/// `0x85B1`–`0x8629` — the attract entry: scenario chain + index init
+/// (the shipped `ds:0x9C62`/`ds:0x9D34` structures install as-is), the
+/// `0xA3BC` buttons-only hook, input-latch clears and the
 /// channel-A flush (`cs:[0x8B7C] = 0xFFFF`), the title-music idiom
 /// (`al = 0` `0x8A80` + `[cs:0x1280]` reset + `[cs:0x1278]` at
 /// `ds:0x3D7` + `[cs:0x127C]` `cl = 0`), shade/star clears,
-/// `Image(0)`/`Present(0xD)` and the `0x9F6` seq arm. The
-/// `tpl + 0x600` live-list/chain copies the asm builds in its init
-/// stubs run here too. Parks the frame-paced body in `Vm::title`.
+/// `Image(0)`/`Present(0xD)` and the `0x9F6` seq arm. Parks the
+/// frame-paced body in `Vm::title`.
 pub fn enter(c: &mut Ctx) {
-    pick::live_lists(c);
+    pick::init(c);
     c.host.svc(Call::Mouse(0x14, 0x1E, 0));
     c.vm.w16(c.st, a!(BUTTONS), 0);
     c.vm.w8(c.st, a!(KEY_PEND), 0);

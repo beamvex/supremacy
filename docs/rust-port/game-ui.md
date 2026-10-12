@@ -82,11 +82,10 @@ restart tail. The asm blocks through the whole routine; the port parks a
 `Title` phase machine in `Vm::title` and `title_step` advances one unit
 per frame (`runner::Game::step` steps `end` → `title` → shell/galaxy).
 
-- `enter` — the `0x85B1` head: `tpl + 0x600` live copies (`ds:0x9C62`
-  chain from `ds:0x9662`, `ds:0x9D34` picker list from `ds:0x9734`),
-  chain cursor/scenario init, buttons-only mouse mask, input-latch
-  clears, title music (`Song(0x3D7)`), `Image(0)`/`Present(0xD)`, the
-  `0x9F6` seq arm.
+- `enter` — the `0x85B1` head: chain cursor/scenario init (the shipped
+  `ds:0x9C62` chain + `ds:0x9D34` picker list install as-is — the asm
+  copies nothing), buttons-only mouse mask, input-latch clears, title
+  music (`Song(0x3D7)`), `Image(0)`/`Present(0xD)`, the `0x9F6` seq arm.
 - `show.rs` — the slide seq-runs (`0x8863` polling; slides 1–3 only
   when `[0x143] == 0x13`), the `0x7D`-frame retrace wait and the
   `0x63`-frame starfield warm-up.

@@ -24,58 +24,29 @@ macro_rules! a {
 const SCENARIO: u16 = 0x91E5;
 /// `[0x9C9F]` — the scenario-image chain cursor `scenario_next` walks.
 const CHAIN_PTR: u16 = 0x9C9F;
-/// `ds:0x9C62` — the live `{+0 img, +4 →[0x9209], +8 →[0x91E5]}`
-/// chain head (runtime copy of the `ds:0x9662` template — the
-/// `live = tpl + 0x600` idiom every hotspot list shares).
+/// `ds:0x9C62` — the shipped `{+0 img, +4 →[0x9209], +8 →[0x91E5]}`
+/// scenario-chain head; the asm installs it into `[0x9C9F]` directly
+/// (file `0x1A302` — it already ships as the live structure).
 const CHAIN_LIVE: u16 = 0x9C62;
-/// `ds:0x9662` — the shipped chain template.
-const CHAIN_TPL: u16 = 0x9662;
 /// `[0x9209]` — the present-variant selector the chain `+4` lands in
 /// (`0` → `Present(0xB)`, else `Present(0xA)` + the `0x89B2` stub).
 const PICK_VAR: u16 = 0x9209;
-/// `ds:0x9D34` — the live picker selection word; the two `0x14`
-/// hotspot records follow it (`ds:0x9D36`, tpl `ds:0x9734`).
+/// `ds:0x9D34` — the shipped picker selection word; the two `0x14`
+/// hotspot records follow it (`ds:0x9D36`, file `0x1A3D4` — also
+/// already live in the image).
 const PICK_LIVE: u16 = 0x9D34;
-/// `ds:0x9734` — the shipped picker list template.
-const PICK_TPL: u16 = 0x9734;
 /// Picker hotspot count.
 const PICK_COUNT: u16 = 2;
 /// `[0x91E7]` — the random-galaxy flag the RORN preset (`0x6792`) sets.
 const RAND_FLAG: u16 = 0x91E7;
-/// `ds:0x9D34` + two `0x14` records — the picker template's byte
-/// length.
-const PICK_LEN: u16 = 0x2A;
 
-/// The `live = tpl + 0x600` copy every hotspot list shares — the asm
-/// builds the live lists in its init stubs; the port runs it on the
-/// attract entry instead (same shipped bytes; the mutated sel/`+0x10`
-/// fields simply re-initialise).
-pub(super) fn live_copy(c: &mut Ctx, tpl: u16, len: u16) {
-    for i in 0..len {
-        let b = c.vm.r8(c.st, tpl.wrapping_add(i));
-        c.vm.w8(c.st, tpl.wrapping_add(0x600).wrapping_add(i), b);
-    }
-}
-
-/// The two template structs the attract needs — the `ds:0x9662`
-/// scenario chain and the `ds:0x9734` picker list — plus the chain
-/// cursor + scenario index init `0x85B1` runs.
-pub(super) fn live_lists(c: &mut Ctx) {
-    let clen = chain_len(c);
-    live_copy(c, CHAIN_TPL, clen);
-    live_copy(c, PICK_TPL, PICK_LEN);
+/// `0x85B1`–`0x85B7` — the chain cursor + scenario index init the
+/// attract entry runs (`mov ax,0x9C62; mov [0x9C9F],ax; mov word
+/// [0x91E5],0`). The `ds:0x9C62` chain and `ds:0x9D34` picker list
+/// ship in the image and are used as-is — no template copy.
+pub(super) fn init(c: &mut Ctx) {
     c.vm.w16(c.st, CHAIN_PTR, CHAIN_LIVE);
     c.vm.w16(c.st, SCENARIO, 0);
-}
-
-/// Byte length of the shipped chain — records `0xC` wide up to and
-/// including the `[si] == 0` terminator [`scenario_next`] wraps on.
-fn chain_len(c: &mut Ctx) -> u16 {
-    let mut si = CHAIN_TPL;
-    while c.vm.r16(c.st, si) != 0 {
-        si = si.wrapping_add(0xC);
-    }
-    si.wrapping_add(0xC).wrapping_sub(CHAIN_TPL)
 }
 
 /// `0x87D7`–`0x8840` — the picker install: mouse reset (`ax=0`), the

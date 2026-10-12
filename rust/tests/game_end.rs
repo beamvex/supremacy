@@ -20,7 +20,7 @@ use supremacy::platform::MemFs;
 /// `[0x91E5]` — the scenario index the endings pick pages on.
 const SCENARIO: usize = 0x91E5;
 
-/// The shipped `ds:0x9662` scenario-chain template (file `0x1A302`) —
+/// The shipped `ds:0x9C62` scenario chain (file `0x1A302`) —
 /// four `{img, ·, →[0x9209], ·, →[0x91E5], ·}` records + terminator.
 const CHAIN: [u8; 0x3C] = [
     0x04, 0, 0, 0, 0, 0, 0, 0, 0x01, 0, 0, 0, //
@@ -29,7 +29,7 @@ const CHAIN: [u8; 0x3C] = [
     0x02, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, //
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 ];
-/// The shipped `ds:0x9734` picker-list template (file `0x1A3D4`) — the
+/// The shipped `ds:0x9D34` picker list (file `0x1A3D4`) — the
 /// sel word, the cycle hotspot (`0xF676`) and the start hotspot
 /// (`0xF6D4`, rect `x 0xE2..0x12A` / `y 0xA5..0xB8`).
 const PICK: [u8; 0x2A] = [
@@ -39,13 +39,14 @@ const PICK: [u8; 0x2A] = [
     0xE2, 0, 0xA5, 0, 0x2A, 0x01, 0xB8, 0, 0, 0, 0, 0, 0xD4, 0xF6, 0x6B, 0x28, 0xFF, 0xFF, 0, 0xFF,
 ];
 
-/// Seed the tpl structs into the staging heap — the `0x844B` restore
-/// at the ending's input-exit carries them into the save block
-/// exactly like the shipped image does.
-fn seed_tpl(vm: &mut Vm) {
+/// Seed the live structs where the shipped image puts them — the
+/// chain into the staging heap (the `0x844B` restore at the ending's
+/// input-exit carries it into the save block) and the picker list
+/// into `hi` scratch.
+fn seed_live(vm: &mut Vm) {
     let at = |a: usize| a - 0x7D39;
-    vm.stage[at(0x9662)..at(0x9662) + CHAIN.len()].copy_from_slice(&CHAIN);
-    vm.stage[at(0x9734)..at(0x9734) + PICK.len()].copy_from_slice(&PICK);
+    vm.stage[at(0x9C62)..at(0x9C62) + CHAIN.len()].copy_from_slice(&CHAIN);
+    vm.hi[0x70..0x70 + PICK.len()].copy_from_slice(&PICK); // ds:0x9D34
 }
 
 /// Recording host — `texts` scripts the `menu_text` page results
@@ -102,11 +103,11 @@ struct Rig {
 }
 
 impl Rig {
-    /// Fresh rig — zeroed `Vm`, preset-3 galaxy, empty script, tpl
+    /// Fresh rig — zeroed `Vm`, preset-3 galaxy, empty script, the live
     /// structs seeded into `stage` for the `0x844B` restore.
     fn new() -> Self {
         let mut vm = Vm::new();
-        seed_tpl(&mut vm);
+        seed_live(&mut vm);
         Self {
             vm,
             st: galaxy(),

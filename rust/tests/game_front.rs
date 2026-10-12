@@ -9,8 +9,8 @@ use supremacy::args::{Sound, Video};
 use supremacy::assets::{heap_segment, load_set};
 use supremacy::front::{Game, Host, Phase, Pump};
 use supremacy::game::{
-    self, Call, Ctx, NullHost, Rng, Vm, VmHost, BUTTONS, CUR_X, CUR_Y, HOT_COUNT, KEY_CODE,
-    KEY_PEND, UIMODE,
+    self, Call, Ctx, NullHost, Rng, Vm, VmHost, BUTTONS, CUR_X, CUR_Y, HOT_COUNT, HOT_LIST,
+    KEY_CODE, KEY_PEND, UIMODE,
 };
 use supremacy::palette::{from_dac, DAC_OFS, ROWS_OFS, WORK_OFS};
 use supremacy::video::Screen;
@@ -311,6 +311,50 @@ fn game_enters_shell_and_galaxy_exits_on_right_click() {
     assert_eq!(g.st.byte(UIMODE), 5);
     g.host.pump.set_buttons(false, true);
     g.step(); // 0x7D → press(2) → frame exit → shell_enter
+    assert_eq!(g.phase, Phase::Shell);
+    assert_eq!(g.st.byte(UIMODE), 0);
+}
+
+/// The real `*IN` boot — `Game::new_title` on the shipped image uses
+/// the `ds:0x9C62`/`ds:0x9D34` structures as they ship (no `tpl + 0x600`
+/// copy — that idiom clobbered the live picker list with string data,
+/// leaving every hotspot unhittable: GAM-43). A keypress jumps the
+/// attract to the picker and a click inside the start rect
+/// (`x 0xE2..0x12A`, `y 0xA5..0xB8`) must reach the shell.
+#[test]
+fn title_boot_picker_start_reaches_the_shell() {
+    let mut g = Game::new_title(
+        img(),
+        load_set(&game_dir(), "MCGIN", heap_segment()).unwrap(),
+        from_dac(&img()[DAC_OFS..DAC_OFS + 768]),
+        Video::Mcga,
+        Sound::PcSpeaker,
+        false,
+        0x42,
+        Box::new(supremacy::platform::MemFs::new()),
+    );
+    g.host.set_assets(&game_dir(), "MCG");
+    assert!(g.vm.title.is_some());
+
+    g.host.pump.key(0x39); // any key → `jmp 0x87D7`
+    for _ in 0..0x10 {
+        g.step();
+        if g.st.word(HOT_LIST) == 0x9D36 {
+            break;
+        }
+    }
+    assert_eq!(g.st.word(HOT_LIST), 0x9D36);
+
+    g.host.pump.move_to(0x106, 0xAE);
+    g.host.pump.set_buttons(true, false);
+    for _ in 0..0x10 {
+        g.step();
+        if g.vm.title.is_none() {
+            break;
+        }
+        g.host.pump.set_buttons(false, false);
+    }
+    assert!(g.vm.title.is_none(), "start click never left the picker");
     assert_eq!(g.phase, Phase::Shell);
     assert_eq!(g.st.byte(UIMODE), 0);
 }

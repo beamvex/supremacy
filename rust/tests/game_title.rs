@@ -1,7 +1,7 @@
 //! `cs:0x85B1` — the title attract + `0x87D7` scenario picker, driven
 //! through `title_enter`/`title_step` with scripted cursor input.
 //!
-//! The shipped `ds:0x9662` chain yields scenario indices `1, 2, 3, 0`
+//! The shipped `ds:0x9C62` chain yields scenario indices `1, 2, 3, 0`
 //! (SMINE, KRART, RORN, WOTOK) as `0x8926` cycles; `0x8984` commits
 //! `[0x91E5]` through the `0x6801` `pop ax; ret` preset tail, which
 //! `title_step` turns into the shared `0x1D60` post tail (`[0x9C9A]=1`,
@@ -23,7 +23,7 @@ const PICK_VAR: usize = 0x9209;
 /// `[0x143]` — the video-mode word gating the MCGA slides.
 const MODE_WORD: usize = 0x143;
 
-/// The shipped `ds:0x9662` chain template (file `0x1A302`).
+/// The shipped `ds:0x9C62` scenario chain (file `0x1A302`).
 const CHAIN: [u8; 0x3C] = [
     0x04, 0, 0, 0, 0, 0, 0, 0, 0x01, 0, 0, 0, //
     0x03, 0, 0, 0, 0, 0, 0, 0, 0x02, 0, 0, 0, //
@@ -31,7 +31,7 @@ const CHAIN: [u8; 0x3C] = [
     0x02, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, //
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 ];
-/// The shipped `ds:0x9734` picker list (file `0x1A3D4`) — sel word,
+/// The shipped `ds:0x9D34` picker list (file `0x1A3D4`) — sel word,
 /// cycle hotspot (`0xF676`, `x 0x6A..0xCE` / `y 0xA5..0xB8`) and start
 /// (`0xF6D4`, `x 0xE2..0x12A`).
 const PICK: [u8; 0x2A] = [
@@ -97,15 +97,17 @@ struct Rig {
 }
 
 impl Rig {
-    /// Fresh rig — zeroed `Vm`, tpl structs seeded in `st` like the
-    /// shipped image's save block.
+    /// Fresh rig — zeroed `Vm`, the live structs seeded where the
+    /// shipped image puts them (the chain in the save block, the
+    /// picker list in `hi` scratch).
     fn new() -> Self {
+        let mut vm = Vm::new();
         let mut st = State::new();
         let at = |a: usize| a - 0x7D39;
-        st.block[at(0x9662)..at(0x9662) + CHAIN.len()].copy_from_slice(&CHAIN);
-        st.block[at(0x9734)..at(0x9734) + PICK.len()].copy_from_slice(&PICK);
+        st.block[at(0x9C62)..at(0x9C62) + CHAIN.len()].copy_from_slice(&CHAIN);
+        vm.hi[0x70..0x70 + PICK.len()].copy_from_slice(&PICK); // ds:0x9D34
         Self {
-            vm: Vm::new(),
+            vm,
             st,
             rng: Rng::new(0x42),
             host: Host {
@@ -167,7 +169,7 @@ fn attract_entry_plays_music_and_slide0() {
     assert!(r.vm.title.is_some());
     assert_eq!(r.st.word(CHAIN_PTR), 0x9C62);
     assert_eq!(r.st.word(SCENARIO), 0);
-    // The `tpl + 0x600` live copies landed — picker list head record.
+    // The shipped live list is installed — picker list head record.
     assert_eq!(r.vm.r16(&r.st, 0x9D36), 0x006A);
     assert_eq!(r.vm.r16(&r.st, 0x9D4A), 0x00E2);
     assert_eq!(r.vm.r16(&r.st, 0x9D42), 0xF676);
@@ -314,7 +316,7 @@ fn start_after_full_cycle_picks_rorn() {
 #[test]
 fn zeroed_chain_is_safe() {
     let mut r = Rig::new();
-    r.st.block[0x9662 - 0x7D39..0x9662 - 0x7D39 + CHAIN.len()].fill(0);
+    r.st.block[0x9C62 - 0x7D39..0x9C62 - 0x7D39 + CHAIN.len()].fill(0);
     game::dispatch_action(&mut r.ctx(), 0x8926);
     // All-terminator chain bails instead of spinning forever.
     assert!(r.host.calls.contains(&Call::Image(0)));
