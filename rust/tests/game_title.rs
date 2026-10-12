@@ -194,7 +194,7 @@ fn pending_key_enters_picker() {
 #[test]
 fn non_mcga_skips_to_credits() {
     let mut r = Rig::new();
-    r.vm.w16(&mut r.st, MODE_WORD as u16, 0x0D); // EGA — the 0x8641 test fails
+    r.vm.w16(&mut r.st, u16::try_from(MODE_WORD).unwrap(), 0x0D); // EGA — the 0x8641 test fails
     r.stream_end(0x9F6);
     r.host.latch = true;
     r.boot();
@@ -205,7 +205,7 @@ fn non_mcga_skips_to_credits() {
 #[test]
 fn mcga_runs_all_three_slides() {
     let mut r = Rig::new();
-    r.vm.w16(&mut r.st, MODE_WORD as u16, 0x13);
+    r.vm.w16(&mut r.st, u16::try_from(MODE_WORD).unwrap(), 0x13);
     r.stream_end(0x9F6);
     r.stream_end(0xB22);
     r.stream_end(0xC8A);

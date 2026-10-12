@@ -111,10 +111,10 @@ fn hud_arms_gate_on_uimode() {
     assert_eq!(r.seq(0xFC), Tick::HudPop);
     let mut want = vec![];
     for (i, ch) in "   74565".bytes().enumerate() {
-        want.push(Call::Glyph(ch, 0x45 + i as u16, 0x32));
+        want.push(Call::Glyph(ch, 0x45 + u16::try_from(i).unwrap(), 0x32));
     }
     for (i, ch) in " 4660".bytes().enumerate() {
-        want.push(Call::Glyph(ch, 0x49 + i as u16, 0x0B));
+        want.push(Call::Glyph(ch, 0x49 + u16::try_from(i).unwrap(), 0x0B));
     }
     assert_eq!(r.host.0, want);
 }

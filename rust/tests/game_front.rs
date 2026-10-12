@@ -140,11 +140,17 @@ fn pump_latches_synthetic_codes() {
     p.set_buttons(true, false);
     p.write(&mut vm, &mut st);
     assert_eq!(
-        (vm.r16(&st, CUR_X as u16), vm.r16(&st, CUR_Y as u16)),
+        (
+            vm.r16(&st, u16::try_from(CUR_X).unwrap()),
+            vm.r16(&st, u16::try_from(CUR_Y).unwrap())
+        ),
         (100, 50)
     );
     assert_eq!(
-        (vm.r8(&st, KEY_PEND as u16), vm.r8(&st, KEY_CODE as u16)),
+        (
+            vm.r8(&st, u16::try_from(KEY_PEND).unwrap()),
+            vm.r8(&st, u16::try_from(KEY_CODE).unwrap())
+        ),
         (1, 0x7E)
     );
     let mut host = NullHost;
@@ -157,7 +163,7 @@ fn pump_latches_synthetic_codes() {
         files: &mut files,
     };
     game::menu_service(&mut c); // synth → press(1)
-    assert_eq!(c.vm.r16(c.st, BUTTONS as u16), 1);
+    assert_eq!(c.vm.r16(c.st, u16::try_from(BUTTONS).unwrap()), 1);
 }
 
 #[test]
