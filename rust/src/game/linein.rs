@@ -19,8 +19,8 @@
 
 use super::cells::{IN_DIRTY, IN_DONE, LINE_MODE, NAME_LEN, NAME_MAX};
 use super::consts::{BUTTONS, FRAME, PANEL_ON, UIMODE};
+use super::keymap::KEYMAP;
 use super::vhost::Call;
-use super::vm::KEYMAP;
 use super::vops::{vsync, Ctx};
 use super::{menu, seq, tick_step};
 
@@ -94,7 +94,7 @@ fn chan_b(c: &mut Ctx) -> u8 {
 /// Scan the `ds:0x7CBD` table — `0xE699`: `cmp [di],al; add di,2;
 /// loop`. `None` when no entry matches.
 fn lookup(c: &mut Ctx, code: u8) -> Option<u8> {
-    for i in 0..u16::try_from(super::vm::KEYMAP_N).unwrap_or(0) {
+    for i in 0..u16::try_from(super::keymap::KEYMAP_N).unwrap_or(0) {
         let e = a!(KEYMAP).wrapping_add(i.wrapping_mul(2));
         if c.vm.r8(c.st, e) == code {
             return Some(c.vm.r8(c.st, e + 1));

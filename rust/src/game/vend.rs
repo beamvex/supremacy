@@ -15,9 +15,9 @@
 //! themselves run frame-stepped in [`seq`]; the `0x1D35` restart tail
 //! is [`tail`].
 
-mod fx;
+pub(crate) mod fx;
 mod seq;
-mod tail;
+pub(crate) mod tail;
 
 use super::consts::{KEY_PEND, REC_BASE, REC_COUNT};
 use super::vhost::Call;

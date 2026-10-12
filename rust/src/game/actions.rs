@@ -11,7 +11,7 @@
 use super::cells::{BLINK_B, BLINK_PH, S_CNF_T};
 use super::text;
 use super::vops::Ctx;
-use super::{dialog, dlg_io, init, screens};
+use super::{dialog, dlg_io, init, screens, title};
 
 /// `u16` casts for the `ds:` slot constants.
 macro_rules! a {
@@ -40,6 +40,8 @@ pub fn dispatch_action(c: &mut Ctx, t: u16) {
         0x2F9B | 0x9CEB => dialog::confirm(c),
         0x2D86 | 0x9AD6 => blink_reprint(c),
         0x305B | 0x9DAB => init::act_newgame(c),
+        0x8926 | 0xF676 => title::scenario_next(c),
+        0x8984 | 0xF6D4 => title::scenario_start(c),
         _ => screens::dispatch(c, t),
     }
 }

@@ -10,8 +10,8 @@
 use crate::args::{Sound, Video};
 use crate::assets::AssetSet;
 use crate::game::{
-    dispatch_action, end_step, frame_step, new_game, select_galaxy, shell_enter, shell_step, Ctx,
-    Frame, Rng, State, Vm, VmHost, UIMODE,
+    dispatch_action, end_step, frame_step, new_game, select_galaxy, shell_enter, shell_step,
+    title_enter, title_step, Ctx, Frame, Rng, State, Vm, VmHost, UIMODE,
 };
 use crate::palette::Palette;
 use crate::platform::DosFiles;
@@ -61,6 +61,54 @@ impl Game {
         seed: u32,
         files: Box<dyn DosFiles>,
     ) -> Self {
+        let mut g = Self::bundle(img, set, pal, video, sound, k_mode, seed, files);
+        select_galaxy(&mut g.st, preset);
+        // The asm flow is pick → `0x8432` snapshot inside `new_game`
+        // (the heap restore `0x844B` is the `0x2F91` action's job) —
+        // the preset lands in the snapshot because it runs first.
+        new_game(&mut g.vm, &mut g.st, &mut g.rng);
+        let mut c = g.ctx();
+        shell_enter(&mut c);
+        g
+    }
+
+    /// Boot game — the asm's entry-stub flow: `Vm::from_image` + the
+    /// shipped state block (the picker's `tpl` records live in it),
+    /// then `cs:0x85B1` — the title attract parked in `Vm::title`. The
+    /// scenario picker's start action runs [`select_galaxy`] itself
+    /// and the shared `0x1D60` tail does [`new_game`].
+    #[must_use]
+    #[allow(clippy::too_many_arguments)]
+    pub fn new_title(
+        img: Vec<u8>,
+        set: AssetSet,
+        pal: Palette,
+        video: Video,
+        sound: Sound,
+        k_mode: bool,
+        seed: u32,
+        files: Box<dyn DosFiles>,
+    ) -> Self {
+        let mut g = Self::bundle(img, set, pal, video, sound, k_mode, seed, files);
+        g.st = State::from_image(&g.host.img);
+        title_enter(&mut g.ctx());
+        g
+    }
+
+    /// The shared bundle — `Vm`/`Host` from the image, `Rng`, `files`,
+    /// `phase` shell, and the `[0x143]` BIOS-mode word the mode
+    /// select's template copy writes (the attract's MCGA slide gate).
+    #[allow(clippy::too_many_arguments)]
+    fn bundle(
+        img: Vec<u8>,
+        set: AssetSet,
+        pal: Palette,
+        video: Video,
+        sound: Sound,
+        k_mode: bool,
+        seed: u32,
+        files: Box<dyn DosFiles>,
+    ) -> Self {
         let mut g = Self {
             vm: Vm::from_image(&img),
             st: State::new(),
@@ -69,13 +117,7 @@ impl Game {
             files,
             phase: Phase::Shell,
         };
-        select_galaxy(&mut g.st, preset);
-        // The asm flow is pick → `0x844B` snapshot → `0x8432` restore
-        // inside `new_game`; snapshot here so the preset survives it.
-        g.vm.stage_save(&g.st);
-        new_game(&mut g.vm, &mut g.st, &mut g.rng);
-        let mut c = g.ctx();
-        shell_enter(&mut c);
+        g.vm.w16(&mut g.st, 0x143, u16::from(video.int10_mode()));
         g
     }
 
@@ -105,6 +147,16 @@ impl Game {
         if self.vm.end.is_some() {
             let mut c = self.ctx();
             end_step(&mut c);
+            return;
+        }
+        // The `cs:0x85B1` title attract owns the machine the same way
+        // on a boot or post-ending restart; its completion runs the
+        // `0x1D60` tail inside `title_step` (`jmp 0x305B` → new game +
+        // shell re-entry).
+        if self.vm.title.is_some() {
+            let mut c = self.ctx();
+            title_step(&mut c);
+            self.sync_phase();
             return;
         }
         match self.phase {

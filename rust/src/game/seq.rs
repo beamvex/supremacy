@@ -62,9 +62,11 @@ fn advance_phase(c: &mut Ctx, period: u8) -> bool {
 }
 
 /// The `cs:0x5C52` fetch/dispatch loop — one command per call unless a
-/// link (`0`) chains the fetch onward.
+/// link (`0`) chains the fetch onward. The link walk is bounded — a
+/// zeroed/corrupt `cs:` (a synthetic rig, a short image) would
+/// otherwise spin on `si = [si]` forever.
 fn run_cmd(c: &mut Ctx, mut si: u16) {
-    loop {
+    for _ in 0..0x100 {
         let op = c.host.cs_word(si);
         si = si.wrapping_add(4);
         match op {

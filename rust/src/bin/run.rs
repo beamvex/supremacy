@@ -2,9 +2,11 @@
 //! [--set STEM] [--exe PATH] [--preset N] [--seed N] [--galaxy]`.
 //!
 //! Loads the unpacked exe, one asset set and the mode palette, builds a
-//! [`supremacy::front::Game`] (fresh galaxy via `select_galaxy` +
-//! `new_game`), then runs the `minifb` loop. Savegames land in the
-//! game dir (`--galaxy` skips the shell's new-game action).
+//! [`supremacy::front::Game`], then runs the `minifb` loop. The default
+//! boot runs the `0x85B1` title attract + scenario picker (the `*IN`
+//! set); `--preset N` or `--galaxy` skip it straight to a fresh galaxy
+//! (`select_galaxy` + `new_game`). Savegames land in the game dir
+//! (`--galaxy` skips the shell's new-game action).
 
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -18,13 +20,13 @@ fn main() -> ExitCode {
     let mut pos: Vec<String> = Vec::new();
     let mut stem: Option<String> = None;
     let mut exe: Option<PathBuf> = None;
-    let (mut preset, mut seed, mut galaxy) = (3usize, 0x42u32, false);
+    let (mut preset, mut seed, mut galaxy) = (None, 0x42u32, false);
     let mut it = std::env::args().skip(1);
     while let Some(a) = it.next() {
         match a.as_str() {
             "--set" => stem = it.next(),
             "--exe" => exe = it.next().map(PathBuf::from),
-            "--preset" => preset = it.next().and_then(|v| v.parse().ok()).unwrap_or(3),
+            "--preset" => preset = it.next().and_then(|v| v.parse().ok()),
             "--seed" => seed = it.next().and_then(|v| v.parse().ok()).unwrap_or(0x42),
             "--galaxy" => galaxy = true,
             _ => pos.push(a),
@@ -43,7 +45,7 @@ fn run(
     pos: Vec<String>,
     stem: Option<String>,
     exe: Option<PathBuf>,
-    preset: usize,
+    preset: Option<usize>,
     seed: u32,
     galaxy: bool,
 ) -> ExitCode {
@@ -54,9 +56,16 @@ fn run(
         Ok(i) => i,
         Err(e) => return fail("exe", e),
     };
-    let set = match load_set(&dir, &stem, 0x3A22) {
+    // Title boot runs on the `*IN` intro set — the asm's start-up loads
+    // it before `0x85B1`; `--preset`/`--galaxy` go straight to base.
+    let boot = if preset.is_none() && !galaxy {
+        format!("{stem}IN")
+    } else {
+        stem.clone()
+    };
+    let set = match load_set(&dir, &boot, 0x3A22) {
         Ok(s) => s,
-        Err(e) => return fail(&stem, e),
+        Err(e) => return fail(&boot, e),
     };
     let pal = palette(&img, cfg.video);
     boot(dir, stem, img, set, pal, &cfg, preset, seed, galaxy)
@@ -70,22 +79,34 @@ fn boot(
     set: supremacy::assets::AssetSet,
     pal: Palette,
     cfg: &supremacy::args::Config,
-    preset: usize,
+    preset: Option<usize>,
     seed: u32,
     galaxy: bool,
 ) -> ExitCode {
     let files = Box::new(supremacy::platform::HostFs::new(dir.clone()));
-    let mut g = Game::new(
-        img,
-        set,
-        pal,
-        cfg.video,
-        cfg.sound,
-        cfg.keyboard_mouse,
-        preset,
-        seed,
-        files,
-    );
+    let mut g = if preset.is_none() && !galaxy {
+        Game::new_title(
+            img,
+            set,
+            pal,
+            cfg.video,
+            cfg.sound,
+            cfg.keyboard_mouse,
+            files,
+        )
+    } else {
+        Game::new(
+            img,
+            set,
+            pal,
+            cfg.video,
+            cfg.sound,
+            cfg.keyboard_mouse,
+            preset.unwrap_or(3),
+            seed,
+            files,
+        )
+    };
     // `Call::Load`'s `ds:0x1208`+ cell mapping — the endings' `*DTH`/
     // `*WIN` and the restart tail's `*IN`/base pairs.
     g.host.set_assets(&dir, &stem);

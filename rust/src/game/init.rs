@@ -20,9 +20,10 @@ const LIFELESS: [u8; 9] = *b"LIFELESS!";
 
 /// New-game record init — the state writes of `cs:0x9DAB` (file
 /// `0x3305B`–`0x331C2`). Opens with `0x8432` (file `0x3309D`) — the
-/// staging-heap restore that resets the save block to the state the
-/// `0x844B` snapshot captured (menu picks like `[0x91E4]` survive
-/// because the snapshot runs after them). Assumes
+/// staging-heap snapshot that captures the configured save block
+/// (menu picks like `[0x91E4]` are in it because the preset runs
+/// before this call; the `0x844B` restore direction is the one
+/// `0x2F91` uses). Assumes
 /// [`select_galaxy`][super::select_galaxy] already anchored the array
 /// (`[0x9158]`) and set the counts; video and sound calls in the asm
 /// are the shell's job, not this fn's.
@@ -32,7 +33,7 @@ const LIFELESS: [u8; 9] = *b"LIFELESS!";
 /// (`0xC350 + rand(0x4E20)` credits), planets `1..count−1` are named
 /// `LIFELESS!`, every record gets its serial and a cleared `F_WORD0`.
 pub fn new_game(vm: &mut Vm, st: &mut State, rng: &mut Rng) {
-    vm.stage_load(st);
+    vm.stage_save(st);
     let base = st.word(REC_BASE);
     let n = st.planets();
     home_planet(st, base, usize::from(st.byte(DIFFICULTY)));
@@ -55,7 +56,7 @@ pub fn new_game(vm: &mut Vm, st: &mut State, rng: &mut Rng) {
 }
 
 /// `cs:0x305B`/`cs:0x9DAB` — the new-game menu action: [`new_game`]
-/// (with its `0x8432` stage restore), then the asm tail at file
+/// (with its `0x8432` stage snapshot), then the asm tail at file
 /// `0x331C4`–`0x331E6` — `0xA3BC` input restrict (int-33 `ax=0x14`,
 /// mask `0x1E`), `0x83AA` mark, `0x5DD3` select-next, a `0x32`-frame
 /// `{0x2CA9, [cs:0x127C]}` wait, `0x2FD7`, `[0x1278]` reload, `0xA36A`

@@ -5,8 +5,8 @@
 The saveable game-state block: exactly the `0x1F8B` bytes at
 `ds:0x7D39..0x9CC4` that the save routine writes whole (`int 21`
 create/write at file `0x383F3`) and load reads back (`0x383CE`), and
-that the heap-staging copies (`0x844B`/`0x8432`) move to/from the loader
-heap segment.
+that the heap-staging copies (`0x8432` save/`0x844B` restore) move
+to/from the loader heap segment.
 
 - `block: Box<[u8; STATE_LEN]>` — `STATE_OFS = 0x7D39`,
   `STATE_LEN = 0x1F8B`. Accessors take **real `ds:` offsets** and
@@ -141,8 +141,8 @@ menu-order pickers (`0x36792`/`0x367B2`/`0x367CD`/`0x367E8`, shared tail
 
 ## `init.rs` — `new_game` (`cs:0x9DAB`, file `0x3305B`–`0x331C2`)
 
-Opens with `stage_load` (the `0x8432` staging-heap restore — resets the
-save block to the `0x844B` snapshot taken after the menu picks).
+Opens with `stage_save` (the `0x8432` staging-heap snapshot — captures
+the post-pick block so `act_stage`'s `0x844B` restore can reset to it).
 Assumes `select_galaxy` already ran. Then:
 
 - record 0 (`home_planet`): fixed start — `F_TROOPS =

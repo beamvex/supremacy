@@ -52,7 +52,7 @@ fn golden_shell_run() {
         video: 0xDBB5_0B53_2674_BF8E,
         pal: 0x179D_CB6E_B754_B64F,
         audio: 0x99A3_2F12_5F1B_E6DB,
-        state: 0x74E0_0526_8765_2A13,
+        state: 0x8DE3_F853_3369_7E2A,
         rng: 0x0002_3B6B,
     };
     assert_eq!(d, want);
@@ -68,7 +68,7 @@ fn golden_galaxy_run() {
         video: 0x3FE0_A931_1D01_0D74,
         pal: 0x179D_CB6E_B754_B64F,
         audio: 0x4CE9_06BA_48A6_AC1B,
-        state: 0xD0FF_F069_1C46_7EEC,
+        state: 0x3291_58E5_0E6A_7C05,
         rng: 0x0002_3B6B,
     };
     assert_eq!(d, want);

@@ -10,8 +10,11 @@ The interpreter runs over the whole `ds` space, split three ways:
 - `hi: Box<[u8]>` — `ds:0x9CC4..=0xFFFF`: menu records and scratch.
 
 Plus `modal` (the `cs:0xE713` modal-dialog flag — a code-segment cell in
-the asm) and `stage` (the heap segment the `0x844B`/`0x8432` routines
-snapshot the save block into/out of, `ds:0x3829` in the asm).
+the asm), `end`/`title`/`title_done` (the parked `cs:0x8B17`/`0x8C65`
+ending and `cs:0x85B1` attract machines — the asm blocks inside them,
+the port steps them one unit per frame) and `stage` (the heap segment
+the `0x8432`/`0x844B` routines copy the save block into/out of,
+`ds:0x3829` in the asm).
 
 Key addresses: `JT_BASE = 0x50E3` (op jump table — runtime-initialised,
 the shipped image holds stale bytes), `TAB_BASE = 0x5183` (4-byte
@@ -23,7 +26,8 @@ the shipped image holds stale bytes), `TAB_BASE = 0x5183` (4-byte
   `0x76BF → 0x7CBD` when the bytes are present.
 - `r8`/`r16`/`w8`/`w16` — byte/word access across the three regions
   (routed by offset; unaligned-safe LE).
-- `stage_save`/`stage_load` — the `0x844B`/`0x8432` block copies.
+- `stage_save`/`stage_load` — the `0x8432`/`0x844B` block copies
+  (`ds:` → heap, heap → `ds:`).
 - `rec_ofs(st, i)` — `[0x9158] + i·0x3A` via `r16`.
 - Operand fetchers: `slot(si)` reads a 4-byte `{val, tag}` (tag `0x0FAA`
   shipped, consumed but unused) advancing `si += 4`; `imm(si)` reads a

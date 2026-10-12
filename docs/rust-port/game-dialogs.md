@@ -44,7 +44,7 @@ The filename buffer is `ds:0..0x20`; the input routine sanitises
   `NAME_MAX=9`, then the `ds:0..0x20` sanitiser. `filename()` reads the
   ASCIIZ result.
 - `act_yes`/`act_no`/`act_cancel` — `[0x91DA]` = `1`/`2`/`0xFF`;
-  `act_stage` (`cs:0x2F91`) — the `0x844B` heap snapshot.
+  `act_stage` (`cs:0x2F91`) — the `0x844B` heap restore.
 
 ## `linein.rs` — `line_input` (`cs:0xE66E`, `0x2E66E`–`0x2E77C`)
 

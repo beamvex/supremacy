@@ -105,11 +105,14 @@ fn preset_and_new_game() {
     assert_eq!(st.byte(game::DIFFICULTY), 1);
     let mut rng = Rng::new(0x1111_2222);
     let mut vm = game::Vm::new();
-    // The asm flow snapshots configured state (`0x844B`) before the
-    // `0x8432` restore inside `new_game` — mirror it so the preset
-    // survives.
-    vm.stage_save(&st);
     game::new_game(&mut vm, &mut st, &mut rng);
+    // `new_game` opens with `0x8432` — the staging-heap snapshot of the
+    // configured block — so `stage` now holds the SMINE preset (the
+    // `0x844B` restore direction is what `0x2F91` uses).
+    let mut snap = game::State::new();
+    snap.block.copy_from_slice(&vm.stage[..]);
+    assert_eq!(snap.word(game::REC_BASE), 0x8BC6);
+    assert_eq!(snap.byte(game::DIFFICULTY), 1);
     let base = usize::from(st.word(game::REC_BASE));
     // record 0 — fixed block
     assert_eq!(st.dword(base + game::F_CREDITS), 0x1879A);

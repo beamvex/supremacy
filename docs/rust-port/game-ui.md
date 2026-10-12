@@ -67,11 +67,41 @@ pointer (`jmp [si+0xC]`); `+0x10..+0x13` = nav links (`0xFF` = stay).
 | `0x2F0F` | confirm reprint (list + title) |
 | `0x2F01`/`0x2F08`/`0x2F95` | `act_yes`/`act_no`/`act_cancel` → `[0x91DA]` = `1`/`2`/`0xFF` |
 | `0x2F0E` | no-op |
-| `0x2F91` | `act_stage` (`0x844B` heap snapshot) |
+| `0x2F91` | `act_stage` (`0x844B` heap restore) |
 | `0x2F9B` | `dialog::confirm` |
 | `0x2D86` | blink-phase reset + `0x77E3` reprint |
 | `0x305B`/`0x9DAB` | `init::act_newgame` |
+| `0x8926` | `title::scenario_next` (picker cycle) |
+| `0x8984` | `title::scenario_start` (picker start) |
 | other | `Call::Native(t)` for the frontend |
+
+## `title.rs` — the `0x85B1` attract + `0x8840` scenario picker
+
+Runs at boot (entry-stub `call 0x85B1`) and inside the endings' `0x1D35`
+restart tail. The asm blocks through the whole routine; the port parks a
+`Title` phase machine in `Vm::title` and `title_step` advances one unit
+per frame (`runner::Game::step` steps `end` → `title` → shell/galaxy).
+
+- `enter` — the `0x85B1` head: `tpl + 0x600` live copies (`ds:0x9C62`
+  chain from `ds:0x9662`, `ds:0x9D34` picker list from `ds:0x9734`),
+  chain cursor/scenario init, buttons-only mouse mask, input-latch
+  clears, title music (`Song(0x3D7)`), `Image(0)`/`Present(0xD)`, the
+  `0x9F6` seq arm.
+- `show.rs` — the slide seq-runs (`0x8863` polling; slides 1–3 only
+  when `[0x143] == 0x13`), the `0x7D`-frame retrace wait and the
+  `0x63`-frame starfield warm-up.
+- `credits.rs` — the repeating `menu_text` credits loop: page,
+  `[0x1290]` scroll, `0x190`/`0x96` hold, `[0x1292]` advance.
+- `pick.rs` — the `0x87D7` install (any input during the attract jumps
+  here) and the `{0x2CA9, 0xE93C, 0xA10F}` picker frame loop; exits
+  only through its two hotspots: `scenario_next` (`0x8926`, walks the
+  chain records `[0x9C9F]` — `[0x9209]`/`[0x91E5]` writes, wraps on the
+  zero terminator) and `scenario_start` (`0x8984`, dispatches
+  `[0x91E5]` → WOTOK 3 / SMINE 2 / KRART 1 / RORN 0 + `[0x91E7]=0xFF`
+  for `s ≥ 3`, then sets `Vm::title_done`).
+- `title_step` turns `title_done` into the `0x1D60` post tail
+  (`vend::tail::restart_tail`) — the `0x85B1` `ret` site both the boot
+  stub and the restart tail share.
 
 ## `selrec.rs` — record selection
 

@@ -4,6 +4,7 @@
 
 use super::super::super::consts::{BUTTONS, KEY_PEND, SEQ_PTR};
 use super::super::super::seq::seq_step;
+use super::super::super::title::title_step;
 use super::super::super::vhost::Call;
 use super::super::super::vops::{vsync, Ctx};
 use super::super::fx;
@@ -66,29 +67,27 @@ impl End {
 
     /// `Ph::Input` — the `0x8C3F`/`0x8D9E` poll: one `0x8891` frame
     /// until `[0x9CDA] == 1` or `0x1E2E` pops a key; then `0x2F91`
-    /// `stage_save` + the `0x1D35` restart head → `Ph::Title`.
+    /// (`call 0x844B` — the stage restore) + the `0x1D35` restart
+    /// head → `Ph::Title`.
     pub(super) fn input(self, c: &mut Ctx) -> Self {
         fx::stars(c);
         let key = c.host.svc(Call::KeyPop).to_le_bytes()[0];
         if c.vm.r16(c.st, a!(BUTTONS)) != 1 && key == 0 {
             return self;
         }
-        c.vm.stage_save(c.st);
+        c.vm.stage_load(c.st);
         fx::refresh(c);
         c.host.svc(Call::Present(9));
         tail::restart_head(c);
         self.at(Ph::Title)
     }
 
-    /// `Ph::Title` — one `[0x9CDA] == 1`/`[0x9CCB]` poll per frame
-    /// while the unported `0x85B1` attract's `Native` stands in; on
-    /// input, the `0x1D35` tail reloads the base set and `jmp 0x305B`s.
+    /// `Ph::Title` — the `0x85B1` attract: [`title_step`] advances
+    /// `Vm::title` one unit per frame; the picker hand-off runs the
+    /// `0x1D60` tail inside it, clearing `Vm::title` (file
+    /// `0x31D35`–`0x31D71`).
     pub(super) fn title(self, c: &mut Ctx) -> Option<Self> {
-        vsync(c);
-        if c.vm.r16(c.st, a!(BUTTONS)) != 1 && !fx::pending(c) {
-            return Some(self);
-        }
-        tail::restart_tail(c);
-        None
+        title_step(c);
+        c.vm.title.is_some().then_some(self)
     }
 }

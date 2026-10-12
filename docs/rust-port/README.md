@@ -118,9 +118,10 @@ The `game` module is large enough to split across six pages:
   through the mode palette (`bin/supremacy.rs`).
 - `supremacy-run <GAME-dir> [V] [K] [S] [--set STEM] [--exe PATH]
   [--preset N] [--seed N] [--galaxy]` (feature `minifb`) — boots a
-  `front::Game` (fresh galaxy via `select_galaxy` + `new_game`, saves via
-  `HostFs` rooted at the game dir) and runs the `minifb` loop
-  (`bin/run.rs`).
+  `front::Game` into the `0x85B1` title attract on the `*IN` set
+  (`--preset`/`--galaxy` skip it to a fresh galaxy via `select_galaxy` +
+  `new_game`; saves via `HostFs` rooted at the game dir) and runs the
+  `minifb` loop (`bin/run.rs`).
 - `supremacy-smoke <GAME-dir> [V] [K] [S] [--ticks N] [--script F.scr]
   [--expect "k=v,…"] [--frame F.ppm]` — the headless CI mode: steps the
   game deterministically with no display or audio device and prints a

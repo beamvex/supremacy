@@ -158,9 +158,10 @@ pub fn act_cancel(c: &mut Ctx) {
     c.vm.w8(c.st, a!(DLG_FLAG), 0xFF);
 }
 
-/// `cs:0x2F91` — the heap-staging call (`0x844B`) used by the save
-/// side: snapshot the `ds:0x7D39..0x9CC4` block into the `0x3829`
-/// heap segment (file `0x32F91`, `0x3844B`).
+/// `cs:0x2F91` — the heap-staging call (`0x844B`) the endings also
+/// run on their input-exit: restore the `ds:0x7D39..0x9CC4` block from
+/// the `0x3829` heap segment (file `0x32F91`, `0x3844B` — the
+/// `0x3829:` → `ds:` direction; `0x8432` is the snapshot).
 pub fn act_stage(c: &mut Ctx) {
-    c.vm.stage_save(c.st);
+    c.vm.stage_load(c.st);
 }

@@ -97,17 +97,25 @@ a `dropped` counter for unmodelled calls. `cs:` reads map through
 
 The playable bundle `{vm, st, rng, host, files, phase}`. `Game::new`
 ports the init tail before `shell_enter`: `Vm::from_image` (shipped `ds`
-image), `State::new`, `Rng::new(seed)`, `Host::new`, then
-`select_galaxy(preset)` → `stage_save` (the `0x844B` snapshot so the
-preset survives `new_game`'s `0x8432` restore) → `new_game` →
-`shell_enter`.
+image), `State::new`, `Rng::new(seed)`, `Host::new`, the `[0x143]`
+BIOS-mode word the mode select leaves, then `select_galaxy(preset)` →
+`new_game` (whose head runs `stage_save`/`0x8432`, so the preset lands
+in the staging snapshot) → `shell_enter`.
+
+`Game::new_title` is the asm's boot path instead: `State::from_image`
+(the picker's template records ship in the save block) then
+`title_enter` — the `0x85B1` attract parked in `Vm::title`; the picker's
+start action selects the preset and the shared `0x1D60` tail runs
+`new_game` + `shell_enter`.
 
 `step()` = one frame: `pump_input` mirrors inputs into `ds:` (plus
-the `[0x91D3]` gate byte into the audio layer), then
-`shell_step` (Phase::Shell, `cs:0x2CC5`) or `frame_step`
+the `[0x91D3]` gate byte into the audio layer), then — in precedence
+order — `end_step` while `Vm::end` is live (the `cs:0x8B17`/`0x8C65`
+endings), `title_step` while `Vm::title` is live (boot or post-ending
+restart), else `shell_step` (Phase::Shell, `cs:0x2CC5`) or `frame_step`
 (Phase::Galaxy, `cs:0x395B`; returns `Frame::Shell` → back to shell on
-the `[0x9CDA] & 2` exit edge). `enter_galaxy()` forces the galaxy loop —
-the new-game menu actions that `jmp 0x395B` aren't decoded yet.
+the `[0x9CDA] & 2` exit edge). `enter_galaxy()` forces the galaxy loop
+through the `0x3906` action.
 
 ## `window.rs` (feature `minifb`)
 

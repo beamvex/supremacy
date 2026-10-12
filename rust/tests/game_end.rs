@@ -1,12 +1,13 @@
 //! `0xFA` end-to-end — the `cs:0x8B17`/`cs:0x8C65` ending sequences
-//! driven through `tick_step` + `end_step`.
+//! driven through `tick_step` + `end_step`, including the `0x1D35`
+//! restart through the `0x85B1` title attract and scenario picker.
 //!
 //! Monitor mapping (file `0x382E5`–`0x38338`): faction-record kind `7`
 //! (fallen) or no kind-`7` planet → **A = defeat** (`[0x91F1]`, code
 //! `2`, `*DTH` assets); record `0` kind `0xA` (inhabited) or no
 //! kind-`0xA` planet → **B = victory** (`[0x91F0]`, code `3`, `*WIN`
-//! assets). Both `jmp 0x1D35` — the title-attract + new-game restart
-//! the tail asserts on (`Native(0x85B1)` then the `*IN`/base loads).
+//! assets). Both `jmp 0x1D35` — the tail asserts on the `*IN` load
+//! order, the attract's `Song(0x3D7)` marker and the picker install.
 
 mod common;
 
@@ -19,19 +20,54 @@ use supremacy::platform::MemFs;
 /// `[0x91E5]` — the scenario index the endings pick pages on.
 const SCENARIO: usize = 0x91E5;
 
+/// The shipped `ds:0x9662` scenario-chain template (file `0x1A302`) —
+/// four `{img, ·, →[0x9209], ·, →[0x91E5], ·}` records + terminator.
+const CHAIN: [u8; 0x3C] = [
+    0x04, 0, 0, 0, 0, 0, 0, 0, 0x01, 0, 0, 0, //
+    0x03, 0, 0, 0, 0, 0, 0, 0, 0x02, 0, 0, 0, //
+    0x01, 0, 0, 0, 0xFF, 0xFF, 0xFF, 0xFF, 0x03, 0, 0, 0, //
+    0x02, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, //
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+];
+/// The shipped `ds:0x9734` picker-list template (file `0x1A3D4`) — the
+/// sel word, the cycle hotspot (`0xF676`) and the start hotspot
+/// (`0xF6D4`, rect `x 0xE2..0x12A` / `y 0xA5..0xB8`).
+const PICK: [u8; 0x2A] = [
+    0, 0, //
+    0x6A, 0, 0xA5, 0, 0xCE, 0, 0xB8, 0, 0, 0, 0, 0, 0x76, 0xF6, 0x6B, 0x28, 0xFF, 0xFF, 0xFF,
+    0x01, //
+    0xE2, 0, 0xA5, 0, 0x2A, 0x01, 0xB8, 0, 0, 0, 0, 0, 0xD4, 0xF6, 0x6B, 0x28, 0xFF, 0xFF, 0, 0xFF,
+];
+
+/// Seed the tpl structs into the staging heap — the `0x844B` restore
+/// at the ending's input-exit carries them into the save block
+/// exactly like the shipped image does.
+fn seed_tpl(vm: &mut Vm) {
+    let at = |a: usize| a - 0x7D39;
+    vm.stage[at(0x9662)..at(0x9662) + CHAIN.len()].copy_from_slice(&CHAIN);
+    vm.stage[at(0x9734)..at(0x9734) + PICK.len()].copy_from_slice(&PICK);
+}
+
 /// Recording host — `texts` scripts the `menu_text` page results
 /// (`0x100` = stream end), `keys` the channel-A stack `Call::KeyPop`
-/// drains; `pump_input` latches `[0x9CCB]` once the `0x85B1` attract
-/// marker is out — the `Ph::Title` exit the asm takes on input.
+/// drains. `attract` flips on the `0x85B1` entry's `Song(0x3D7)` —
+/// `pump_input` then keeps a pending key latched so every attract
+/// block exits to `0x87D7` on its first frame, and clicks the start
+/// hotspot once the picker list is live.
 struct Host {
     calls: Vec<Call>,
     cs: Vec<u8>,
     texts: VecDeque<u16>,
     keys: VecDeque<u8>,
+    attract: bool,
+    clicked: bool,
 }
 
 impl VmHost for Host {
     fn svc(&mut self, call: Call) -> u16 {
+        if call == Call::Song(0x3D7) {
+            self.attract = true;
+        }
         self.calls.push(call);
         match call {
             Call::KeyPop => self.keys.pop_front().map_or(0, u16::from),
@@ -44,8 +80,14 @@ impl VmHost for Host {
         u16::from(self.cs[a]) | u16::from(self.cs[a + 1]) << 8
     }
     fn pump_input(&mut self, vm: &mut Vm, st: &mut State) {
-        if self.calls.contains(&Call::Native(0x85B1)) {
-            vm.w8(st, u16::try_from(game::KEY_PEND).unwrap_or(0), 1);
+        let w16 = u16::try_from;
+        if !self.clicked && vm.r16(st, w16(game::HOT_LIST).unwrap_or(0)) == 0x9D36 {
+            vm.w16(st, w16(game::CUR_X).unwrap_or(0), 0x100);
+            vm.w16(st, w16(game::CUR_Y).unwrap_or(0), 0xB0);
+            vm.w16(st, w16(game::BUTTONS).unwrap_or(0), 1);
+            self.clicked = true;
+        } else if self.attract {
+            vm.w8(st, w16(game::KEY_PEND).unwrap_or(0), 1);
         }
     }
 }
@@ -60,10 +102,13 @@ struct Rig {
 }
 
 impl Rig {
-    /// Fresh rig — zeroed `Vm`, preset-3 galaxy, empty script.
+    /// Fresh rig — zeroed `Vm`, preset-3 galaxy, empty script, tpl
+    /// structs seeded into `stage` for the `0x844B` restore.
     fn new() -> Self {
+        let mut vm = Vm::new();
+        seed_tpl(&mut vm);
         Self {
-            vm: Vm::new(),
+            vm,
             st: galaxy(),
             rng: Rng::new(0x42),
             host: Host {
@@ -71,6 +116,8 @@ impl Rig {
                 cs: vec![0; 0x10000],
                 texts: VecDeque::new(),
                 keys: VecDeque::new(),
+                attract: false,
+                clicked: false,
             },
             files: MemFs::new(),
         }
@@ -163,12 +210,22 @@ fn defeat_sequence_runs_to_restart() {
     assert!(c.contains(&Call::Present(0xE)));
     assert!(c.contains(&Call::Image(0)));
     assert!(c.contains(&Call::KeyPop));
-    assert!(c.contains(&Call::Native(0x85B1)));
-    // `0x1D35` — `*IN` pair before the attract, base pair after.
-    assert!(r.pos(Call::Load(0x1218)) < r.pos(Call::Native(0x85B1)));
-    assert!(r.pos(Call::Load(0x1222)) < r.pos(Call::Native(0x85B1)));
-    assert!(r.pos(Call::Load(0x1208)) > r.pos(Call::Native(0x85B1)));
+    // `0x1D35` — `*IN` pair before the attract's `0x85B1` entry marker
+    // (`Song(0x3D7)`), the base pair after the picker hands off.
+    let title = r.pos(Call::Song(0x3D7));
+    assert!(r.pos(Call::Load(0x1218)) < title);
+    assert!(r.pos(Call::Load(0x1222)) < title);
+    assert!(r.pos(Call::Load(0x1208)) > title);
     assert!(c.contains(&Call::Load(0x1210)));
+    // The `0x87D7` picker install and its `Image(2)`/`Present(0xB)` show.
+    assert!(c.contains(&Call::Image(2)));
+    assert!(c.contains(&Call::Present(0xB)));
+    // The start hotspot `0x8984` → preset → `jmp 0x305B` new game:
+    // the shell list is reinstalled (`[0x9194] = 0xA0AC`).
+    assert_eq!(
+        r.vm.r16(&r.st, u16::try_from(game::HOT_LIST).unwrap_or(0)),
+        0xA0AC
+    );
 }
 
 #[test]
@@ -215,7 +272,7 @@ fn victory_pages_credits_then_restart() {
     assert!(c.contains(&Call::Slot(0x1292, 0xC)));
     // Non-RORN skips the 0xDBE reveal (`Present(0xF)`/`Image(0)`).
     assert!(!c.contains(&Call::Present(0xF)));
-    assert!(c.contains(&Call::Native(0x85B1)));
+    assert!(c.contains(&Call::Song(0x3D7)));
     assert!(r.vm.end.is_none());
 }
 

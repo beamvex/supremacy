@@ -9,6 +9,15 @@
 //! `[0x4FCB] < [0x4FCC]`. Uppercase chars only — `'\'` arrives as
 //! `0x5B` ('[') and the `ds:0` sanitiser remaps it to `0x5C`.
 
+/// `ds:0x7CBD` — the 62-entry `{code, output}` keymap the `0xE66E`
+/// line editor and the `0x32BA8` yes/no poll read (ends exactly at the
+/// save block).
+pub const KEYMAP: usize = 0x7CBD;
+/// `ds:0x76BF` — the shipped keymap template (file `0x1835F`).
+pub const KEYMAP_SRC: usize = 0x76BF;
+/// Keymap entry count — 62 `{code, output}` byte pairs.
+pub const KEYMAP_N: usize = 0x3E;
+
 /// The 124 shipped bytes — erase keys first (`0x0E`/`0x70`/`0x53`),
 /// then pad keys (`0x1C`/`0x74`), digits, keypad, `-`/`=`, QWERTY
 /// rows (`';'`→`':'`, `'\'`→`'['`), `2C..35` row, space, and the
@@ -29,3 +38,9 @@ pub const KEYMAP_BYTES: [u8; 124] = [
     0x30, b'B', 0x31, b'N', 0x32, b'M', 0x33, b',', 0x34, b'.', 0x35, b'/', 0x39, b' ', 0x47, b'[',
     0x56, b'[', 0x5B, 0x00,
 ];
+
+/// Install the runtime keymap at `ds:0x7CBD` from the embedded
+/// shipped bytes — for rigs with no image.
+pub fn install(low: &mut [u8]) {
+    low[KEYMAP..KEYMAP + KEYMAP_BYTES.len()].copy_from_slice(&KEYMAP_BYTES);
+}
