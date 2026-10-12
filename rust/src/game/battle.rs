@@ -6,6 +6,7 @@ use super::mach::{M_FLAGS, M_HOST, M_TYPE};
 use super::rec::F_SERIAL;
 use super::rec::{F_ATTACK, F_DEFENCE, F_KIND, F_LINK_A, F_LINK_B, F_LINK_C, F_TROOPS};
 use super::ship::{S_CREW, S_FLAGS, S_LINK, S_POW};
+use super::vops::Ctx;
 use super::State;
 
 /// Crew ceiling for the reinforcement bonus (file `0x348E9`).
@@ -19,8 +20,9 @@ pub enum Battle {
     /// Defence held: ships took proportional losses, troops bled
     /// `def·2/100` (file `0x34796`–`0x34973`).
     Repelled,
-    /// Defence held with zero troops: surviving crews gained `+7`
-    /// (file `0x3489D`–`0x3496F`).
+    /// Defence held with zero troops: crews gained `+7` and the
+    /// `0x34911` tail recolonised a non-inhabited planet (file
+    /// `0x3489D`–`0x3496F`).
     Reinforced,
     /// Defence broken: linked ships and bound machines destroyed, the
     /// planet becomes kind `7` (file `0x3463F`–`0x34795`).
@@ -29,7 +31,8 @@ pub enum Battle {
 
 /// Attacker losses — `pow = pow·pct/100` per linked armed ship; a `0`
 /// roll unlinks the ship (file `0x34796`–`0x34973`).
-pub(super) fn repelled(st: &mut State, r: usize, eff: u32) -> Battle {
+pub(super) fn repelled(c: &mut Ctx, r: usize, eff: u32) -> Battle {
+    let st = &mut *c.st;
     let def = u32::from(st.word(r + F_DEFENCE));
     let pct = 100 * eff / def;
     let mut sum = 0u16;
@@ -45,7 +48,7 @@ pub(super) fn repelled(st: &mut State, r: usize, eff: u32) -> Battle {
     let under = left > st.word(r + F_TROOPS);
     st.set_word(r + F_TROOPS, left);
     if under {
-        return reinforce(st, r);
+        return reinforce(c, r);
     }
     Battle::Repelled
 }
@@ -144,9 +147,11 @@ fn clear_link(st: &mut State, r: usize, i: u32) {
     }
 }
 
-/// Zero-troops reinforcement — crews of armed linked ships gain `+7`
-/// under `0x5D` (file `0x3489D`–`0x3496F`).
-pub(super) fn reinforce(st: &mut State, r: usize) -> Battle {
+/// Zero-troops reinforcement on a non-inhabited planet — crews of
+/// armed linked ships gain `+7` under `0x5D`, then the `0x34911` tail
+/// recolonises it (file `0x3489D`–`0x3496F`).
+pub(super) fn reinforce(c: &mut Ctx, r: usize) -> Battle {
+    let st = &mut *c.st;
     st.set_word(r + F_TROOPS, 0);
     if st.word(r + F_KIND) == 0xA {
         return Battle::Reinforced;
@@ -163,5 +168,6 @@ pub(super) fn reinforce(st: &mut State, r: usize) -> Battle {
     }
     st.set_word(DIRTY1, st.word(DIRTY1) | 0x8);
     st.set_word(DIRTY0, st.word(DIRTY0) | 0x18);
+    super::reinf::recolonise(c, r);
     Battle::Reinforced
 }

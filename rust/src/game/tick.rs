@@ -94,7 +94,7 @@ fn dispatch(c: &mut Ctx, bl: u8) -> Tick {
         return Tick::Planet(sim_planet(c.st, b - 0x38));
     }
     if b < 0x38 + 2 * n {
-        return Tick::Defence(defence_tick(c.st, b - 0x38 - n));
+        return Tick::Defence(defence_tick(c, b - 0x38 - n));
     }
     if b < 0x56 + 2 * n {
         return Tick::Script(vops::run(c, b - 0x38 - 2 * n));

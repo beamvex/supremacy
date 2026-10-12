@@ -120,11 +120,19 @@ fn roll(c: &mut Ctx, r: u16) {
     }
 }
 
-/// `cs:0x7FA5` — random name: 9 spaces, `rand&3 + 1` letters
-/// alternating the `0x794B`/`0x795B` tables, then a 3-char digraph from
-/// `0x7963` whose first letter differs from the last written.
+/// `cs:0x7FA5` — random name for a planet record (`si += 0xE` to its
+/// name field, then the shared body).
 pub fn name_gen(c: &mut Ctx, rec: u16) {
     let si = rec + u16::try_from(super::rec::F_NAME).unwrap_or(0);
+    name_span(c, si);
+}
+
+/// `cs:0x7FA8` — the name body on an explicit `ds:` cursor: 9 spaces,
+/// `rand&3 + 1` letters alternating the `0x794B`/`0x795B` tables, then
+/// a 3-char digraph from `0x7963` whose first letter differs from the
+/// last written. The recolonise machine spawn jumps straight here so
+/// the machine's `+0` field gets the name.
+pub fn name_span(c: &mut Ctx, si: u16) {
     for k in 0..9 {
         c.vm.w8(c.st, si + k, 0x20);
     }

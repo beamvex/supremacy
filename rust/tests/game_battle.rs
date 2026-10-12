@@ -4,6 +4,7 @@
 mod common;
 
 use common::gsim::{galaxy, mach, rec, set_mach, ship};
+use common::rig;
 use supremacy::game::{self, Battle, MachOut, Rng, State};
 
 /// Two armed ships with `pow` docked at planet record `p`.
@@ -68,32 +69,77 @@ fn build_countdown_colonises_queued_planet() {
 
 #[test]
 fn defence_scan_and_overrun() {
-    let mut st = galaxy();
-    let p = rec(&st, 1);
-    st.set_byte(p + game::F_OWNER, 3);
-    st.set_byte(p + game::F_SERIAL, 1);
-    st.set_word(p + game::F_TROOPS, 0x7530); // regen caps at 0x3095
-    st.set_word(game::UIMODE, 0);
-    dock(&mut st, p, 2, 1); // two weak armed ships
-    assert_eq!(game::defence_tick(&mut st, 1), Battle::Overrun);
-    assert_eq!(st.word(p + game::F_DEFENCE), 0);
-    assert_eq!(st.word(p + game::F_KIND), 7); // planet fell
+    let mut rig = rig::Rig::new();
+    let p = rec(&rig.st, 1);
+    rig.st.set_byte(p + game::F_OWNER, 3);
+    rig.st.set_byte(p + game::F_SERIAL, 1);
+    rig.st.set_word(p + game::F_TROOPS, 0x7530); // regen caps at 0x3095
+    rig.st.set_word(game::UIMODE, 0);
+    dock(&mut rig.st, p, 2, 1); // two weak armed ships
+    {
+        let mut c = rig.ctx();
+        assert_eq!(game::defence_tick(&mut c, 1), Battle::Overrun);
+    }
+    assert_eq!(rig.st.word(p + game::F_DEFENCE), 0);
+    assert_eq!(rig.st.word(p + game::F_KIND), 7); // planet fell
     for i in 0..2u16 {
-        assert_eq!(st.word(ship(i) + game::S_POW), 0); // ships destroyed
+        assert_eq!(rig.st.word(ship(i) + game::S_POW), 0); // ships destroyed
     }
 }
 
 #[test]
 fn defence_repelled_damages_ships() {
-    let mut st = galaxy();
-    let p = rec(&st, 1);
-    st.set_byte(p + game::F_OWNER, 3);
-    st.set_byte(p + game::F_SERIAL, 1);
-    st.set_word(p + game::F_TROOPS, 10); // eff = 1 < any defence
-    st.set_word(game::UIMODE, 0);
-    dock(&mut st, p, 1, 100);
-    match game::defence_tick(&mut st, 1) {
+    let mut rig = rig::Rig::new();
+    let p = rec(&rig.st, 1);
+    rig.st.set_byte(p + game::F_OWNER, 3);
+    rig.st.set_byte(p + game::F_SERIAL, 1);
+    rig.st.set_word(p + game::F_TROOPS, 10); // eff = 1 < any defence
+    rig.st.set_word(game::UIMODE, 0);
+    dock(&mut rig.st, p, 1, 100);
+    let mut c = rig.ctx();
+    match game::defence_tick(&mut c, 1) {
         Battle::Repelled | Battle::Reinforced => {}
         other => panic!("expected Repelled/Reinforced, got {other:?}"),
     }
+}
+
+#[test]
+fn zero_troops_recolonises_fallen_planet() {
+    let mut rig = rig::Rig::new();
+    let p = rec(&rig.st, 1);
+    rig.st.set_byte(p + game::F_OWNER, 3);
+    rig.st.set_byte(p + game::F_SERIAL, 1);
+    rig.st.set_word(p + game::F_KIND, 7); // fallen — not yet inhabited
+    rig.st.set_word(game::SEL_REC, u16::try_from(p).unwrap());
+    // The zeroed `Vm` digraph table can't terminate `name_span` — give
+    // every entry a nonzero first byte (the letters leave `0x00`).
+    for i in 0..16u16 {
+        rig.w8(usize::from(0x7963 + i * 4), b'A');
+    }
+    dock(&mut rig.st, p, 1, 40);
+    {
+        let mut c = rig.ctx();
+        assert_eq!(game::defence_tick(&mut c, 1), Battle::Reinforced);
+    }
+    assert_eq!(rig.st.word(p + game::F_KIND), 0xA); // recolonised
+    assert_eq!(rig.st.byte(0x91F4), 0xFF); // orders flag armed
+    assert_eq!(rig.st.byte(ship(0) + game::S_CREW), 8); // crew +7
+    assert!(rig.host.0.contains(&game::Call::PlanetPanel));
+    assert!(rig.host.0.contains(&game::Call::Sound(3)));
+}
+
+#[test]
+fn inhabited_planet_skips_recolonise() {
+    let mut rig = rig::Rig::new();
+    let p = rec(&rig.st, 1);
+    rig.st.set_byte(p + game::F_OWNER, 3);
+    rig.st.set_byte(p + game::F_SERIAL, 1);
+    rig.st.set_word(p + game::F_KIND, 0xA);
+    dock(&mut rig.st, p, 1, 40);
+    {
+        let mut c = rig.ctx();
+        assert_eq!(game::defence_tick(&mut c, 1), Battle::Reinforced);
+    }
+    assert_eq!(rig.st.byte(0x91F4), 0); // tail skipped
+    assert_eq!(rig.st.byte(ship(0) + game::S_CREW), 1); // no crew bonus
 }

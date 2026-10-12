@@ -89,7 +89,18 @@ Selected record → dirty `0x8`/`0x10`.
 Then: `F_TROOPS == 0` → `Quiet` when defence is also zero, else
 `reinforce` (`F_TROOPS=0`; kind `0xA` early-outs → `Reinforced`; else
 `REINF_REC` = rec and crews of armed linked ships gain `+7` while under
-`0x5D`, dirty `0x8`/`0x18`). Nonzero troops → `regen` (`+4`/`+3`/`+1`
+`0x5D`, dirty `0x8`/`0x18`, then the `0x34911` recolonise tail in
+`reinf.rs`: `cs:0x8019` spawns `1..=5` machines bound to the record —
+`(rand&7)−(rand&3)` in `0..5` else none, `0x803A` per unit over a
+`0x6611` free-slot scan, type-table entry `6`/`5` for owners `4`/`5`
+(flags `0x30`), `4` or `0` by `rand&1` for others (flags `0x10`),
+`rand(T_DEPOSIT)` into `M_DEPOSIT`, machine name at `+0` via the
+`0x7FA8` name-gen body — then the 8-byte name copy into `ds:0x8478`,
+the `0x841D`/`0x845F` report pair on the ticker, `kind = 0xA`,
+`[0x91F4] = 0xFF`, the `al=5`/`cl=3` sting, and `0x5C97` panel redraw
+when the record is selected — the recolonisation that flips a fallen
+world back to inhabited for the `0xFA` endgame count). Nonzero troops →
+`regen` (`+4`/`+3`/`+1`
 by owner 4/5/other, cap `0x3095`, record 0 skips) then `resolve`:
 `def == 0` → `overrun`; `eff = troops·(2+F_29)/100` (min 1); `def >
 eff` → `repelled` (`pct = 100·eff/def`; each linked armed ship takes

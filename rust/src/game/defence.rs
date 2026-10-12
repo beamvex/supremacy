@@ -2,6 +2,7 @@ use super::battle::{overrun, reinforce, repelled, Battle};
 use super::consts::{DIRTY0, DIRTY1, FLEET_BASE, FLEET_COUNT, FLEET_STRIDE, SCAN_REC, SEL_REC};
 use super::rec::{F_ATTACK, F_DEFENCE, F_DEFLVL, F_OWNER, F_TROOPS};
 use super::ship::{S_CREW, S_FLAGS, S_GUNS, S_LINK, S_LOAD, S_POW};
+use super::vops::Ctx;
 use super::State;
 
 /// Crew-weight divisor in the defence formula (file `0x344C9`).
@@ -10,7 +11,8 @@ const CREW_DIV: u32 = 0x48;
 const TROOPS_MAX: u16 = 0x3095;
 
 /// One planet's defence pass — `cs:0x4434` (file `0x34434`–`0x34973`).
-pub fn defence_tick(st: &mut State, idx: u16) -> Battle {
+pub fn defence_tick(c: &mut Ctx, idx: u16) -> Battle {
+    let st = &mut *c.st;
     let r = usize::from(st.rec_ofs(idx));
     st.set_word(SCAN_REC, u16::try_from(r).unwrap_or(0));
     if st.byte(r + F_OWNER) == 0 {
@@ -21,10 +23,10 @@ pub fn defence_tick(st: &mut State, idx: u16) -> Battle {
         if st.word(r + F_DEFENCE) == 0 {
             return Battle::Quiet;
         }
-        return reinforce(st, r);
+        return reinforce(c, r);
     }
     regen(st, r);
-    resolve(st, r)
+    resolve(c, r)
 }
 
 /// Σ ship strength → `F_ATTACK`, weighted → `F_DEFENCE` (file
@@ -69,14 +71,15 @@ fn regen(st: &mut State, r: usize) {
 }
 
 /// The eff-vs-defence comparison (file `0x3457D`–`0x345DA`).
-fn resolve(st: &mut State, r: usize) -> Battle {
+fn resolve(c: &mut Ctx, r: usize) -> Battle {
+    let st = &mut *c.st;
     let (troops, def) = (st.word(r + F_TROOPS), st.word(r + F_DEFENCE));
     if def == 0 {
         return overrun(st, r);
     }
     let eff = (u32::from(troops) * (2 + u32::from(st.byte(r + F_DEFLVL))) / 100).max(1);
     if u32::from(def) > eff {
-        return repelled(st, r, eff);
+        return repelled(c, r, eff);
     }
     super::battle::destroy_ships(st, r);
     overrun(st, r)

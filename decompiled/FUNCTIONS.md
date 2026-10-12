@@ -598,8 +598,21 @@ Per-planet pass (dispatcher codes `0x38 + total + planet_index`):
 - Scan: `F_ATTACK` = Σ `pow`, `F_DEFENCE` = Σ `pow + (pow·crew/0x48 &
   0xFFFF)·(guns + load + F_29 + 1) & 0xFFFF` — the asm's `mul`/`div`
   keep `ax`, so both stages truncate to 16 bits.
-- Troops 0 + defence → reinforcement: crews of armed linked ships `+7`
-  (cap `0x5D`); troops 0 + no defence → quiet.
+- Troops 0 + defence → reinforcement/recolonise (`cs:0x489D`, file
+  `0x3489D`–`0x3496F`): `+0x26` cleared, `kind 0xA` exits early, else
+  `[0x9150] = si`, crews of armed linked ships `+7` (cap `0x5D`), dirty
+  `0x8`/`0x18`, then the recolonise tail — `call 0x8019` spawns
+  `1..=5` machines on `[0x918C]` (`cx = (rand&7) − (rand&3)`, unsigned
+  `cl < 5` gate; `0x803A` per unit: `0x6611` free-slot scan sets
+  `[0x91E0]` when full, `+0x21` = planet `+0x28` serial, `+0x1F` =
+  `0x30` for type-table entry `6`/`5` on owners `4`/`5`, else entry `4`
+  or `0` on `rand&1` with `+0x1F` rewritten `0x10`; the `0x38085` copy
+  fills timer/`+0x14`/ops/type/rate/`rand(+0xC)` deposit and `jmp
+  0x7FA8` writes the machine's `+0` name), 8-byte name copy to
+  `ds:0x8478`, `0x6B06` enqueues `0x841D`/`0x845F`, `kind = 0xA`,
+  `[0x91F4] = 0xFF`, the `0x8A5B`/`al=5`/`cl=3` sting (`[0x91D3]`-gated),
+  and `jmp 0x5C97` when `[0x918C] == [0x917C]`; troops 0 + no defence
+  → quiet.
 - Regen `+4/+3/+1` (owner 4/5/other, cap `0x3095`), then
   `eff = troops·(2 + F_29)/100` min 1 vs `F_DEFENCE`:
   - `def > eff` → repelled: each linked armed ship's `pow` scaled by

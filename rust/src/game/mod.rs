@@ -41,6 +41,7 @@ mod num;
 mod panel;
 mod preset;
 mod rec;
+mod reinf;
 mod rng;
 mod save;
 mod screens;
