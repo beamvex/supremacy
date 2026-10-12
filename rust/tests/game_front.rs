@@ -383,4 +383,11 @@ fn title_boot_picker_start_reaches_the_shell() {
     assert!(g.vm.title.is_none(), "start click never left the picker");
     assert_eq!(g.phase, Phase::Shell);
     assert_eq!(g.st.byte(UIMODE), 0);
+    // GAM-44 — the `0x305B` head + `0x33194` repaint must leave the
+    // post-pick shell visible: `scenario_start`'s `0x9CA1 = 0xF` +
+    // refresh pair fades the picker to black, so without the `0x305B`
+    // `Image(0)`/`Present(0)` repaint the chosen-opponent shell stayed
+    // on the black palette/cleared buffer.
+    assert!(g.host.scr.pixels().iter().any(|&p| p != 0));
+    assert!((1..256).any(|n| g.host.pal.rgb(n) != [0, 0, 0]));
 }

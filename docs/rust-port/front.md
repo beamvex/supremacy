@@ -106,7 +106,7 @@ in the staging snapshot) → `shell_enter`.
 (the picker's template records ship in the save block) then
 `title_enter` — the `0x85B1` attract parked in `Vm::title`; the picker's
 start action selects the preset and the shared `0x1D60` tail runs
-`new_game` + `shell_enter`.
+`act_newgame` (the full `0x305B` — head, repaint and shell re-entry).
 
 `step()` = one frame: `pump_input` mirrors inputs into `ds:` (plus
 the `[0x91D3]` gate byte into the audio layer), then — in precedence

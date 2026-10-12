@@ -157,10 +157,16 @@ Assumes `select_galaxy` already ran. Then:
 - records `1..count`: name `LIFELESS!`; all `0..=count` get serial `i`
   and `F_WORD0 = 0`.
 
-`act_newgame` (`cs:0x305B`/`0x9DAB` tail, `0x331C4`–`0x331E6`):
-`new_game`, then int-33 restrict (`ax=0x14`, mask `0x1E`), `mark_sel`,
-`sel_next`, a `0x32`-frame `{vsync, Sound(0)}` wait, `Native(0x2FD7)`,
-`Slot(0x1278)` image reload, input reinstall (`ax=0x14`, mask `0x1F`).
+`act_newgame` (`cs:0x305B`/`0x9DAB`, file `0x3305B`–`0x331EF`): the
+`0x3305B` head — game-song swap (`SndReset`/`Song(0xC3E)`/`Sound(0)`/
+`0x89FB`), `[0x91D3]=0`, `Slot(0x1260)`, the shell hotspot install and
+`Present(0)` — then `newgame_body` (`cs:0x30A0`, the `0x8427` restart
+action's `jmp` target): `new_game`, the `0x33194` repaint
+(`0x1260`/`0x125C`/`0x89B3`/`Image(0)`/`Present(0)`, `uimode=0`), then
+the `0x331C4` tail — int-33 restrict (`ax=0x14`, mask `0x1E`),
+`mark_sel`, `sel_next`, a `0x32`-frame `{vsync, Sound(0)}` wait,
+`Native(0x2FD7)`, `Slot(0x1278)` image reload, input reinstall
+(`ax=0x14`, mask `0x1F`).
 
 ## `save.rs` / `load.rs` — savegame I/O
 

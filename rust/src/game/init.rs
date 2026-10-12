@@ -1,4 +1,7 @@
-use super::consts::{DIFFICULTY, REC_BASE, REC_STRIDE, SEL_IDX};
+use super::cells::{MENU_COUNT, MENU_LIST, MENU_SEL};
+use super::consts::{
+    DIFFICULTY, HOT_COUNT, HOT_LIST, HOT_SEL, REC_BASE, REC_STRIDE, SEL_IDX, SND_ON, UIMODE,
+};
 use super::rec::{
     F_CREDITS, F_DEFENCE, F_DEFLVL, F_ENERGY, F_FOOD, F_FUEL, F_MINERALS, F_NAME, F_OWNER, F_POP,
     F_SERIAL, F_TROOPS, F_WORD0,
@@ -7,6 +10,13 @@ use super::vhost::Call;
 use super::vm::Vm;
 use super::vops::{vsync, Ctx};
 use super::{selrec, shell, text, Rng, State};
+
+/// `u16` casts for the `ds:` slot constants.
+macro_rules! a {
+    ($k:expr) => {
+        u16::try_from($k).unwrap_or(0)
+    };
+}
 
 /// Per-difficulty `F_TROOPS` parameter — `[0x91E4]` = 0/1/2 → these
 /// words (file `0x330A4`–`0x330CE`).
@@ -25,8 +35,8 @@ const LIFELESS: [u8; 9] = *b"LIFELESS!";
 /// before this call; the `0x844B` restore direction is the one
 /// `0x2F91` uses). Assumes
 /// [`select_galaxy`][super::select_galaxy] already anchored the array
-/// (`[0x9158]`) and set the counts; video and sound calls in the asm
-/// are the shell's job, not this fn's.
+/// (`[0x9158]`) and set the counts; the asm's video/sound calls live
+/// in [`head`]/[`repaint`] on the `act_newgame` path.
 ///
 /// Record `0` gets the fixed starting block (credits `0x1879A`), the
 /// appended faction record `[count]` gets the rolled block
@@ -55,15 +65,26 @@ pub fn new_game(vm: &mut Vm, st: &mut State, rng: &mut Rng) {
     }
 }
 
-/// `cs:0x305B`/`cs:0x9DAB` — the new-game menu action: [`new_game`]
-/// (with its `0x8432` stage snapshot), then the asm tail at file
+/// `cs:0x305B`/`cs:0x9DAB` — the new-game menu action: [`head`] (the
+/// `0x3305B` sound/screen install the `jmp 0x30A0` restart entry
+/// skips), then [`newgame_body`] — [`new_game`], the `0x33194` repaint
+/// and the `0x331C4` tail ending `jmp 0x2D27` (shell re-entry).
+pub fn act_newgame(c: &mut Ctx) {
+    head(c);
+    newgame_body(c);
+}
+
+/// `cs:0x30A0` — the restart re-entry point (file `0x330A0`–`0x331EF`):
+/// [`new_game`] (whose `0x8432` stage save is an identity re-save on
+/// the restart path), the `0x33194` repaint, then the asm tail
 /// `0x331C4`–`0x331E6` — `0xA3BC` input restrict (int-33 `ax=0x14`,
 /// mask `0x1E`), `0x83AA` mark, `0x5DD3` select-next, a `0x32`-frame
 /// `{0x2CA9, [cs:0x127C]}` wait, `0x2FD7`, `[0x1278]` reload, `0xA36A`
 /// input reinstall, the `0x6E30` ticker message — before `jmp 0x2D27`
 /// re-enters the shell setup tail.
-pub fn act_newgame(c: &mut Ctx) {
+pub fn newgame_body(c: &mut Ctx) {
     new_game(c.vm, c.st, c.rng);
+    repaint(c);
     c.host.svc(Call::Mouse(0x14, 0x1E, 0));
     selrec::mark_sel(c);
     selrec::sel_next(c);
@@ -76,6 +97,37 @@ pub fn act_newgame(c: &mut Ctx) {
     c.host.svc(Call::Mouse(0x14, 0x1F, 0));
     text::enqueue(c, 0x6E30);
     shell::re_enter(c);
+}
+
+/// `0x3305B`–`0x3309C` — the `0x305B` entry head: the game-song swap
+/// (`SndReset`, `Song(0x0C3E)`, `Sound(0)`, `0x89FB`), `[0x91D3] = 0`
+/// (sound on), the `0x1260` DAC flush, the shell hotspot install
+/// (`[0x9CC8] = [0xA0AA]`, `[0x9194] = 0xA0AC`, `[0x91A8] = 0x31`)
+/// and the `dx = 0` `0x125E` present.
+fn head(c: &mut Ctx) {
+    c.host.svc(Call::SndReset);
+    c.host.svc(Call::Song(0xC3E));
+    c.host.svc(Call::Sound(0));
+    c.host.svc(Call::Chan(0x89FB, 0));
+    c.vm.w8(c.st, a!(SND_ON), 0);
+    c.host.svc(Call::Slot(0x1260, 0));
+    let sel = c.vm.r16(c.st, a!(MENU_SEL));
+    c.vm.w16(c.st, a!(HOT_SEL), sel);
+    c.vm.w16(c.st, a!(HOT_LIST), a!(MENU_LIST));
+    c.vm.w16(c.st, a!(HOT_COUNT), MENU_COUNT);
+    c.host.svc_st(Call::Present(0), c.vm, c.st);
+}
+
+/// `0x33194`–`0x331B2` — the mid-init repaint both entries share:
+/// `0x1260`/`0x125C`, the `0x89B3` border, `Image(0)`, `Present(0)`
+/// and `uimode = 0` (file `0x33194`–`0x331B0`).
+fn repaint(c: &mut Ctx) {
+    c.host.svc(Call::Slot(0x1260, 0));
+    c.host.svc(Call::Slot(0x125C, 0));
+    c.host.svc(Call::Native(0x89B3));
+    c.host.svc(Call::Image(0));
+    c.host.svc_st(Call::Present(0), c.vm, c.st);
+    c.vm.w8(c.st, a!(UIMODE), 0);
 }
 
 /// `i·0x3A` as `u16` — the stride the asm multiplies by.

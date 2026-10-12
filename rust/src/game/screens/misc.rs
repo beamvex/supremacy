@@ -119,11 +119,11 @@ fn kind_str(c: &mut Ctx, rec: u16) -> u16 {
 /// `0x38430`): the `0x2F91` stage snapshot (the `pop si` ×3 abandons
 /// the dialog frames the action `jmp`s out of), then the `jmp 0x30A0`
 /// re-entry — record init and the new-game tail. The port's
-/// [`init::act_newgame`] replays that tail; its `stage_load` head is
+/// [`init::newgame_body`] replays that tail; its `stage_load` head is
 /// an identity copy over the just-saved snapshot.
 pub fn restart(c: &mut Ctx) {
     dlg_io::act_stage(c);
-    init::act_newgame(c);
+    init::newgame_body(c);
 }
 
 /// `cs:0x854A` — the sound toggle (file `0x3854A`–`0x38576`): flip
