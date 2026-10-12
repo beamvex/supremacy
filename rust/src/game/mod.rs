@@ -38,6 +38,7 @@ mod mach;
 mod machine;
 mod menu;
 mod mine;
+mod namedit;
 mod num;
 mod panel;
 mod preset;

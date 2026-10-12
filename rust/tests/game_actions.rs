@@ -261,3 +261,160 @@ fn surface_messages_a_kind4() {
     assert_eq!(r.r16(Q0), 0x6AD6);
     assert!(!r.host.0.contains(&Call::Image(0x57)));
 }
+
+#[test]
+fn view_steps_cycle_and_skip_one() {
+    let mut r = Rig::new();
+    game::dispatch_action(&mut r.ctx(), 0xD398); // prev: 0 → 6
+    assert_eq!(r.r8(game::TYPE_SEL), 6);
+    game::dispatch_action(&mut r.ctx(), 0x6648); // label window: 6 → 5
+    assert_eq!(r.r8(game::TYPE_SEL), 5);
+    game::dispatch_action(&mut r.ctx(), 0xD398); // 5 → 4
+    assert_eq!(r.r8(game::TYPE_SEL), 4);
+    game::dispatch_action(&mut r.ctx(), 0xD3E3); // next: 4 → 5
+    assert_eq!(r.r8(game::TYPE_SEL), 5);
+    r.w8(game::TYPE_SEL, 0);
+    game::dispatch_action(&mut r.ctx(), 0x6693); // 0 → skips 1 → 2
+    assert_eq!(r.r8(game::TYPE_SEL), 2);
+    assert_eq!(r.r8(game::REDRAW), 0xFF);
+    assert_eq!(r.r8(game::PANEL_REQ), 0xFF);
+}
+
+#[test]
+fn launch_without_carrier_reports() {
+    let mut r = Rig::new();
+    r.w16(game::TICK_PUT, u16::try_from(Q0).unwrap_or(0));
+    game::dispatch_action(&mut r.ctx(), 0xDF33);
+    assert_eq!(r.r16(Q0), 0x7130);
+    assert_eq!(r.r16(Q0 + 4), 0x7123);
+    assert!(!r.host.0.contains(&Call::Native(0xDF33)));
+}
+
+#[test]
+fn launch_transit_reports_the_unit() {
+    let mut r = Rig::new();
+    let m = u16::try_from(game::MACH_BASE).unwrap_or(0);
+    r.w8(usize::from(m) + game::M_TYPE, 4);
+    r.w8(usize::from(m) + game::M_FLAGS, 1); // in transit
+    r.w16(usize::from(m) + 0x18, 0); // empty
+    r.w16(game::TICK_PUT, u16::try_from(Q0).unwrap_or(0));
+    game::dispatch_action(&mut r.ctx(), 0x71E3);
+    assert_eq!(r.r16(Q0), 0x683A);
+    assert_eq!(r.r16(game::REINF_REC), m);
+}
+
+#[test]
+fn spy_menu_kind4_reports_and_tails() {
+    let mut r = Rig::new();
+    let rec = r.r16(game::REC_BASE);
+    r.w16(game::REC_CUR, rec);
+    r.w16(usize::from(rec) + 0xC, 4);
+    r.w16(game::TICK_PUT, u16::try_from(Q0).unwrap_or(0));
+    r.w16(game::TICK_PTR, u16::try_from(Q0).unwrap_or(0));
+    r.w8(0x762C, 0xFF); // record terminators so the pump drains
+    r.w8(0x712C, 0xFF);
+    game::dispatch_action(&mut r.ctx(), 0xEE99);
+    assert_eq!(r.r16(Q0), 0x762C);
+    assert_eq!(r.r16(Q0 + 4), 0x712C);
+    assert_eq!(r.r8(0x81FE), 0xFF); // report flag armed by the tail
+    assert!(!r.host.0.contains(&Call::Native(0xEE99)));
+}
+
+#[test]
+fn order_open_enters_surface_for_the_sel() {
+    let mut r = Rig::new();
+    let rec = r.r16(game::REC_BASE);
+    r.w16(usize::from(rec) + 0xC, 0xA); // colonised
+    r.w16(game::SEL_REC, rec);
+    r.w16(game::BUTTONS, 2);
+    game::dispatch_action(&mut r.ctx(), 0xAC91);
+    assert!(r.host.0.contains(&Call::Present(7)));
+    assert_eq!(r.r8(game::UIMODE), 0); // leave → shell
+    assert_eq!(r.r16(game::HOT_LIST), 0xA0AC);
+}
+
+#[test]
+fn order_sel_follows_the_row_link() {
+    let mut r = Rig::new();
+    let rec = r.r16(game::REC_BASE).wrapping_add(2 * 0x3A);
+    r.w16(usize::from(rec) + 0xC, 0xA);
+    r.w16(game::LINK_REC, 0x3000);
+    r.w16(0x3002, rec); // row record at link +2
+    r.w16(game::BUTTONS, 2);
+    game::dispatch_action(&mut r.ctx(), 0x3F18);
+    assert!(r.host.0.contains(&Call::Present(7)));
+}
+
+#[test]
+fn mach_open_enters_the_host_surface() {
+    let mut r = Rig::new();
+    let rec = r.r16(game::REC_BASE);
+    r.w16(usize::from(rec) + 0xC, 0xA); // host colonised
+    let m = u16::try_from(game::MACH_BASE).unwrap_or(0);
+    r.w8(usize::from(m) + game::M_TYPE, 2); // not DAC
+    r.w8(usize::from(m) + game::M_HOST, 0); // host = record 0
+    r.w16(game::SEL_MACH, m);
+    r.w16(game::BUTTONS, 2);
+    game::dispatch_action(&mut r.ctx(), 0xACE1);
+    assert_eq!(r.r16(game::SEL_REC), rec);
+    assert!(r.host.0.contains(&Call::Present(7)));
+}
+
+#[test]
+fn order_build_copies_sel_into_cur() {
+    let mut r = Rig::new();
+    let rec = r.r16(game::REC_BASE).wrapping_add(0x3A);
+    r.w16(game::SEL_REC, rec);
+    r.w16(game::BUTTONS, 2);
+    game::dispatch_action(&mut r.ctx(), 0xB8F1);
+    assert_eq!(r.r16(game::REC_CUR), rec);
+    assert_eq!(r.r8(game::UIMODE), 0); // leave → shell
+}
+
+#[test]
+fn gal_build_commits_the_new_unit() {
+    let mut r = Rig::new();
+    let t = 0x4000u16;
+    r.w16(game::TYPE_REC, t);
+    r.w8(usize::from(t) + 0x12, 7); // kind 7 — skips the kind-4 gates
+    r.w16(usize::from(t) + 6, 0x64); // cost 100
+    let f = r
+        .r16(game::REC_BASE)
+        .wrapping_add(r.r16(game::REC_COUNT).wrapping_mul(0x3A));
+    for o in [0x18usize, 0x1C, 0x20] {
+        r.w8(usize::from(f) + o, 0); // free bays
+    }
+    r.w16(usize::from(f) + 0x36, 0x3E8); // funds 1000
+    r.w8(usize::from(t) + 0x22, 0xFF); // empty type name → terminator
+    r.keys(&[0x1C]); // Enter accepts the prefill
+    game::dispatch_action(&mut r.ctx(), 0xD17E);
+    let m = u16::try_from(game::MACH_BASE).unwrap_or(0);
+    assert_eq!(r.r16(game::REINF_REC), m);
+    assert_eq!(r.r8(usize::from(m) + game::M_TYPE), 7);
+    assert_eq!(r.r8(usize::from(f) + 0x18), 1); // bay = index + 1
+    assert_eq!(r.r16(usize::from(f) + 0x36), 0x3E8 - 0x64);
+    assert_eq!(r.r16(game::SEL_REC), f);
+    assert!(!r.host.0.contains(&Call::Native(0xD17E)));
+}
+
+#[test]
+fn gal_build_cancel_leaves_the_slot_free() {
+    let mut r = Rig::new();
+    let t = 0x4000u16;
+    r.w16(game::TYPE_REC, t);
+    r.w8(usize::from(t) + 0x12, 7);
+    r.w16(usize::from(t) + 6, 0);
+    let f = r
+        .r16(game::REC_BASE)
+        .wrapping_add(r.r16(game::REC_COUNT).wrapping_mul(0x3A));
+    for o in [0x18usize, 0x1C, 0x20] {
+        r.w8(usize::from(f) + o, 0);
+    }
+    r.w16(usize::from(f) + 0x36, 0x3E8);
+    r.w8(usize::from(t) + 0x22, 0xFF);
+    r.keys(&[0x1]); // Esc cancels the name edit
+    game::dispatch_action(&mut r.ctx(), 0x642E);
+    let m = u16::try_from(game::MACH_BASE).unwrap_or(0);
+    assert_eq!(r.r8(usize::from(m) + game::M_TYPE), 0); // uncommitted
+    assert_eq!(r.r16(usize::from(f) + 0x36), 0x3E8); // funds untouched
+}

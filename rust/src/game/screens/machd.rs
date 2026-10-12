@@ -42,7 +42,7 @@ pub fn enter_detail_mach(c: &mut Ctx) {
 
 /// `cs:0x5085` — machine record → its `+0x21`-indexed host record,
 /// `[0x9158] + i·0x3A` (file `0x35085`–`0x350A8`).
-fn mach_host(c: &mut Ctx, m: u16) -> u16 {
+pub(super) fn mach_host(c: &mut Ctx, m: u16) -> u16 {
     let i = u16::from(c.vm.r8(c.st, m + 0x21));
     c.vm.r16(c.st, a!(REC_BASE))
         .wrapping_add(i.wrapping_mul(a!(REC_STRIDE)))

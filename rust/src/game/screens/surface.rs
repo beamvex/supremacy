@@ -31,7 +31,7 @@ pub fn enter_surface(c: &mut Ctx) {
     if !admitted(c, rec, kind) {
         return;
     }
-    body(c);
+    open_entry(c);
 }
 
 /// The `0x403E`–`0x4068` guard — `0x4071` admits, `0x406B` enqueues
@@ -57,26 +57,44 @@ fn admitted(c: &mut Ctx, rec: u16, kind: u16) -> bool {
     false
 }
 
-/// `0x4071` — the open: chirp + `0x8A80` channel `5`,
-/// `[0x917C] = [0x9184]`, the draw head, the clears, the `0x4166`
-/// idle banner, the `0xABA4` `0x2A`-record `uimode-7` install, the
-/// table build + header prints, then the frame loop.
-fn body(c: &mut Ctx) {
+/// `0x4071` — the open: chirp + `0x8A80` channel `5`, then the
+/// `0x4092` head and the shared tail.
+pub(super) fn open_entry(c: &mut Ctx) {
     snd(c, 0, 1);
     c.host.svc(Call::Chan(0x8A80, 5));
+    open_at(c);
+}
+
+/// `0x4092` — `[0x917C] = [0x9184]`, the draw head, the full clears,
+/// then the shared tail. `mach_open` `jmp`s here for non-DAC units.
+pub(super) fn open_at(c: &mut Ctx) {
     let cur = c.vm.r16(c.st, a!(REC_CUR));
     c.vm.w16(c.st, a!(SEL_REC), cur);
     draw(c);
-    clears(c);
+    clears(c, true);
+    tail(c);
+}
+
+/// `0x40B7` — the mid-`clears` entry the `0x3FE0`/`0x3FFF` heads jump
+/// to: keeps `SEL_MACH`, clears the dirty/`SEQ` cells, shared tail.
+pub(super) fn resume_entry(c: &mut Ctx) {
+    clears(c, false);
+    tail(c);
+}
+
+/// The `0x40C9` shared tail — the `0x4166` idle banner, the `0xABA4`
+/// `0x2A`-record `uimode-7` install, the table build + header prints,
+/// then the frame loop.
+fn tail(c: &mut Ctx) {
     banner(c);
     install(c, 0xABA2, 0xABA4, 0x2A, 7);
     table(c);
     frame_loop(c);
 }
 
-/// The `0x4092` draw head — `[0x1260]`/`[0x125C]` pair, `0x89B3`,
-/// `Image(0x57)`, `Present(7)` (file `0x34096`–`0x340B0`).
-fn draw(c: &mut Ctx) {
+/// The `0x4098` draw head — `[0x1260]`/`[0x125C]` pair, `0x89B3`,
+/// `Image(0x57)`, `Present(7)` (file `0x34098`–`0x340B0`).
+pub(super) fn draw(c: &mut Ctx) {
     c.host.svc(Call::Slot(0x1260, 0));
     c.host.svc(Call::Slot(0x125C, 0));
     c.host.svc(Call::Native(0x89B3));
@@ -84,10 +102,12 @@ fn draw(c: &mut Ctx) {
     c.host.svc_st(Call::Present(7), c.vm, c.st);
 }
 
-/// `0x40B1` — the `SEL_MACH`/dirty/`SEQ` clears (file `0x340B1`–
-/// `0x340C8`).
-fn clears(c: &mut Ctx) {
-    c.vm.w16(c.st, a!(SEL_MACH), 0);
+/// `0x40B1`/`0x40B7` — the dirty/`SEQ` clears; the `mach_too` variant
+/// also clears `SEL_MACH` (file `0x340B1`–`0x340C8`).
+fn clears(c: &mut Ctx, mach_too: bool) {
+    if mach_too {
+        c.vm.w16(c.st, a!(SEL_MACH), 0);
+    }
     c.vm.w16(c.st, a!(DIRTY0), 0);
     c.vm.w16(c.st, a!(DIRTY1), 0);
     c.vm.w16(c.st, a!(SEQ_PTR), 0);

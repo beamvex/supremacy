@@ -17,19 +17,28 @@ mod build;
 mod detail;
 mod fleet;
 mod galaxy;
+mod galbuild;
+mod galmsg;
+mod launch;
 mod machd;
 mod misc;
+mod open;
 mod orders;
+mod spy;
 mod status;
 mod surface;
 
 pub use build::enter_build;
 pub use detail::{enter_detail, enter_detail_sel, enter_detail_win};
 pub use fleet::enter_fleet;
-pub use galaxy::enter_galaxy;
+pub use galaxy::{enter_galaxy, view_next, view_prev};
+pub use galbuild::gal_build;
+pub use launch::fleet_launch;
 pub use machd::enter_detail_mach;
 pub use misc::{cell_pick, map_click, mode_pick, report, restart, snd_toggle, stub};
+pub use open::{mach_open, order_build, order_open, order_sel};
 pub use orders::enter_orders;
+pub use spy::spy_menu;
 pub use status::{enter_status, enter_status_win};
 pub use surface::enter_surface;
 
@@ -76,6 +85,11 @@ fn misc(c: &mut Ctx, t: u16) {
         0x80DE | 0xEE2E => mode_pick(c, 3),
         0x80E4 | 0xEE34 => mode_pick(c, 4),
         0x80EA | 0xEE3A => mode_pick(c, 5),
+        0x71E3 | 0xDF33 => fleet_launch(c),
+        0x8149 | 0xEE99 => spy_menu(c),
+        0x642E | 0xD17E => gal_build(c),
+        0x6648 | 0xD398 => view_prev(c),
+        0x6693 | 0xD3E3 => view_next(c),
         _ => nav(c, t),
     }
 }
@@ -87,6 +101,10 @@ fn nav(c: &mut Ctx, t: u16) {
         0x5DA1 | 0xCAF1 => selrec::sel_prev(c),
         0x5DD3 | 0xCB23 => selrec::sel_next(c),
         0x5E5A | 0xCBAA => selrec::sel_faction(c),
+        0x3F18 | 0xAC68 => order_sel(c),
+        0x3F41 | 0xAC91 => order_open(c),
+        0x3F91 | 0xACE1 => mach_open(c),
+        0x4BA1 | 0xB8F1 => order_build(c),
         _ => drop(c.host.svc(Call::Native(t))),
     }
 }
