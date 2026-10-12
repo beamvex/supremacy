@@ -206,3 +206,68 @@ fn engine_runs_the_tandy_driver() {
     a.render(&mut vec![0f32; 4410]);
     assert!(matches!(a.drv, Drv::Tandy(_)));
 }
+
+#[test]
+fn tone_write_sends_the_full_10_bit_divisor() {
+    // Zeroed module: `d16` reads are all `0`, so the sfx sweep's
+    // `twrite(0xC0, cur | d16)` emits exactly the poked `cur` —
+    // `0x169` latches `0xC0|9` then `(0x169>>4)&0x3F` = `0x16` (the
+    // asm's `shr dx,1 ×2` / `shr al,1 ×2` at `0x1E05`).
+    let img = vec![0u8; 0x2900];
+    let mut t = Tandy::new(Rec::new(), img.as_slice());
+    t.dispatch(0x31, 0xFF); // `[0x24]` sfx armed
+    t.dispatch(0x3B, 0xFF); // `[0x2E]` bcnt — no wrap this tick
+    t.dispatch(0x3C, 0xFF); // `[0x2F]` pcnt — no wrap this tick
+    t.dispatch(0x3F, 0x69); // `[0x32]` cur lo
+    t.dispatch(0x40, 0x01); // `[0x33]` cur hi
+    t.dispatch(0, 0);
+    let psg: Vec<u8> = t
+        .ports
+        .outs()
+        .iter()
+        .filter(|&&(p, _)| p == 0xC0)
+        .map(|&(_, v)| v)
+        .collect();
+    // ch0/1 `vlatch|0xF` mutes, then the ch2 sweep pair + `0xE7`
+    // noise + the `vol` writes on the `vsel`-picked channels.
+    assert_eq!(psg, [0x9F, 0xBF, 0xC9, 0x16, 0xE7, 0xDF, 0xFF]);
+}
+
+#[test]
+fn bus_synthesises_the_psg_while_enabled() {
+    use supremacy::audio::Ports;
+    use supremacy::front::audio::Bus;
+    let mut b = Bus::new(44_100);
+    b.outb(0x61, 0x60); // the tick tail's Tandy sound-enable
+    b.outb(0xC0, 0x89); // ch0 tone latch, low nibble 9
+    b.outb(0xC0, 0x16); // data byte → divisor 0x169 (~310 Hz)
+    b.outb(0xC0, 0x90); // ch0 attenuator = 0 (full)
+    let pcm: Vec<f32> = (0..4410).map(|_| b.sample()).collect();
+    assert!(pcm.iter().any(|&s| s > 0.0));
+    assert!(pcm.iter().any(|&s| s < 0.0));
+}
+
+#[test]
+fn bus_psg_silent_without_the_enable_or_volume() {
+    use supremacy::audio::Ports;
+    use supremacy::front::audio::Bus;
+    // No `0x61 | 0x60` — the PSG stays gated off.
+    let mut b = Bus::new(44_100);
+    b.outb(0xC0, 0x89);
+    b.outb(0xC0, 0x16);
+    b.outb(0xC0, 0x90);
+    assert!((0..512).all(|_| b.sample() == 0.0));
+    // Enabled but attenuator `0xF` — silent either way.
+    b.outb(0x61, 0x60);
+    b.outb(0xC0, 0x9F);
+    assert!((0..512).all(|_| b.sample() == 0.0));
+}
+
+#[test]
+fn engine_renders_audible_tandy_output() {
+    let mut a = Audio::new(Sound::Tandy, img().as_slice(), 44_100);
+    a.chan(0x8A80, 0); // song record 0 through the `ah=2` wrapper
+    let mut pcm = vec![0f32; 44_100 * 2];
+    a.render(&mut pcm);
+    assert!(pcm.iter().any(|&s| s != 0.0));
+}

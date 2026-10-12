@@ -18,6 +18,10 @@ mod drv;
 mod engine;
 #[cfg(feature = "audio")]
 mod out;
+mod psg;
+mod psg_mix;
+mod psg_new;
+mod psg_reg;
 
 pub use bus::Bus;
 pub use drv::Drv;

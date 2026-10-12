@@ -131,21 +131,25 @@ feature a cpal `audio::Out` stream is opened first (rate negotiated
 back into `snd`), and each stepped frame renders `rate/30` mono
 samples into its bounded queue.
 
-## `audio` (`audio/`) — the GAM-31 sound backend
+## `audio` (`audio/`) — the sound backend (GAM-7/31)
 
-`audio::Audio` owns a `audio::Pc`-driver-over-`audio::Bus` pair and maps
-the game calls onto the asm wrapper semantics (files `0x38A5B`,
-`0x38A3B`, `0x38A80`, `0x38577`): `Sfx` → `int 80` `ah=1`+`ah=3` + the
-`[cs:0x127C]` export; `Chan(0x8A5B)` → `ah=1` + `[cs:0x1280]`; `Chan(
-0x8A3B)` → `ah=3`; `Chan(0x8A80)` → `ah=2` gated on the mirrored
-`[0x91D3] == 0`; `Sound` → the far export alone. Every wrapper gates
-`[0x155] <= 2` — `AdLib`/`Roland` skip the `int 80` and count their
-export calls into `Audio::dropped` (the C driver module isn't ported).
+`audio::Audio` owns the `[0x155]`-picked driver (`drv::Drv` — `Pc` /
+`Tandy` / `Ar` over `audio::Bus`) and maps the game calls onto the asm
+wrapper semantics (files `0x38A5B`, `0x38A3B`, `0x38A80`, `0x38577`):
+`Sfx` → `int 80` `ah=1`+`ah=3` + the `[cs:0x127C]` export;
+`Chan(0x8A5B)` → `ah=1` + `[cs:0x1280]`; `Chan(0x8A3B)` → `ah=3`;
+`Chan(0x8A80)` → `ah=2` gated on the mirrored `[0x91D3] == 0`;
+`Sound`/`Song`/`SndReset` → the far exports alone. The `int 80` path
+gates `[0x155] <= 2`, so the A/R module is only reached through its
+`cs:0x126C` far table (`init`/`load_song`/`select`/`reset`).
 
 `Bus` is the concrete `audio::Ports`: `0x43`/`0x42` latch the PIT-2
 divisor, `0x61` is the gate, and `sample()` emits the square wave;
-`0x388`/`0x389` write an `oplon` OPL2 rendered in the same frame;
-`0x330`/`0x331` answer as a quiescent MPU-401. `Audio::render` runs the
-driver's `ah=0` tick at the ~50 Hz rate `install_drivers` programs
+`0xC0` feeds the `psg` SN76489 (three tone voices + LFSR noise, mixed
+while the driver's `0x61 | 0x60` Tandy-enable write holds); `0x388`/
+`0x389` write an `oplon` OPL2 rendered in the same frame; `0x330`/
+`0x331` answer as a quiescent MPU-401 (MIDI bytes accepted and
+dropped). `Audio::render` runs the driver's `ah=0` tick (the A/R
+export-2 `service`) at the ~50 Hz rate `install_drivers` programs
 into PIT channel 0 (`0x5CEC`; the `0x5D37` at `cs:[0x1C00]` is the
 A/R module's own install) inside the sample stream.

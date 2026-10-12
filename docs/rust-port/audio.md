@@ -95,10 +95,14 @@ cells `[0x23..0x31]` plus the `cs:` bytes beyond.
   limit — the `sub` half jumps over the `cmp`)/sweep → gate.
 
 The host backend (`front::audio`, see `front.md`) supplies the
-concrete `Ports`; the driver's tick is fed at ~50 Hz — the
-`install_drivers` int-8 hook (file `0x31E8E`, P/T only) reprograms
-PIT channel 0 with divisor `0x5CEC`. The A/R module has its own
-timer install (file `0x3552`, `cs:[0x1C00] = 0x5D37`).
+concrete `Ports` — its `Bus` synthesises each device the drivers
+address: the `0x61`-gated PIT-2 square wave, the SN76489 the `0xC0`
+bytes feed (gated on the `0x61 | 0x60` Tandy enable), an `oplon`
+OPL2 on `0x388`/`0x389`, and a quiescent MPU-401 on `0x330`/`0x331`.
+The driver's tick is fed at ~50 Hz — the `install_drivers` int-8
+hook (file `0x31E8E`, P/T only) reprograms PIT channel 0 with
+divisor `0x5CEC`. The A/R module has its own timer install (file
+`0x3552`, `cs:[0x1C00] = 0x5D37`).
 
 ## `Tandy<P: Ports>` — Tandy 3-voice tracker (`tandy.rs` + `tandy_*.rs`)
 

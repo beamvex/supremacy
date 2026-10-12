@@ -4,13 +4,15 @@ use crate::audio::Ports;
 impl Ports for Bus {
     /// `out dx,al` — the port map the drivers write: PIT control
     /// `0x43` (only channel-2 commands matter — ch0 is the `Timer`
-    /// model's), `0x42` divisor latch, `0x61` speaker gate, the OPL
-    /// pair `0x388`/`0x389`, and the MPU-401 `0x330`/`0x331`.
+    /// model's), `0x42` divisor latch, `0x61` speaker/PSG gate, `0xC0`
+    /// the SN76489 latch, the OPL pair `0x388`/`0x389`, and the
+    /// MPU-401 `0x330`/`0x331`.
     fn outb(&mut self, port: u16, val: u8) {
         match port {
             0x43 => self.cmd(val),
             0x42 => self.latch(val),
             0x61 => self.gate = val,
+            0xC0 => self.psg.write(val),
             0x388 => self.opl_addr = val,
             0x389 => {
                 self.opl.write_reg(self.opl_addr, val);

@@ -1,3 +1,4 @@
+use super::psg::Psg;
 use crate::platform::PIT_HZ;
 use oplon::Opl2;
 
@@ -13,10 +14,12 @@ pub(super) const OPL_T1_READS: u8 = 80;
 /// The host's port-mapped sound hardware — the concrete
 /// [`Ports`][crate::audio::Ports] sink
 /// the drivers write to. PIT channel 2 (`0x43` cmd, `0x42` latch) plus
-/// the `0x61` gate synthesise the PC-speaker square wave; `0x388`/
-/// `0x389` drive an `oplon` OPL2 (the `AdLib` the `A` mode would use);
-/// `0x330`/`0x331` answer as a quiescent MPU-401 so the Roland path
-/// sees a live UART (its MIDI bytes are accepted and dropped).
+/// the `0x61` gate synthesise the PC-speaker square wave; `0xC0`
+/// feeds the [`Psg`] SN76489 (the Tandy chip, gated on the driver's
+/// `0x61 | 0x60` enable write); `0x388`/`0x389` drive an `oplon` OPL2
+/// (the `AdLib` the `A` mode would use); `0x330`/`0x331` answer as a
+/// quiescent MPU-401 so the Roland path sees a live UART (its MIDI
+/// bytes are accepted and dropped).
 pub struct Bus {
     /// Effective PIT ch2 divisor — `0` encodes 65536 (~18 Hz).
     pub(super) divisor: u16,
@@ -35,6 +38,8 @@ pub struct Bus {
     pub(super) opl_t1: u8,
     /// The OPL2 chip.
     pub(super) opl: Opl2,
+    /// The SN76489 the `0xC0` writes feed.
+    pub(super) psg: Psg,
     /// MPU-401 — a `0x331` command write arms the `0xFE` ACK.
     pub(super) mpu_ack: bool,
     /// Square-wave phase, 0..1 cycles.
@@ -56,6 +61,7 @@ impl Bus {
             opl_st: 0,
             opl_t1: 0,
             opl: Opl2::new(rate),
+            psg: Psg::new(rate),
             mpu_ack: false,
             phase: 0.0,
             rate,
@@ -63,10 +69,12 @@ impl Bus {
     }
 
     /// Retarget at a new output rate — rebuilds the OPL resampler
-    /// (register state clears, like a fresh detect).
+    /// (register state clears, like a fresh detect) and retunes the
+    /// PSG's phase clocks.
     pub fn set_rate(&mut self, rate: u32) {
         self.rate = rate;
         self.opl = Opl2::new(rate);
+        self.psg.set_rate(rate);
         self.opl_st = 0;
         self.opl_t1 = 0;
     }
@@ -79,13 +87,15 @@ impl Bus {
         self.divisor
     }
 
-    /// One output sample — the speaker's square wave under the OPL's
-    /// stereo-mid render, soft-clamped to ±1.
+    /// One output sample — the speaker's square wave plus the PSG
+    /// voices (enabled while the Tandy driver's `0x61 | 0x60` write
+    /// holds) under the OPL's stereo-mid render, soft-clamped to ±1.
     #[allow(clippy::cast_precision_loss)]
     pub fn sample(&mut self) -> f32 {
         let (l, r) = self.opl.render_frame();
         let opl = (l.saturating_add(r) >> 1) as f32 * OPL_GAIN;
-        (self.square() + opl).clamp(-1.0, 1.0)
+        let psg = self.psg.mix(self.gate & 0x60 == 0x60);
+        (self.square() + opl + psg).clamp(-1.0, 1.0)
     }
 
     /// The `0x42`-programmed channel-2 frequency, `0` when gated off

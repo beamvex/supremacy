@@ -150,10 +150,11 @@ impl<P: Ports> Tandy<P> {
         self.ports.outb(0xC0, latch | (0xFF - v) >> 4);
     }
 
-    /// `0x1E05` — the 10-bit tone pair: `latch | (d & 0xF)` then
-    /// `d >> 6` (the `shr dx,2; shr al,2` top-six-bits).
+    /// `0x1E05` — the 10-bit tone pair: `latch | (d & 0xF)` then the
+    /// top six bits — `shr dx,1 ×2` gives `d >> 2`, `mov al,dl` +
+    /// `shr al,1 ×2` leaves `(d >> 4) & 0x3F` in `al`.
     pub(super) fn twrite(&mut self, latch: u8, d: u16) {
         self.ports.outb(0xC0, latch | (d & 0xF).to_le_bytes()[0]);
-        self.ports.outb(0xC0, (d >> 6).to_le_bytes()[0]);
+        self.ports.outb(0xC0, ((d >> 4) & 0x3F).to_le_bytes()[0]);
     }
 }
