@@ -1,7 +1,7 @@
 //! GAM-29 — the C-compiled `AdLib`/Roland driver (`audio::Ar`, file
-//! `0x2900`): the jump-table far exports (init/service/load_song/
-//! select/reset/fade), the `ds:si` song record copy + `map`/`tbl`
-//! queue base, the AdLib OPL2 apply/service stream and the Roland
+//! `0x2900`): the jump-table far exports (`init`/`service`/`load_song`/
+//! `select`/`reset`/`fade`), the `ds:si` song record copy + `map`/`tbl`
+//! queue base, the `AdLib` OPL2 `apply`/`service` stream and the Roland
 //! MPU-401 UART stream.
 
 mod common;
@@ -97,11 +97,12 @@ fn load_song_select_then_service_writes_opl() {
 
 #[test]
 fn roland_load_song_sends_timbre_sysexes() {
-    let mut a = Ar::new(Rec::new(), img().as_slice());
+    let i = img();
+    let mut a = Ar::new(Rec::new(), i.as_slice());
     a.ports.replies.extend([0x00, 0x00, 0xFE, 0x00, 0x00, 0xFE]);
     assert_eq!(a.init(1), 1);
     a.ports.ops.clear();
-    a.load_song(song0(&img()));
+    a.load_song(song0(&i));
     let midi: Vec<u8> = a
         .ports
         .outs()
@@ -112,7 +113,29 @@ fn roland_load_song_sends_timbre_sysexes() {
     // `0x2104` — timbre uploads (SysEx `F0` blocks) + the `C1`
     // program sweep for each `progmap` slot.
     assert!(midi.contains(&0xF0));
-    assert!(midi.iter().filter(|&&v| v == 0xC1).count() == 0x20);
+    let c1 = midi.iter().fold(0usize, |n, &v| n + usize::from(v == 0xC1));
+    assert_eq!(c1, 0x20);
+    // Each uploaded `timbre` is six sends: the `0x1C6F` name block, the
+    // `0x1C61` index block and four `0x3A` param blocks (`0x1C1D`) —
+    // `F0` heads, `F7` tails. (The `0x281D` setup `SysEx` went at
+    // `init`, already cleared above.)
+    let s = song0(&i);
+    let qi = qbase_idx(s) * 2;
+    let qbase = usize::from(u16::from_le_bytes([s[0x118 + qi], s[0x119 + qi]])) * 16;
+    let uploads = (0..0x20usize)
+        .filter(|&n| {
+            s[0x98 + n * 2] != 0 && s[0x99 + n * 2] != 0 && s[qbase + 0x118 + n * 0x100] != 0x20
+        })
+        .count();
+    let f7 = midi.iter().fold(0usize, |n, &v| n + usize::from(v == 0xF7));
+    assert_eq!(f7, uploads * 6);
+}
+
+/// `tbl[maxmap + 1]` — the `0x236A` scan index `load_song` uses for
+/// `qbase` (highest `map[0..0x7F]` value + 1).
+fn qbase_idx(s: &[u8]) -> usize {
+    let max = s[0x18..0x97].iter().copied().max().unwrap_or(0);
+    usize::from(max) + 1
 }
 
 #[test]

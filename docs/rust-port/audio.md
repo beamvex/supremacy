@@ -41,7 +41,8 @@ live MPU-401.
 
 - `reset()` (`mpu_reset.rs`, file `0x3470`) — polls DSR up to `0xFFFF`
   reads, issues `0xFF` (reset) to `0x331` under `cli`, waits DRR, reads
-  the `0xFE` ACK into `ack`; `true` when the ACK arrives.
+  the reply: only an exact `0xFE` ACK is kept in `ack` (any other byte
+  stores `0`); `true` on the `0xFE`.
 - `command(b)` (`mpu_cmd.rs`, file `0x34F5`) — wait DSR, write to `0x331`
   under `cli`, poll DRR, read and return the `0x330` response.
 - `send(b)` (file `0x350E`) / `read()` (file `0x351F`) — wait for the

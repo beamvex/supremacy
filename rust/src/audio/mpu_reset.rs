@@ -9,14 +9,14 @@ impl<P: Ports> Mpu<P> {
     /// MPU-401 reset + detect — file `0x3470`. Polls DSR for up to
     /// `0xFFFF` reads, issues `0xFF` (reset) to the command port under
     /// `cli`, then waits for DRR and reads the data port expecting the
-    /// `0xFE` ACK, stored to `[0x1C02]` (`self.ack`). Returns `true` when
-    /// the ACK arrives — the asm returns the raw byte and tests
-    /// `or al,al`.
+    /// `0xFE` ACK — the asm `cmp`s the byte and stores `0xFE` or `0`
+    /// to `[0x1C02]` (`self.ack`). Returns `true` only for `0xFE` —
+    /// any other reply (or a timeout's `0`) fails the detect.
     pub fn reset(&mut self) -> bool {
         for _ in 0..0xFFFF {
             if self.ports.inb(STAT) & DSR == 0 {
                 self.ports.outb(STAT, 0xFF);
-                self.ack = self.read_ack();
+                self.ack = if self.read_ack() == 0xFE { 0xFE } else { 0 };
                 return self.ack != 0;
             }
         }

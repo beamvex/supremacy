@@ -53,7 +53,8 @@ pub struct Ar<P> {
     pub(super) fade: u8,
     /// `[0x205C]` — fade rate (doubled on `AdLib`).
     pub(super) frate: u8,
-    /// `[0x205E]` — fade tick divider (2).
+    /// `[0x205E]` — fade tick divider (the shipped cell is `2`, so the
+    /// first `fader` step lands on the second `service`).
     pub(super) fcnt: u8,
     /// `[0x2058]` — master music volume (`0x64`/`0x7F` `init`).
     pub(super) mvol: u8,
@@ -132,7 +133,7 @@ impl<P: Ports> Ar<P> {
             rst: 0,
             fade: 0,
             frate: 0,
-            fcnt: 0,
+            fcnt: 2,
             mvol: 0,
             dvol: 0,
             wvol: 0,

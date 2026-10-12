@@ -195,10 +195,11 @@ Driver cells `[0x23..0x34]`: `[0x23]` music arm, `[0x24]` sfx arm,
 - `0x3E90` `opl_key_off(dl=ch)`: `0xA0+ch`=0, `0xB0+ch`=0.
 - `0x3E5D` note-on register half: caches `[si+0x16]=bx&0x3FF`,
   `[si+0x15]=bh>>4`; writes `0xA0+ch`=bl (f-num low), `0xB0+ch`=
-  `(bh&3) | ((bh>>1)&0x1C) | cl` (f-num hi + block + key bits).
+  `(bh&3) | ((bh>>2)&0x1C) | cl` (f-num hi + block + key bits).
 - `0x3470` `mpu_reset` → `al`: DSR poll (`0x331` bit 6, `0xFFFF` budget),
   `out 0x331=0xFF` (reset) under `cli`, DRR poll (bit 7), `in 0x330` →
-  `0xFE` ACK stored at `[0x1C02]`; returns 0 on timeout/no-ACK.
+  `cmp al,0xFE` — only an exact `0xFE` is kept in `[0x1C02]` (any other
+  reply stores `0`); returns 0 on timeout/non-`0xFE`.
 - `0x34F5` `mpu_cmd(al)`: DSR wait, `out 0x331`, DRR wait, drain `0x330`.
 - `0x350E` `mpu_send(al)`: DSR wait, `out 0x330`.
 - `0x351F` `mpu_read` → `al`: DRR wait, `in 0x330`.
@@ -257,8 +258,11 @@ the **instrument area** base; its own `0x118` header is followed by:
   `tbl[dl+1] + [0x1C03]` → `[0x1C81]` = instrument-area segment.
 - `0x404` (Roland only, `[0x19AC]≠0`): for each of the 32 `cs:0x170B`
   program entries with both bytes nonzero, `0x44F` uploads timbre slot
-  *i* = `es:[0x1C81]:[i*0x100+0x118]` via `mpu_sysex`; then 32 ×
-  program-change bytes (`0xC1`) via `0xC0E`/`mpu_send`.
+  *i* = `es:[0x1C81]:[i*0x100+0x118]` — six `mpu_sysex` sends: the
+  `0x1C6F` name block, the `0x1C61` index block, then **four**
+  `0x3A`-byte param blocks (`0x1C1D`, record `+0x16`..`+0xFD`, the
+  `0x228C` address bump between each). A `0x20`-leading name skips the
+  upload. Then 32 × program-change bytes (`0xC1`) via `0xC0E`/`mpu_send`.
 - export `0x0C` → `0xEE` **select sound**: `cl` = sound index →
   `[0x19FA]`; `[0x19FB]=0x118` resets the queue cursor.
 - `0x5DD`+ **queue tick**: block seg = `tbl[map[[0x19FA]]]+[0x1C03]`,

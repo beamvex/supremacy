@@ -92,8 +92,13 @@ impl<P: Ports> Ar<P> {
 
     /// `0x260D` — kind-5 pan: `param & 0xF0` pans right (`0x40 +
     /// nibble·4`), `param & 0xF` pans left (`0x40 - nibble·4`), zero
-    /// centres; `B0+ch, 0x0A, v`.
+    /// centres — and zero also clears `kind` (the asm's `[si+5] = 0`
+    /// on the centre path), so a `0` param doesn't re-pan each pass.
+    /// `B0+ch, 0x0A, v`.
     fn pan(&mut self, bp: u8, p: u8) {
+        if p == 0 {
+            self.chans[usize::from(bp) - 1].kind = 0;
+        }
         let v = if p & 0xF0 != 0 {
             0x40 + ((p & 0xF0) >> 2)
         } else if p & 0xF != 0 {

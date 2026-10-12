@@ -110,21 +110,32 @@ impl<P: Ports> Ar<P> {
 
     /// `0x2B59`/`0x2B86` — the `fnum` ramp: `fnum += d` wrapping at the
     /// `0x157..0x2AE` octave bounds (`block` tracking), then
-    /// `0x2ECF` re-writes `A0`/`B0`.
+    /// `0x2ECF` re-writes `A0`/`B0`. The asm's `bx` arithmetic is
+    /// 16-bit — a down-ramp that underflows `0` stores the wrapped
+    /// value verbatim (`ja` exits the `bx` loop on it).
     fn ramp(&mut self, c: usize, d: i16) {
-        let mut f = i32::from(self.chans[c].fnum) + i32::from(d);
-        let mut b = self.chans[c].block;
-        while f >= 0x2AE {
-            f += 0x157 - 0x2AE;
-            b = b.wrapping_add(1);
-        }
-        while f <= 0x142 {
-            f = 0x28A + (0x142 - f);
-            b = b.wrapping_sub(1);
-        }
-        self.chans[c].fnum = u16::try_from(f & 0xFFFF).unwrap_or_default();
-        self.chans[c].block = b;
+        self.ramp_f(c, d);
         self.freq_apply(c);
+    }
+
+    /// The `bx`/`dl` ramp math shared with `slide_a` — computes the
+    /// next `{block, fnum}` without the `0x2ECF` register tail.
+    fn ramp_f(&mut self, c: usize, d: i16) {
+        let mut b = self.chans[c].block;
+        let mut f = self.chans[c].fnum.wrapping_add(d.cast_unsigned());
+        if d >= 0 {
+            while f >= 0x2AE {
+                f = f.wrapping_sub(0x157);
+                b = b.wrapping_add(1);
+            }
+        } else {
+            while f <= 0x142 {
+                f = 0x3CC_u16.wrapping_sub(f);
+                b = b.wrapping_sub(1);
+            }
+        }
+        self.chans[c].fnum = f;
+        self.chans[c].block = b;
     }
 
     /// `0x2C2C` — arm an `AdLib` slide: `+0x12`/`+0x0C` = target
@@ -145,7 +156,8 @@ impl<P: Ports> Ar<P> {
 
     /// `0x2C5D` — one `AdLib` slide step: `param` latches `+0x0F`;
     /// `fnum` walks `rate·2` toward `slide_tgt` (full `{block,fnum}`
-    /// compare); on arrival `+0x12` keys on, else `0x2ECF`.
+    /// compare); still short → `0x2ECF` re-writes `A0`/`B0`, on
+    /// arrival `+0x12` keys on instead (no extra freq write).
     fn slide_a(&mut self, c: usize) {
         let p = self.chans[c].param;
         if p != 0 {
@@ -155,7 +167,7 @@ impl<P: Ports> Ar<P> {
         if self.chans[c].slide_tgt == 0 {
             return;
         }
-        self.ramp(c, self.rstep(c));
+        self.ramp_f(c, self.rstep(c));
         let full = self.chans[c].fnum | u16::from(self.chans[c].block) << 12;
         let done = if self.chans[c].slide_dir == 0 {
             full <= self.chans[c].slide_tgt
@@ -166,6 +178,8 @@ impl<P: Ports> Ar<P> {
             self.chans[c].slide_tgt = 0;
             let n = self.chans[c].slide_note;
             self.note_on_a(c, n);
+        } else {
+            self.freq_apply(c);
         }
     }
 
@@ -179,9 +193,10 @@ impl<P: Ports> Ar<P> {
         }
     }
 
-    /// `ftab[n]` — the `cs:0x1D60` `fnum` table (`n - 0xC`, floored at
-    /// the table base like `note_on` does).
+    /// `ftab[n]` — the `cs:0x1D60` `fnum` table at `n - 0xC`. Unlike
+    /// `note_on`'s clamp this `sub bl,0xC` wraps in `bl` — notes below
+    /// `0xC` index past the table end exactly like the asm.
     fn ftab(&self, n: u8) -> u16 {
-        self.d16(0x1D60 + u16::from(n.saturating_sub(0xC)) * 2)
+        self.d16(0x1D60 + u16::from(n.wrapping_sub(0xC)) * 2)
     }
 }

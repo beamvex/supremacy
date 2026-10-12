@@ -56,9 +56,9 @@ impl<P: Ports> Ar<P> {
 
     /// `0x214F` — one MT-32 `timbre` upload for program `i`. The record
     /// sits `0x118 + i·0x100` into the `tbl[1]` region: `+0` name (8),
-    /// `+0x12` index (4), then three `0x3A`-byte param blocks, each
-    /// `SysEx`'d with the `0x228C` address bump. A name starting with
-    /// space (`0x20`) skips the upload entirely.
+    /// `+0x12` index (4), then four `0x3A`-byte param blocks (`+0x16`
+    /// through `+0xFD`), each `SysEx`'d with the `0x228C` address bump.
+    /// A name starting with space (`0x20`) skips the upload entirely.
     fn timbre(&mut self, i: u8) {
         let base = usize::from(self.qbase) * 16 + 0x118 + usize::from(i) * 0x100;
         if self.song.get(base) == Some(&0x20) {
@@ -74,7 +74,7 @@ impl<P: Ports> Ar<P> {
         let blk = self.stg(0x1C6F, 0x14).to_vec();
         self.syx(&blk);
         self.tidx(base + 0x12, i);
-        for p in 0..3 {
+        for p in 0..4 {
             self.tpart(base + 0x16 + p * 0x3A);
         }
     }

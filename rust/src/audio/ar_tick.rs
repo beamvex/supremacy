@@ -34,9 +34,9 @@ impl<P: Ports> Ar<P> {
         }
     }
 
-    /// `0x1F05` — the `fader`: every other tick `mvol -= frate`; on
-    /// borrow `mvol = 0`, `en = 0`, `fade = 0`. `0x1F40` applies the
-    /// new level after each step.
+    /// `0x1F05` — the `fader`: every other tick `mvol -= frate`, then
+    /// `0x1F40` applies the new level (the `jnc` falls into it). On
+    /// borrow `mvol = 0` before the apply, then `en = 0`, `fade = 0`.
     fn fader(&mut self) {
         if self.fade == 0 {
             return;
@@ -48,6 +48,7 @@ impl<P: Ports> Ar<P> {
         self.fcnt = 2;
         if self.mvol >= self.frate {
             self.mvol -= self.frate;
+            self.mvol_apply();
         } else {
             self.mvol = 0;
             self.mvol_apply();
