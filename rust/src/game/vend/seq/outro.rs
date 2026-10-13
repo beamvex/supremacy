@@ -21,7 +21,7 @@ macro_rules! a {
 }
 
 impl End {
-    /// `Ph::Post` — the `[0x9CA1]`/`[0x9205]`/`[0x91D6]`/`[0x9198]`/
+    /// The post block — the `[0x9CA1]`/`[0x9205]`/`[0x91D6]`/`[0x9198]`/
     /// `[0x91A0]`/`[0x91D7]` arm + refresh, then the `Image(0)`/
     /// `Present` reveal + `Seq` — B only on scenario `3` (file
     /// `0x38BC0`–`0x38C10` / `0x38D18`–`0x38D6F`).

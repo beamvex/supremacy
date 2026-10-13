@@ -26,8 +26,9 @@
 //! - `Call::Load` → [`Loader`] (`front/load.rs`) — the int-21 asset
 //!   loaders' `ds:0x1208`+ cell → `{stem}{sfx}.{BIN,GPH}` swap
 //!   (GAM-33).
-//! - `Call::Text` → `front/text.rs` — the `menu_text` page walk + the
-//!   MCG 16×24 tile painters (GAM-46);
+//! - `Call::Text`/`Call::Scroll` → `front/text.rs` — the `menu_text`
+//!   block walk + MCG 16×24 tile painters and the upward crawl the
+//!   shipped binary's scroll slots stubbed out (GAM-46);
 //!   `Call::Stars` → `front/stars.rs` — the `cs:0x4EC4` starfield.
 //! - `[0x1264]`/`[0x1266]` stay stubs — the refresh-list copies are
 //!   presentation details the window's per-frame blit supersedes
@@ -37,6 +38,7 @@
 //! the `file − 0x30000` label space the docs name functions with. The
 //! `VmHost` impl and per-call bodies live in [`svc`].
 
+mod draw;
 mod svc;
 
 use std::path::Path;
@@ -47,7 +49,7 @@ use crate::palette::Palette;
 use crate::video::Screen;
 
 use super::audio::{Audio, BOOT_RATE};
-use super::{load::Loader, map::Map, stars::Stars, Pump};
+use super::{load::Loader, map::Map, stars::Stars, text, Pump};
 
 /// A live vsync hook — the frontend's stand-in for the async
 /// int-9/int-33 ISRs plus the retrace the `0x2CA9` routine waits on.
@@ -77,9 +79,9 @@ pub struct Host {
     pub ink: u8,
     /// Calls dropped because the port doesn't model them yet.
     pub dropped: usize,
-    /// `cs:0xF672` mirror — the `menu_text` stream cursor `Call::Text`
-    /// resumes on.
-    text_cur: u16,
+    /// The `menu_text` crawl — the `cs:0xF672` cursor plus the scroll
+    /// state `Call::Scroll` steps (GAM-46).
+    crawl: text::Crawl,
     /// The host-side `cs:0x4EC4` star table `Call::Stars` walks.
     stars: Stars,
     /// The `[0x1278]` `map_draw` `ds:`-cell mirror (`[0x91D0]`/`[0x9168]`/
@@ -114,7 +116,7 @@ impl Host {
             img,
             ink: 0x0F,
             dropped: 0,
-            text_cur: 0,
+            crawl: text::Crawl::new(),
             stars: Stars::new(0x00C0_FFEE),
             map: Map::new(),
             loader: None,

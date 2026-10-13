@@ -204,12 +204,11 @@ fn scaled(i: &[u8], ofs: usize) -> [u8; 3] {
 }
 
 /// GAM-46 — `menu_text` must paint the `ss:` stream's 16×24 tiles:
-/// the shipped `0x5012` page ("MELBOURNE HOUSE" over three lines at
-/// rows 45/71/97) lands in the framebuffer and `0xFF`-suspends with
-/// the cursor on the next page, so the credits advance — the
-/// paging/scroll the ticket reported missing. (The old walk read
-/// `file:0x20000` instead of `ss = 0x1F6F` → `0x202F0` and never drew
-/// the tiles, so every page returned stream-end instantly.)
+/// the shipped `0x5012` block ("MELBOURNE HOUSE" over three lines at
+/// rows 45/71/97) lands in the framebuffer on arm and `0xFF`-suspends
+/// with the cursor on the next block, so the credits advance. (The old
+/// walk read `file:0x20000` instead of `ss = 0x1F6F` → `0x202F0` and
+/// never drew the tiles, so every page returned stream-end instantly.)
 #[test]
 fn menu_text_paints_the_credits_pages() {
     let mut h = host();
@@ -222,9 +221,78 @@ fn menu_text_paints_the_credits_pages() {
     assert!(h.scr.buf[0x58C0..].iter().any(|&b| b != 0)); // line 2
     assert!(h.scr.buf[0x7940..].iter().any(|&b| b != 0)); // line 3
     assert_eq!(h.dropped, 0);
-    let before = h.scr.buf.clone();
-    assert_eq!(h.svc(Call::Text(u16::MAX)), 0xF1); // next page resumes
-    assert_ne!(h.scr.buf, before);
+}
+
+/// GAM-46 — the crawl is a scroll, not a repaint: `Call::Scroll` shifts
+/// the painted block up `arg` rows a call and feeds the queued `0xFF`
+/// block's rows in at the bottom, so every card is visible en route and
+/// nothing ever repaints over itself.
+#[test]
+fn scroll_steps_crawl_the_text_up() {
+    let mut h = host();
+    let tile = [2, 2, 2, 2, 2, 2, 0, 0, 0, 2, 2, 2, 2, 2, 2, 0];
+    assert_eq!(h.svc(Call::Text(0x5012)), 0xF1);
+    assert_eq!(&h.scr.buf[0x3868..0x3868 + 0x10], &tile); // 'M' row 0
+                                                          // Each step — the painted block moves up `2` rows; nothing
+                                                          // repaints in place (the old bug).
+    h.svc(Call::Scroll(2));
+    assert_eq!(&h.scr.buf[0x35E8..0x35E8 + 0x10], &tile);
+    h.svc(Call::Scroll(2));
+    assert_eq!(&h.scr.buf[0x3368..0x3368 + 0x10], &tile);
+    // After 24 more steps the next block ("S.U.P.R.E.M.A.C.Y.") starts
+    // feeding in at the bottom of the screen.
+    h.svc(Call::Text(u16::MAX)); // pull block 1 into the queue
+    for _ in 0..0x30 {
+        h.svc(Call::Scroll(2));
+    }
+    let bottom = &h.scr.buf[0xFA00 - 0x140 * 0x40..];
+    assert!(bottom.iter().any(|&b| b != 0), "next block never fed in");
+}
+
+/// GAM-46 — the "snow" must clear before the text begins and stay
+/// swept: `Call::Text` arm wipes the live star dots and once the crawl
+/// is scrolling, `Call::Stars` no longer plots new ones over the text.
+#[test]
+fn snow_clears_at_arm_and_stays_swept() {
+    let mut h = host();
+    for _ in 0..0x40 {
+        h.svc(Call::Stars(0x63));
+    }
+    let dots = |h: &Host| {
+        h.scr
+            .buf
+            .iter()
+            .fold(0usize, |n, &b| n + usize::from(b == 1))
+    };
+    assert!(dots(&h) > 0, "starfield never plotted");
+    h.svc(Call::Text(0x5012));
+    assert_eq!(dots(&h), 0, "snow still on screen at first text");
+    h.svc(Call::Scroll(2));
+    for _ in 0..0x20 {
+        h.svc(Call::Stars(0x63));
+        h.svc(Call::Scroll(2));
+    }
+    assert_eq!(dots(&h), 0, "stars replotted over the crawl");
+    assert!(h.scr.buf.iter().any(|&b| b != 0)); // text still scrolling
+}
+
+/// GAM-46 — the crawl runs the stream to its `0x00` terminator then
+/// reports `0x100` once a full screen of blank tail has fed: every
+/// block has scrolled through and the buffer lands clean.
+#[test]
+fn crawl_drains_the_whole_stream() {
+    let mut h = host();
+    h.svc(Call::Text(0x5012));
+    let mut ax = 0u16;
+    for _ in 0..0x2000 {
+        h.svc(Call::Scroll(2));
+        ax = h.svc(Call::Text(u16::MAX));
+        if ax & 0x100 != 0 {
+            break;
+        }
+    }
+    assert_eq!(ax & 0x100, 0x100, "stream never ended");
+    assert!(h.scr.buf.iter().all(|&b| b == 0));
 }
 
 /// Non-MCG `menu_text` twins stay unported — the walk still decodes

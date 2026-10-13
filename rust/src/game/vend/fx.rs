@@ -48,6 +48,18 @@ pub(crate) fn pending(c: &mut Ctx) -> bool {
     c.vm.r8(c.st, a!(KEY_PEND)) != 0
 }
 
+/// Rows the `menu_text` crawl advances per frame — the `[0x1290]`/
+/// `0x8983` scroll call the shipped binary stubs. 2px/frame is
+/// ~60px/s at the 30 FPS loop; the page-era `0x96`/`0x190` holds ran
+/// ~4–13s per block.
+const SCROLL_PX: u16 = 2;
+
+/// One text-crawl frame — `Call::Scroll` shifts the framebuffer up
+/// `SCROLL_PX` and feeds the pending block in at the bottom.
+pub(crate) fn scroll(c: &mut Ctx) {
+    c.host.svc(Call::Scroll(SCROLL_PX));
+}
+
 /// `cmp word [0x91E5]` — the scenario index.
 pub(super) fn scenario(c: &mut Ctx) -> u16 {
     c.vm.r16(c.st, SCENARIO)

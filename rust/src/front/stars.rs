@@ -63,8 +63,10 @@ impl Stars {
     }
 
     /// One `0x8891` walk over `cx + 1` stars — respawn out-of-bounds,
-    /// `0x8881` move, `[0x1294]` mark the survivors.
-    pub fn step(&mut self, cx: usize, scr: &mut Screen, ink: u8) {
+    /// `0x8881` move, `[0x1294]` mark the survivors. `plot = false`
+    /// suppresses the mark — the `menu_text` crawl runs with the snow
+    /// swept rather than let dots scatter over the glyphs (GAM-46).
+    pub fn step(&mut self, cx: usize, scr: &mut Screen, ink: u8, plot: bool) {
         for i in 0..(cx + 1).min(LEN) {
             let mut s = self.tab[i];
             if s.x >= W || s.y >= H {
@@ -74,10 +76,25 @@ impl Stars {
             }
             s.x = s.x.wrapping_add(s.vx.cast_unsigned());
             s.y = s.y.wrapping_add(s.vy.cast_unsigned());
-            if s.x < W && s.y < H {
+            if plot && s.x < W && s.y < H {
                 mark(scr, &mut s, ink);
             }
             self.tab[i] = s;
+        }
+    }
+
+    /// The `0x4E3C` init the crawl runs at page arm — wipe every live
+    /// dot (the same `prev`-is-`1` test `0x2F59B` uses) so the snow is
+    /// gone before the text starts.
+    pub fn clear(&mut self, scr: &mut Screen) {
+        if scr.mode != Video::Mcga {
+            return;
+        }
+        for s in self.tab.iter_mut() {
+            if s.prev != 0 && scr.buf.get(usize::from(s.prev)) == Some(&1) {
+                scr.buf[usize::from(s.prev)] = 0;
+            }
+            s.prev = 0;
         }
     }
 

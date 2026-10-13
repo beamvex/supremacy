@@ -35,41 +35,47 @@ impl End {
         self.scroll(c)
     }
 
-    /// `Slot(0x1290,9)` scroll + `0x8983` mark (`dx` = `0xC` vs `9` by
-    /// `fb` — the arg rides the unported `Native`), then arm `Hold`
-    /// (`0x190`; `0x96` for A's non-scroll page). B's `fb` path
-    /// re-tests `[0x9CCB]` (file `0x38CD8`–`0x38CF2`).
+    /// `Slot(0x1290,9)` scroll + `0x8983` mark — `ret` stubs in the
+    /// shipped binary, so B then runs `Ph::Crawl` (the continuous
+    /// scroll they stand in for, GAM-46); A keeps its static card and
+    /// the `0x8891` hold (`0x190`/`0x96` by `fb`, file
+    /// `0x38CD8`–`0x38CF2`).
     fn scroll(mut self, c: &mut Ctx) -> Self {
         c.host.svc(Call::Slot(0x1290, 9));
         c.host.svc(Call::Native(0x8983));
-        if self.e == Ending::B && self.fb && fx::pending(c) {
-            return self.post(c);
+        if self.e == Ending::B {
+            if self.fb && fx::pending(c) {
+                return self.post(c);
+            }
+            c.host.svc(Call::Slot(0x1292, 0xC));
+            return self.at(Ph::Crawl);
         }
-        self.n = match (self.e, self.fb) {
-            (Ending::A, false) => 0x96,
-            _ => 0x190,
-        };
+        self.n = if self.fb { 0x190 } else { 0x96 };
         self.at(Ph::Hold)
     }
 
-    /// `Ph::Hold` — one `0x8891` frame of the countdown; on expiry A
-    /// goes to `Post`, B to `Turn`.
+    /// `Ph::Hold` — one `0x8891` frame of A's countdown; on expiry it
+    /// goes to `Post`.
     pub(super) fn hold(mut self, c: &mut Ctx) -> Self {
         fx::stars(c);
         if self.n != 0 {
             self.n -= 1;
             return self;
         }
-        match self.e {
-            Ending::A => self.post(c),
-            Ending::B => self.at(Ph::Turn),
-        }
+        self.post(c)
     }
 
-    /// `Ph::Turn` — B's `Slot(0x1292,0xC)` + `[0x9CCB]` test looping
-    /// back to `Page` (file `0x38D08`–`0x38D16`).
-    pub(super) fn turn(self, c: &mut Ctx) -> Self {
-        c.host.svc(Call::Slot(0x1292, 0xC));
-        self.at(if fx::pending(c) { Ph::Post } else { Ph::Page })
+    /// `Ph::Crawl` — B's scroll loop: one `Call::Scroll` step + the
+    /// `0x8891` starframe + the `menu_text` resume poll per frame;
+    /// `[0x9CCB]` (the stream end or input) exits to `Post` — the
+    /// `0x38D08`–`0x38D16` test's crawl form.
+    pub(super) fn crawl(self, c: &mut Ctx) -> Self {
+        fx::scroll(c);
+        fx::stars(c);
+        _ = fx::text_page(c, self.cur);
+        if fx::pending(c) {
+            return self.post(c);
+        }
+        self
     }
 }

@@ -41,13 +41,12 @@ use super::vops::Ctx;
 use credits::CREDITS;
 
 /// A running title attract — the phase, the generic `cx`/`dx`
-/// countdown (seq wait, starfield counts), the `cs:0xFB15` scroll flag
-/// `menu_text` reports and the credits page cursor.
+/// countdown (seq wait, starfield counts) and the credits stream
+/// cursor.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Title {
     ph: Ph,
     n: u16,
-    fb: bool,
     cur: u16,
 }
 
@@ -60,12 +59,13 @@ enum Ph {
     Wait,
     /// The `cx = 0x63` `0x8891` starfield warm-up (`0x872B`).
     Warm,
-    /// One `menu_text` credits page + the `[0x1290]`/`0x8983` scroll.
+    /// The `menu_text` credits arm + the `[0x1290]`/`0x8983` scroll
+    /// calls — `ret`s in the shipped binary; the port's `Ph::Crawl`
+    /// runs the scroll they stand in for.
     Page,
-    /// The post-page `0x8891` countdown (`0x190`/`0x96` frames).
-    Hold,
-    /// The `Slot(0x1292,0xC)` page-advance + loop back to `Page`.
-    Turn,
+    /// The continuous text crawl — `Call::Scroll` + a `menu_text`
+    /// resume poll per frame until `[0x9CCB]` (GAM-46).
+    Crawl,
     /// The `0x8840` picker loop — `{0x2CA9, 0xE93C, 0xA10F}` per frame.
     Pick,
 }
@@ -102,7 +102,6 @@ pub fn enter(c: &mut Ctx) {
     c.vm.title = Some(Title {
         ph: Ph::Seq(0),
         n: 0,
-        fb: false,
         cur: CREDITS,
     });
 }
@@ -140,8 +139,7 @@ impl Title {
             Ph::Wait => Some(self.wait(c)),
             Ph::Warm => Some(self.warm(c)),
             Ph::Page => Some(self.page(c)),
-            Ph::Hold => Some(self.hold(c)),
-            Ph::Turn => Some(self.turn(c)),
+            Ph::Crawl => Some(self.crawl(c)),
             Ph::Pick => self.pick(c),
         }
     }

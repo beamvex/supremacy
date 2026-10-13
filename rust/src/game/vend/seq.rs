@@ -42,15 +42,15 @@ pub struct End {
 enum Ph {
     /// The shared `cx = 0x63` starfield warm-up (`0x8B5C`/`0x8CAA`).
     Head,
-    /// One `menu_text` page + the `[0x1290]`/`0x8983` scroll mark —
-    /// A runs it once, B loops via `Turn`.
+    /// One `menu_text` block arm + the `[0x1290]`/`0x8983` scroll
+    /// calls — A then runs a static card `Hold`; B the `Crawl`.
     Page,
-    /// The post-page `0x8891` countdown (`0x190`/`0x96` frames).
+    /// A's post-page `0x8891` countdown (`0x190`/`0x96` frames).
     Hold,
-    /// B's `Slot(0x1292,0xC)` page-advance + `[0x9CCB]` exit test.
-    Turn,
-    /// The `0x8D18`/`0x8BC0` post-block — seq arm + reveal + `Seq`.
-    Post,
+    /// B's continuous text crawl — `Call::Scroll` + the `menu_text`
+    /// resume poll per frame until `[0x9CCB]` (GAM-46; the
+    /// `[0x1292]` page-advance's scroll stand-in).
+    Crawl,
     /// The `0x8863` `{0x2CA9, 0x5C1E}` `seq_run` wait.
     Seq,
     /// The `{0x8891, [0x9CDA]==1?, 0x1E2E}` input wait (`0x8C3F`).
@@ -84,8 +84,7 @@ impl End {
             Ph::Head => Some(self.head(c)),
             Ph::Page => Some(self.page(c)),
             Ph::Hold => Some(self.hold(c)),
-            Ph::Turn => Some(self.turn(c)),
-            Ph::Post => Some(self.post(c)),
+            Ph::Crawl => Some(self.crawl(c)),
             Ph::Seq => Some(self.seqpoll(c)),
             Ph::Input => Some(self.input(c)),
             Ph::Title => self.title(c),

@@ -60,14 +60,22 @@ pub enum Call {
     Song(u16),
     /// `call word far [cs:0x1280]` — the sound-driver reset far export.
     SndReset,
-    /// `call word [0x1296]` — `menu_text` (`cs:0x2F629`): render one
-    /// page of the `ss:` stream cursor `cs:0xF672`. The arg stores a
-    /// fresh cursor first unless it is `u16::MAX` (the resume calls).
-    /// Returns `ax` = `end << 8 | cs:0xFB15` — `end` is the `0x00`-op
-    /// stream terminator the asm latches into `[0x9CCB]` itself (the
-    /// caller mirrors it); the low byte is the page's second header
-    /// byte the scroll variants test.
+    /// `call word [0x1296]` — `menu_text` (`cs:0x2F629`): a fresh arg
+    /// arms the text crawl at the `ss:` stream cursor `cs:0xF672` (the
+    /// first block paints in place, the starfield is swept);
+    /// `u16::MAX` (the resume calls) pulls the next block once the
+    /// current one has fed in at the bottom. Returns `ax` = `end << 8 |
+    /// cs:0xFB15` — `end` latches once the `0x00` terminator has fed a
+    /// full screen of blank tail (the caller mirrors it into
+    /// `[0x9CCB]`); the low byte is the block's second header byte the
+    /// scroll variants test.
     Text(u16),
+    /// The `menu_text` crawl step — the `[0x1290]`/`[0x1292]` dispatch
+    /// slots and `cs:0x8983` are `ret`s in the shipped binary (the DOS
+    /// release pages its text in place), so the port runs the scroll
+    /// they stand in for: shift the framebuffer up `arg` pixel rows and
+    /// feed the pending block in at the bottom (GAM-46).
+    Scroll(u16),
     /// `call 0x8891`'s starfield body — the `cs:0x4EC4` table walk
     /// (move, respawn out-of-bounds, `[0x1294]` mark) for `cx = arg`
     /// stars (`[0x9206]`). The `0x2CA9` head is the caller's `vsync`;
