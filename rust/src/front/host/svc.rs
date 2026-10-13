@@ -74,12 +74,11 @@ impl Host {
         ax
     }
 
-    /// `Call::Stars` — `0x8891`'s `cs:0x4EC4` walk marks `cx + 1`
-    /// stars in `ink`.
+    /// `Call::Stars` — `0x8891`'s `cs:0x4EC4` walk; the MCG `[0x1294]`
+    /// mark erases each star's previous pixel and only plots onto
+    /// empty cells (no trails, no text clobber).
     fn star(&mut self, cx: u16) {
-        let ink = self.ink;
-        self.stars
-            .step(usize::from(cx), &mut |x, y| self.scr.put_pixel(x, y, ink));
+        self.stars.step(usize::from(cx), &mut self.scr, self.ink);
     }
 
     /// `[0x1258]`/`[0x1260]` (`0x2EDBB`/`0x2EDA8`) — `int 10/AX=1012`

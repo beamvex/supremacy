@@ -237,6 +237,29 @@ fn menu_text_other_modes_count_undrawn_tiles() {
     assert!(h.scr.buf.iter().all(|&b| b == 0));
 }
 
+/// GAM-46 follow-up — the MCG `[0x1294]` star mark (`0x2F59B`) must
+/// erase the star's previous pixel (only when it's still the `1`
+/// colour) and only plot onto empty cells, so the attract's starfield
+/// moves as dots instead of trailing rays over the credits text.
+#[test]
+fn stars_move_as_dots_and_never_clobber_text() {
+    let mut h = host();
+    assert_eq!(h.svc(Call::Text(0x5012)), 0xF1); // a real credits page
+    let text: Vec<usize> = (0..h.scr.buf.len()).filter(|&i| h.scr.buf[i] > 1).collect();
+    let before: Vec<u8> = text.iter().map(|&i| h.scr.buf[i]).collect();
+    for _ in 0..0x40 {
+        h.svc(Call::Stars(0x63));
+    }
+    let after: Vec<u8> = text.iter().map(|&i| h.scr.buf[i]).collect();
+    assert_eq!(before, after, "stars overwrote text pixels");
+    let dots = h
+        .scr
+        .buf
+        .iter()
+        .fold(0usize, |n, &b| n + usize::from(b == 1));
+    assert!(dots <= 0x63, "stars trailed: {dots} marked pixels");
+}
+
 #[test]
 fn cs_word_reads_the_code_segment() {
     let mut h = host();
