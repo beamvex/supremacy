@@ -2,8 +2,8 @@
 //! `cs:0x7FA5` random-name generator it uses.
 
 use super::consts::{DAY, DIFFICULTY, DIRTY0, REC_BASE, REC_TOTAL};
+use super::ppanel;
 use super::rec::{F_CASH, F_OWNER};
-use super::vhost::Call;
 use super::vm::Flow;
 use super::vops::{set_bits, uimode, Ctx};
 
@@ -76,7 +76,7 @@ fn spawn(c: &mut Ctx) {
     }
     name_gen(c, r);
     if uimode(c) == 0 {
-        c.host.svc(Call::PlanetPanel);
+        ppanel::planet_panel(c);
     }
 }
 

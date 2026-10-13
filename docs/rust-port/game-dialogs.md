@@ -34,7 +34,7 @@ The filename buffer is `ds:0..0x20`; the input routine sanitises
 - `load_game` (`cs:0x2E94`) — prompt `0x78E5`, `input_name`,
   `slot_mode(1)` (`[0x9CCA]` + `Slot(0x1278)` pre-load), `st.load(files,
   name)`; carry → `0x7929` error print + `None`. Success →
-  `slot_mode(2)`, `PlanetPanel`, `0x7C50` print, then the `[0x91E5]`
+  `slot_mode(2)`, `ppanel::planet_panel`, `0x7C50` print, then the `[0x91E5]`
   switch → `Loaded::{A,B,C,D}` (`jmp 0x685A`/`0x6847`/`0x6834`/`0x6821`).
 - `save_game` (`cs:0x2ED2`) — prompt, input, `st.save`; `0x7C2E` ok /
   `0x7929` error.

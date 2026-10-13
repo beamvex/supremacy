@@ -63,7 +63,7 @@ fn row_click_selects() {
     assert_eq!((r.r16(0x9184), r.r16(0x917C)), (rec, rec));
     assert_eq!(r.r8(usize::from(rec) + 5), 1);
     assert_eq!(r.r16(game::SEQ_DELAY), 0);
-    assert!(r.host.0.contains(&Call::PlanetPanel));
+    assert!(r.host.0.contains(&Call::Rect(0x18, 0x13, 0x3, 0x33)));
 }
 
 #[test]

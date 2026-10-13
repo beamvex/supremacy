@@ -8,9 +8,8 @@
 
 use super::super::cells::IN_DONE;
 use super::super::consts::{MACH_BASE, QUEUED_REC, REC_CUR, REINF_REC};
-use super::super::vhost::Call;
 use super::super::vops::{kind_of, Ctx};
-use super::super::{dialog, namedit, status, text};
+use super::super::{dialog, namedit, ppanel, status, text};
 use super::machd::mach_host;
 use super::snd;
 
@@ -149,7 +148,7 @@ fn launch(c: &mut Ctx, m: u16, rec: u16) {
     namedit::copy9(c, rec + 0xE, 0x8332);
     c.vm.w8(c.st, rec + 0xC, 1);
     status::sel_name(c);
-    c.host.svc(Call::PlanetPanel);
+    ppanel::planet_panel(c);
 }
 
 /// `0x730F`–`0x37348` — clear the byte in the host's `+0x18/+0x1C`/

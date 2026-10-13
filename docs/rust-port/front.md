@@ -88,7 +88,15 @@ a `dropped` counter for unmodelled calls. `cs:` reads map through
   are counted `dropped` (menu font not drawn).
 - `Call::Stars(cx)` → `front/stars.rs` — the host-side `cs:0x4EC4`
   starfield walk, `cx+1` stars marked in `ink`.
-- Menu/Dialog/Refresh/Present/Flash/PlanetPanel/Blit/other
+- `Call::Slot(0x1278)` → `front/map.rs` `Map::draw` (via `svc_st`) —
+  the MCG `0x2F2C5` `map_draw`: the system-oval orbit markers plus the
+  `ds:0x4C95` route overlay; the `ds:` cells only it touches
+  (`[0x91D0]`/`[0x9168]`/`[0x9174]`, the records' `+0`/`+4`, routes'
+  `+2`/`+6`) live in the `Map` mirror. `Slot(0x127C/0x127E/0x1280)` →
+  `map::grid` — the `0x2F398`/`0x2F3CB`/`0x2F3FE` star-grid painters
+  (`cs:0xE93C` LCG seeds persisted back into the image). The other
+  video modes' twins are unported — `dropped`.
+- Menu/Dialog/Refresh/Present/Flash/Blit/other
   `Slot`/`Native`/`Ui`/`Draw` → `dropped += 1`
   (GAM-7/GAM-9 stubs — the window's per-frame blit supersedes the
   refresh-list copy and palette flushes).

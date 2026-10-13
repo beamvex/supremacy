@@ -3,10 +3,9 @@
 
 use super::consts::{DIRTY0, DIRTY1, REC_SEL};
 use super::rec::{F_ENERGY, F_FOOD, F_FUEL, F_KIND, F_OWNER, F_POP};
-use super::text;
-use super::vhost::Call;
 use super::vm::Flow;
 use super::vops::{kind_of, set_bits, uimode, unlink_ships, Ctx, R_SEL};
+use super::{ppanel, text};
 
 /// `cs:0x790A` — destroy the selected planet (`[0x81EE]`): unlink its
 /// ships, `kind = 4`, `owner = 0`, dirty `0x8`, panel refresh in UI
@@ -24,7 +23,7 @@ pub fn kill_sel(c: &mut Ctx) -> Flow {
     c.vm.w8(c.st, sel + u16::try_from(F_OWNER).unwrap_or(0), 0);
     set_bits(c, u16::try_from(DIRTY0).unwrap_or(0), 0x8);
     if m == 0 {
-        c.host.svc(Call::PlanetPanel);
+        ppanel::planet_panel(c);
     }
     Flow::Cont
 }

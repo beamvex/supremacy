@@ -42,6 +42,14 @@ pub fn seq_step(c: &mut Ctx) {
     if !advance_phase(c, period) {
         return;
     }
+    seq_cmd(c);
+}
+
+/// `cs:0x5C49` — the mid-entry `0x5C97` and the `0x60xx` screens
+/// tail-call: fetch/dispatch one command immediately, skipping the
+/// `[0x91A0]` delay and `[0x91D6]`/`[0x91D7]` period gates (file
+/// `0x35C49`–`0x35C51`).
+pub fn seq_cmd(c: &mut Ctx) {
     let si = c.vm.r16(c.st, a16!(SEQ_PTR));
     if si == 0 {
         return;

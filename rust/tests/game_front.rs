@@ -123,6 +123,35 @@ fn slots_clear_and_program_dac() {
     assert_eq!(h.pal.rgb(0), [0, 0, 0]);
 }
 
+/// `Slot(0x1278)` — the `0x2F2C5` `map_draw`: one marker byte per
+/// record at its orbit cell; `Slot(0x127C)` fills the minimap region
+/// with the `0x2F398` star grid. The EGA/CGA/TGA twins are unported.
+#[test]
+fn map_draw_marks_records_and_grid_paints_stars() {
+    let mut h = host();
+    let (mut vm, mut st) = (Vm::new(), gsim::galaxy());
+    let base = vm.r16(&st, u16::try_from(game::REC_BASE).unwrap_or(0));
+    let n = vm.r16(&st, u16::try_from(game::REC_COUNT).unwrap_or(0));
+    for i in 0..=n {
+        let rec = base.wrapping_add(i.wrapping_mul(0x3A));
+        vm.w16(&mut st, rec + 6, i.wrapping_mul(0x20)); // orbit angle
+        vm.w16(&mut st, rec + 8, 0x30); // orbit radius
+        vm.w16(&mut st, rec + 0xA, i.wrapping_mul(3)); // row
+        vm.w16(&mut st, rec + 0xC, 2); // kind — the no-blink case
+        vm.w8(&mut st, rec + 5, 0); // not the selected record
+    }
+    h.svc_st(Call::Slot(0x1278, 0), &vm, &st);
+    let marked = h.scr.buf.iter().filter(|&&b| b != 0).count();
+    assert_eq!(marked, usize::from(n) + 1);
+    let mut e = mode_host(Video::Ega);
+    e.svc_st(Call::Slot(0x1278, 0), &vm, &st);
+    assert_eq!(e.dropped, 1);
+    h.scr.buf.fill(0);
+    h.svc(Call::Slot(0x127C, 0));
+    assert!(h.scr.buf[..0x7120].iter().all(|&b| b == 0));
+    assert!(h.scr.buf[0x7120..].iter().any(|&b| b != 0));
+}
+
 /// `Present(dx)` — the `0x2ED30` composite: regs `1..=31` from row
 /// `dx` of `ds:0x4394`, regs `0x21..=0xFF` from `ds:0x4095` colours
 /// `33..`, every nonzero component through the `ds:[0x9CA1]` shade.

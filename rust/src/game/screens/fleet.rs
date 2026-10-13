@@ -39,7 +39,7 @@ pub fn enter_fleet(c: &mut Ctx, win: bool) {
     c.vm.w16(c.st, a!(SEQ_DELAY), 0);
     c.vm.w8(c.st, a!(SEQ_PHASE), 0);
     c.vm.w16(c.st, a!(SEQ_PTR), 0x360);
-    c.host.svc(Call::Native(0x5C49));
+    seq::seq_cmd(c);
     c.host.svc(Call::Native(0x601A));
     frame_loop(c);
 }

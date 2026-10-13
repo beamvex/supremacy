@@ -4,10 +4,10 @@
 
 use super::consts::DIFFICULTY;
 use super::rec::{F_FOOD, F_FUEL};
-use super::text;
 use super::vhost::Call;
 use super::vm::Flow;
 use super::vops::{faction_rec, set_bits, uimode, unlink_ships, Ctx};
+use super::{ppanel, text};
 
 /// `ds:` cells for the message-flash save/restore (`0x76DE`/`0x80F0`).
 const MSG_ON: u16 = 0x91E8;
@@ -34,7 +34,7 @@ pub fn disaster(c: &mut Ctx) -> Flow {
     }
     c.host.svc(Call::Flash);
     c.host.svc_st(Call::Present(0), c.vm, c.st);
-    c.host.svc(Call::PlanetPanel);
+    ppanel::planet_panel(c);
     text::enqueue(c, 0x5DAE);
     let rec = faction_rec(c);
     halve(c, rec + u16::try_from(F_FOOD).unwrap_or(0));

@@ -15,7 +15,7 @@ use super::cells::{
 use super::dialog::dlg_text;
 use super::vhost::Call;
 use super::vops::Ctx;
-use super::{linein, text};
+use super::{linein, ppanel, text};
 
 /// `u16` casts for the `ds:` slot constants.
 macro_rules! a {
@@ -70,7 +70,7 @@ pub fn load_game(c: &mut Ctx) -> Option<Loaded> {
         return None;
     }
     slot_mode(c, 2);
-    c.host.svc(Call::PlanetPanel);
+    ppanel::planet_panel(c);
     dlg_text(c, a!(S_LOADED));
     Some(match c.vm.r16(c.st, a!(LOAD_TO)) {
         0 => Loaded::A,
@@ -128,7 +128,7 @@ fn err(c: &mut Ctx) {
 /// `[0x9CCA]` = 1/2 (file `0x38E66`/`0x38E75`).
 fn slot_mode(c: &mut Ctx, m: u8) {
     c.vm.w8(c.st, a!(SLOT_MODE), m);
-    c.host.svc(Call::Slot(0x1278, 0));
+    c.host.svc_st(Call::Slot(0x1278, 0), c.vm, c.st);
     c.vm.w8(c.st, a!(SLOT_MODE), 0);
 }
 

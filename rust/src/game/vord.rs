@@ -5,9 +5,9 @@
 //! refreshes.
 
 use super::consts::SEL_REC;
-use super::text;
 use super::vhost::Call;
 use super::vops::{uimode, Ctx};
+use super::{seq, text};
 
 /// `ds:` gate byte — nonzero means an order is pending (cleared at the
 /// end, file `0x34309`/`0x34428`).
@@ -94,5 +94,5 @@ fn load_entry(c: &mut Ctx, si: u16) {
     }
     c.vm.w8(c.st, 0x91D6, c.vm.r8(c.st, si + 0x1A));
     c.host.svc(Call::Refresh);
-    c.host.svc(Call::Native(0x5C49));
+    seq::seq_cmd(c);
 }

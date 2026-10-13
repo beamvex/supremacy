@@ -33,8 +33,6 @@ pub enum Call {
     /// the routine also reads the `ds:[0x9CA1]` shade cell, so hosts
     /// dispatch it through [`VmHost::svc_st`].
     Present(u16),
-    /// `call 0x5C97` — redraw the selected planet panel.
-    PlanetPanel,
     /// `call word [0x1268]` — template slot (blit sprite) with `bx/dx`.
     Blit(u16, u16),
     /// `call/jmp word near [0x1268]` — the char-put slot where `ax`

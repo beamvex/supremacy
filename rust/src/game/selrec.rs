@@ -15,8 +15,8 @@ use super::consts::{
     BUTTONS, CUR_X, CUR_Y, DIFFICULTY, REC_BASE, REC_CUR, REC_STRIDE, SEL_IDX, SEL_REC, SEQ_DELAY,
 };
 use super::dialog;
+use super::ppanel;
 use super::status;
-use super::vhost::Call;
 use super::vops::{faction_rec, Ctx};
 
 /// `u16` casts for the `ds:` slot constants.
@@ -62,7 +62,7 @@ pub fn select_rec(c: &mut Ctx, i: u16) {
     c.vm.w16(c.st, a!(REC_CUR), rec);
     c.vm.w16(c.st, a!(SEL_REC), rec);
     mark_sel(c);
-    c.host.svc(Call::PlanetPanel);
+    ppanel::planet_panel(c);
     status::sel_name(c);
     c.vm.w16(c.st, a!(SEQ_DELAY), 0);
 }
@@ -93,7 +93,7 @@ pub fn sel_faction(c: &mut Ctx) {
     let rec = faction_rec(c);
     c.vm.w16(c.st, a!(SEL_REC), rec);
     sync_sel(c);
-    c.host.svc(Call::PlanetPanel);
+    ppanel::planet_panel(c);
 }
 
 /// `cs:0x5DA1` — step back to the previous record (file

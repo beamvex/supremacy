@@ -2,10 +2,11 @@
 //! per-call bodies the arms need (`rect`, `int33`, `dac_flush`,
 //! `load`, `menu_text`, `star`).
 
-use crate::game::{Call, VmHost, SND_ON};
+use crate::args::Video;
+use crate::game::{Call, State, Vm, VmHost, SND_ON};
 use crate::palette::from_dac;
 
-use super::super::{font, text};
+use super::super::{font, map, text};
 use super::Host;
 
 /// `cs:` near offset → file offset — the real code segment
@@ -91,6 +92,26 @@ impl Host {
     fn dac_flush(&mut self) {
         self.pal = from_dac(self.img.get(PAL_BUF..PAL_BUF + 0x300).unwrap_or(&[]));
     }
+
+    /// `[0x1278]` `map_draw` — the MCG `0x2F2C5` walk in [`map`]; the
+    /// other modes' twins (`0x2F89E`/`0x30CFE`/`0x31824`) aren't ported.
+    fn map_draw(&mut self, vm: &Vm, st: &State) {
+        if self.scr.mode == Video::Mcga {
+            self.map.draw(&mut self.scr.buf, &self.img, vm, st);
+        } else {
+            self.dropped += 1;
+        }
+    }
+
+    /// A `[0x127C]`/`[0x127E]`/`[0x1280]` star-grid painter call — the
+    /// `di`/`rows`/`pairs`/`tail` parameters are the MCG slot's.
+    fn grid(&mut self, di: u16, rows: u16, pairs: u16, tail: u16) {
+        if self.scr.mode == Video::Mcga {
+            map::grid(&mut self.scr.buf, &mut self.img, di, rows, pairs, tail);
+        } else {
+            self.dropped += 1;
+        }
+    }
 }
 
 impl VmHost for Host {
@@ -102,6 +123,9 @@ impl VmHost for Host {
             Call::Mouse(ax, cx, dx) => self.int33(ax, cx, dx),
             Call::KeyPop => return u16::from(self.pump.pop_key().unwrap_or(0)),
             Call::Slot(0x125C, _) => self.scr.buf.fill(0),
+            Call::Slot(0x127C, _) => self.grid(0x7120, 0x66, 0x48, 0xB0),
+            Call::Slot(0x127E, _) => self.grid(0x4610, 0x75, 0x28, 0xF0),
+            Call::Slot(0x1280, _) => self.grid(0x4670, 0x75, 0x20, 0x100),
             Call::Slot(0x1258 | 0x1260, _) => {
                 if self.scr.mode.programs_palette() {
                     self.dac_flush();
@@ -124,7 +148,6 @@ impl VmHost for Host {
             | Call::Refresh
             | Call::Present(_)
             | Call::Flash
-            | Call::PlanetPanel
             | Call::Blit(..)
             | Call::Slot(..)
             | Call::Native(_)
@@ -141,6 +164,7 @@ impl VmHost for Host {
         match call {
             Call::Present(dx) => self.pal.present(&self.img, dx, vm.r8(st, SHADE)),
             Call::Slot(0x128E, _) => self.pal.pal_fade(&self.img, vm.r8(st, SHADE)),
+            Call::Slot(0x1278, _) => self.map_draw(vm, st),
             _ => return self.svc(call),
         }
         0

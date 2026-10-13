@@ -79,9 +79,10 @@ pub fn act_newgame(c: &mut Ctx) {
 /// the restart path), the `0x33194` repaint, then the asm tail
 /// `0x331C4`–`0x331E6` — `0xA3BC` input restrict (int-33 `ax=0x14`,
 /// mask `0x1E`), `0x83AA` mark, `0x5DD3` select-next, a `0x32`-frame
-/// `{0x2CA9, [cs:0x127C]}` wait, `0x2FD7`, `[0x1278]` reload, `0xA36A`
-/// input reinstall, the `0x6E30` ticker message — before `jmp 0x2D27`
-/// re-enters the shell setup tail.
+/// `{0x2CA9, [0x127C]}` wait (the mode's star-grid painter — the near
+/// `ds:` slot, not the `cs:` sound export), `0x2FD7`, `[0x1278]`
+/// reload, `0xA36A` input reinstall, the `0x6E30` ticker message —
+/// before `jmp 0x2D27` re-enters the shell setup tail.
 pub fn newgame_body(c: &mut Ctx) {
     new_game(c.vm, c.st, c.rng);
     repaint(c);
@@ -90,10 +91,10 @@ pub fn newgame_body(c: &mut Ctx) {
     selrec::sel_next(c);
     for _ in 0..=0x32 {
         vsync(c);
-        c.host.svc(Call::Sound(0));
+        c.host.svc(Call::Slot(0x127C, 0));
     }
     c.host.svc(Call::Native(0x2FD7));
-    c.host.svc(Call::Slot(0x1278, 0));
+    c.host.svc_st(Call::Slot(0x1278, 0), c.vm, c.st);
     c.host.svc(Call::Mouse(0x14, 0x1F, 0));
     text::enqueue(c, 0x6E30);
     shell::re_enter(c);

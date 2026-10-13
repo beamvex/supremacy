@@ -46,7 +46,7 @@ use crate::palette::Palette;
 use crate::video::Screen;
 
 use super::audio::{Audio, BOOT_RATE};
-use super::{load::Loader, stars::Stars, Pump};
+use super::{load::Loader, map::Map, stars::Stars, Pump};
 
 /// A live vsync hook — the frontend's stand-in for the async
 /// int-9/int-33 ISRs plus the retrace the `0x2CA9` routine waits on.
@@ -81,6 +81,9 @@ pub struct Host {
     text_cur: u16,
     /// The host-side `cs:0x4EC4` star table `Call::Stars` walks.
     stars: Stars,
+    /// The `[0x1278]` `map_draw` `ds:`-cell mirror (`[0x91D0]`/`[0x9168]`/
+    /// `[0x9174]` + the record/route save cells).
+    map: Map,
     /// `Call::Load`'s dir + set stem (`set_assets` installs it — the
     /// `ds:0x1208`+ cell → `{stem}{sfx}.{BIN,GPH}` mapping).
     loader: Option<Loader>,
@@ -112,6 +115,7 @@ impl Host {
             dropped: 0,
             text_cur: 0,
             stars: Stars::new(0x00C0_FFEE),
+            map: Map::new(),
             loader: None,
             vsync_src: None,
         }

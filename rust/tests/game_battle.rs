@@ -124,7 +124,10 @@ fn zero_troops_recolonises_fallen_planet() {
     assert_eq!(rig.st.word(p + game::F_KIND), 0xA); // recolonised
     assert_eq!(rig.st.byte(0x91F4), 0xFF); // orders flag armed
     assert_eq!(rig.st.byte(ship(0) + game::S_CREW), 8); // crew +7
-    assert!(rig.host.0.contains(&game::Call::PlanetPanel));
+    assert!(rig
+        .host
+        .0
+        .contains(&game::Call::Rect(0x18, 0x13, 0x3, 0x33)));
     assert!(rig.host.0.contains(&game::Call::Sound(3)));
 }
 

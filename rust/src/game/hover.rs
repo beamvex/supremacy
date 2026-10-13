@@ -30,7 +30,7 @@ const Y_CEN: u16 = 0x50;
 /// outside (file `0x38DC6`–`0x38E0F`).
 pub fn hover_check(c: &mut Ctx) {
     if !inside(c) {
-        c.host.svc(Call::Slot(0x1278, 0));
+        c.host.svc_st(Call::Slot(0x1278, 0), c.vm, c.st);
     }
 }
 

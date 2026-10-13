@@ -22,6 +22,7 @@ pub mod audio;
 mod font;
 mod host;
 mod load;
+mod map;
 mod pump;
 mod runner;
 mod stars;

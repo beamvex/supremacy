@@ -167,7 +167,7 @@ Unmapped targets → `Flow::Ret`.
   (`0x4F50`/`0x4F6E`/`0x4F8D`/`0x4FA6`), pick a `0x1E`-byte entry from
   `ds:0x4EBA` by the selected record's `+0x2E`/`+0x26`/kind (cycling
   selector `0x91AC` wraps `5→2`), load entry into the message cells
-  (`0x9198`/`0x9255..0x926C`/`0x91D6`), refresh, `Native(0x5C49)`.
+  (`0x9198`/`0x9255..0x926C`/`0x91D6`), refresh, `seq_cmd`.
 - `vend::endgame` (`0xFA`, `cs:0x82E5`) — faction-record kind 7
   (fallen — index `[0x91B8]` via `0x5E3A`, not rec0) or no kind-7
   planet → `Ending::A` = **defeat** (flag `0x91F1`, code `2`, `*DTH`
@@ -188,7 +188,7 @@ Unmapped targets → `Flow::Ret`.
 
 `Call` enum records one host-side effect in issue order: `Menu`,
 `Dialog`, `Refresh`, `Draw(u16,u16)`, `Sound(u8)`, `Chan(u16,u8)`,
-`Flash`, `Present(u16)`, `PlanetPanel`, `Blit(u16,u16)`,
+`Flash`, `Present(u16)`, `Blit(u16,u16)`,
 `Glyph(u8,u16,u16)`, `Native(u16)`, `Ui(u16)`, `Rect(u16,u16,u16,u16)`,
 `Load(u16)` (the int-21 loaders on the `ds:0x1208`+ name cells),
 `Song(u16)`/`SndReset` (the `load_song`/driver-reset far exports),

@@ -190,7 +190,7 @@ fn sel_faction_points_at_the_faction_record() {
     assert_eq!(r.r16(game::SEL_REC), faction);
     assert_eq!(r.r16(game::REC_CUR), faction);
     assert_eq!(r.r16(game::SEL_IDX), r.r16(game::REC_COUNT) & 0xFF);
-    assert!(r.host.0.contains(&Call::PlanetPanel));
+    assert!(r.host.0.contains(&Call::Rect(0x18, 0x13, 0x3, 0x33)));
 }
 
 #[test]

@@ -49,10 +49,10 @@ fn golden_shell_run() {
     let d = smoke::run(&mut game(), &[], 90);
     let want = Digest {
         steps: 90,
-        video: 0x39B6_4DEB_FA4A_4B06,
+        video: 0x210E_DB76_C27B_F7C1,
         pal: 0x8287_0345_2425_8EC2,
         audio: 0x99A3_2F12_5F1B_E6DB,
-        state: 0x1561_EA20_4455_4812,
+        state: 0xF4EB_549E_19C8_C893,
         rng: 0x0002_3B6B,
     };
     assert_eq!(d, want);
@@ -68,7 +68,7 @@ fn golden_galaxy_run() {
         video: 0x8367_5543_4FA6_02F9,
         pal: 0xB120_61D0_3F10_0CDC,
         audio: 0x4CE9_06BA_48A6_AC1B,
-        state: 0x36E8_C5DC_570C_4DF3,
+        state: 0x7F2B_11DD_EE83_87E4,
         rng: 0x0002_3B6B,
     };
     assert_eq!(d, want);

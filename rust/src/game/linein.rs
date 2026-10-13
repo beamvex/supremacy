@@ -170,7 +170,7 @@ fn idle(c: &mut Ctx) {
     }
     let _ = tick_step(c);
     if c.vm.r8(c.st, a!(UIMODE)) == 0 {
-        c.host.svc(Call::Slot(0x1278, 0));
+        c.host.svc_st(Call::Slot(0x1278, 0), c.vm, c.st);
         let f = c.vm.r8(c.st, a!(FRAME));
         c.vm.w8(c.st, a!(FRAME), f.wrapping_add(1));
     }

@@ -27,7 +27,7 @@ return address a menu action abandons. Then `setup`: slots
 `0x1260`/`0x125C`, `Native(0x89B3)` CGA border, `Image(0)` backdrop,
 `Present(0)`, `Slot(0x1272)`, `[0x928B] = [0x91A6]`, `Refresh`, hotspot
 install (`[0x9CC8]=[0xA0AA]`, `[0x9194]=0xA0AC`, `[0x91A8]=0x31`,
-`uimode=0`), `PlanetPanel`, `mark_sel`, `tick_day`, `Native(0xA3BC)`,
+`uimode=0`), `ppanel::planet_panel`, `mark_sel`, `tick_day`, `Native(0xA3BC)`,
 `Slot(0x1278)`, `Native(0xA36A)`.
 
 `shell_step` — one shell frame (`cs:0x2D5B`–`0x2D84`): `vsync` →
@@ -107,7 +107,7 @@ per frame (`runner::Game::step` steps `end` → `title` → shell/galaxy).
 - `mark_sel`/`unmark_sel` (`cs:0x83AA`/`0x8386`) — set/clear `+5` on
   record `[0x9164]` (re-armed every frame so the panel redraws).
 - `select_rec(i)` (`cs:0x5E03`) — `SEL_IDX = i`, `REC_CUR`/`SEL_REC` =
-  `base + i·0x3A`, mark, `PlanetPanel`, `sel_name`, `SEQ_DELAY = 0`.
+  `base + i·0x3A`, mark, `ppanel::planet_panel`, `sel_name`, `SEQ_DELAY = 0`.
 - `sel_next` (`cs:0x5DD3`) — sound chirp, unmark, `[0x9164]+1` wrapping
   to 0 at `[0x91C6]` (8-bit compare), fall into `select_rec`.
 - `row_click` (`cs:0x5D52`) — left-button inside the `[0xA9..0xB5)`

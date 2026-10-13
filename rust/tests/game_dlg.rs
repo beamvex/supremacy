@@ -87,7 +87,7 @@ fn load_game_switches_on_91e5() {
     assert_eq!(game::load_game(&mut r.ctx()), Some(Loaded::C));
     assert_eq!(r.r8(0x9CCA), 0); // slot-mode brackets cleared
     assert_eq!(r.r16(0x91E5), 2); // block loaded into state
-    assert!(r.host.0.contains(&Call::PlanetPanel));
+    assert!(r.host.0.contains(&Call::Rect(0x18, 0x13, 0x3, 0x33)));
 }
 
 /// The `0x2E94` tail — a good load runs the `[0x91E5]` switch arm,

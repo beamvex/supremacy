@@ -18,6 +18,7 @@ use super::mach::{
     M_ACC, M_BUILD, M_DEPOSIT, M_FLAGS, M_HOST, M_OPS, M_TIMER, M_TYPE, T_14, T_BUILD, T_DEPOSIT,
     T_RATE, T_TYPE,
 };
+use super::ppanel;
 use super::rec::{F_KIND, F_NAME, F_OWNER, F_SERIAL};
 use super::text;
 use super::vhost::Call;
@@ -47,7 +48,7 @@ pub(super) fn recolonise(c: &mut Ctx, r: usize) {
     c.st.set_byte(ORD_FLAG, 0xFF);
     sfx(c);
     if c.st.word(SCAN_REC) == c.st.word(SEL_REC) {
-        c.host.svc(Call::PlanetPanel);
+        ppanel::planet_panel(c);
     }
 }
 
