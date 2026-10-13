@@ -203,6 +203,40 @@ fn scaled(i: &[u8], ofs: usize) -> [u8; 3] {
         .map(|v| u8::try_from(u16::from(v) * 255 / 63).unwrap_or(0))
 }
 
+/// GAM-46 — `menu_text` must paint the `ss:` stream's 16×24 tiles:
+/// the shipped `0x5012` page ("MELBOURNE HOUSE" over three lines at
+/// rows 45/71/97) lands in the framebuffer and `0xFF`-suspends with
+/// the cursor on the next page, so the credits advance — the
+/// paging/scroll the ticket reported missing. (The old walk read
+/// `file:0x20000` instead of `ss = 0x1F6F` → `0x202F0` and never drew
+/// the tiles, so every page returned stream-end instantly.)
+#[test]
+fn menu_text_paints_the_credits_pages() {
+    let mut h = host();
+    assert_eq!(h.svc(Call::Text(0x5012)), 0xF1); // fb15 — scroll variant
+                                                 // Line 1, third tile: 'M' row 0 of `cs:0x21C4 + 0xC·0x180`.
+    assert_eq!(
+        &h.scr.buf[0x3868..0x3868 + 0x10],
+        &[2, 2, 2, 2, 2, 2, 0, 0, 0, 2, 2, 2, 2, 2, 2, 0]
+    );
+    assert!(h.scr.buf[0x58C0..].iter().any(|&b| b != 0)); // line 2
+    assert!(h.scr.buf[0x7940..].iter().any(|&b| b != 0)); // line 3
+    assert_eq!(h.dropped, 0);
+    let before = h.scr.buf.clone();
+    assert_eq!(h.svc(Call::Text(u16::MAX)), 0xF1); // next page resumes
+    assert_ne!(h.scr.buf, before);
+}
+
+/// Non-MCG `menu_text` twins stay unported — the walk still decodes
+/// the stream and counts the tile ops it can't draw.
+#[test]
+fn menu_text_other_modes_count_undrawn_tiles() {
+    let mut h = mode_host(Video::Ega);
+    assert_eq!(h.svc(Call::Text(0x5012)), 0xF1);
+    assert!(h.dropped > 0);
+    assert!(h.scr.buf.iter().all(|&b| b == 0));
+}
+
 #[test]
 fn cs_word_reads_the_code_segment() {
     let mut h = host();

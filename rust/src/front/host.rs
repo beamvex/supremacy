@@ -26,7 +26,8 @@
 //! - `Call::Load` → [`Loader`] (`front/load.rs`) — the int-21 asset
 //!   loaders' `ds:0x1208`+ cell → `{stem}{sfx}.{BIN,GPH}` swap
 //!   (GAM-33).
-//! - `Call::Text` → `front/text.rs` — the `menu_text` page walk;
+//! - `Call::Text` → `front/text.rs` — the `menu_text` page walk + the
+//!   MCG 16×24 tile painters (GAM-46);
 //!   `Call::Stars` → `front/stars.rs` — the `cs:0x4EC4` starfield.
 //! - `[0x1264]`/`[0x1266]` stay stubs — the refresh-list copies are
 //!   presentation details the window's per-frame blit supersedes

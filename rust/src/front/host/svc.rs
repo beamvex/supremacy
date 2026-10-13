@@ -66,10 +66,11 @@ impl Host {
     }
 
     /// `Call::Text` — the `menu_text` page walk (`front/text.rs`);
-    /// undrawn glyph tiles count toward `dropped`.
+    /// tile ops the mode's variant doesn't model count toward
+    /// `dropped`.
     fn menu_text(&mut self, cur: u16) -> u16 {
-        let (ax, glyphs) = text::page(&self.img, &mut self.text_cur, cur);
-        self.dropped += glyphs;
+        let (ax, undrawn) = text::page(&mut self.scr, &self.img, &mut self.text_cur, cur);
+        self.dropped += undrawn;
         ax
     }
 
