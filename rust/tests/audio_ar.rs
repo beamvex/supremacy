@@ -7,13 +7,12 @@
 mod common;
 
 use common::rec::Rec;
-use common::{read, root};
 use supremacy::args::Sound;
 use supremacy::audio::Ar;
 use supremacy::front::audio::{Audio, Drv};
 
 fn img() -> Vec<u8> {
-    read(&root().join("decompiled/GAME.unpacked.exe"))
+    supremacy::img::image()
 }
 
 /// `Call::Song(0x03D7)` — the title song record (`ds = 0x03D7` →

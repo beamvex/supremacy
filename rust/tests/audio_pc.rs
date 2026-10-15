@@ -7,14 +7,13 @@
 
 mod common;
 
-use common::{read, root};
 use supremacy::args::Sound;
 use supremacy::audio::{Pc, Ports};
 use supremacy::front::audio::{Audio, Bus};
 use supremacy::game::{Call, VmHost};
 
 fn img() -> Vec<u8> {
-    read(&root().join("decompiled/GAME.unpacked.exe"))
+    supremacy::img::image()
 }
 
 /// Writes `bytes` at `cs:ofs` — `cs:` maps to file `0xC00 + ofs`, the

@@ -6,13 +6,12 @@
 
 mod common;
 
-use common::{read, root};
 use supremacy::args::Sound;
 use supremacy::audio::{Ports, Tandy};
 use supremacy::front::audio::{Audio, Drv};
 
 fn img() -> Vec<u8> {
-    read(&root().join("decompiled/GAME.unpacked.exe"))
+    supremacy::img::image()
 }
 
 /// Records every `in`/`out`; `in` returns `last` (`audio_dev.rs` shape).

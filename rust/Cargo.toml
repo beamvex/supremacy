@@ -22,3 +22,7 @@ required-features = ["minifb", "audio"]
 [[bin]]
 name = "supremacy-smoke"
 path = "src/bin/smoke.rs"
+
+[[bin]]
+name = "extract-img"
+path = "src/bin/extract_img.rs"

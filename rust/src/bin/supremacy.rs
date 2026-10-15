@@ -72,7 +72,7 @@ fn run(
     };
     let mut scr = Screen::new(cfg.video);
     scr.draw_image(&set, idx);
-    let pal = match palette(dir, cfg.video, exe) {
+    let pal = match palette(cfg.video, exe) {
         Ok(p) => p,
         Err(e) => {
             eprintln!("palette: {e}");
@@ -100,13 +100,16 @@ fn run(
 }
 
 /// Palette for the mode — MCGA reads the master DAC table out of the
-/// unpacked exe (dgroup `0x4994`), EGA/Tandy use the stock 16-colour set,
-/// CGA palette 1 (per `tools/extract_png.py`).
-fn palette(dir: &std::path::Path, v: Video, exe: Option<PathBuf>) -> std::io::Result<Palette> {
+/// unpacked image (dgroup `0x4994`; `--exe` or the committed blobs),
+/// EGA/Tandy use the stock 16-colour set, CGA palette 1 (per
+/// `tools/extract_png.py`).
+fn palette(v: Video, exe: Option<PathBuf>) -> std::io::Result<Palette> {
     Ok(match v {
         Video::Mcga => {
-            let p = exe.unwrap_or_else(|| dir.join("../decompiled/GAME.unpacked.exe"));
-            let img = std::fs::read(&p)?;
+            let img = match exe {
+                Some(p) => std::fs::read(p)?,
+                None => supremacy::img::image(),
+            };
             from_dac(
                 img.get(supremacy::palette::DAC_OFS..supremacy::palette::DAC_OFS + 768)
                     .unwrap_or(&[]),

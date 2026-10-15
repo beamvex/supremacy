@@ -15,7 +15,7 @@ use supremacy::palette::{from_dac, DAC_OFS};
 use supremacy::platform::MemFs;
 
 fn game() -> Game {
-    let img = read(&root().join("decompiled/GAME.unpacked.exe"));
+    let img = supremacy::img::image();
     let set = load_set(&game_dir(), "MCG", heap_segment()).unwrap();
     let pal = from_dac(&img[DAC_OFS..DAC_OFS + 768]);
     Game::new(
@@ -127,7 +127,7 @@ fn boot_from_ds_dump_restores_state() {
         g.step();
     }
     let ds = dt::port_ds(&g);
-    let img = read(&root().join("decompiled/GAME.unpacked.exe"));
+    let img = supremacy::img::image();
     let set = load_set(&game_dir(), "MCG", heap_segment()).unwrap();
     let pal = from_dac(&img[DAC_OFS..DAC_OFS + 768]);
     let mut g2 = dt::from_dumps(
@@ -147,7 +147,7 @@ fn boot_from_ds_dump_restores_state() {
 
 #[test]
 fn boot_from_dos_dump_normalises_op_table() {
-    let img = read(&root().join("decompiled/GAME.unpacked.exe"));
+    let img = supremacy::img::image();
     // The probe's `dump ds` artefact needs a DOSBox-X pass, so stand
     // in with the shipped dgroup image: it already carries the live
     // dump's relocated far pointers (`DS_BASE` is verified against a

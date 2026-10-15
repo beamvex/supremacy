@@ -131,7 +131,10 @@ fn dos_pass(o: &Opt) -> bool {
 }
 
 fn game(o: &Opt, boot: bool) -> Option<Game> {
-    let img = std::fs::read(o.root.join("decompiled/GAME.unpacked.exe")).ok()?;
+    // An unpacked exe on disk still wins — difftest debugging may swap
+    // in a patched image; otherwise the committed `data/*.bin` blobs.
+    let img = std::fs::read(o.root.join("decompiled/GAME.unpacked.exe"))
+        .unwrap_or_else(|_| supremacy::img::image());
     let set = load_set(&o.root.join("GAME"), "MCG", heap_segment()).ok()?;
     let pal = from_dac(img.get(0x15034..0x15034 + 768).unwrap_or(&[]));
     let files = Box::new(MemFs::new()) as Box<dyn supremacy::platform::DosFiles>;

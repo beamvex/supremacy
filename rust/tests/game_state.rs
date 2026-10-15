@@ -87,7 +87,7 @@ fn save_is_exactly_the_state_block() {
 
 #[test]
 fn state_mirrors_shipped_image() {
-    let img = common::read(&common::root().join("decompiled/GAME.unpacked.exe"));
+    let img = supremacy::img::image();
     let st = State::from_image(&img);
     // ds:0x9158 = file 0x197F8 — the shipped block anchors the record
     // array on the SMINE preset and the ticker cursors on 0x928D.

@@ -109,7 +109,7 @@ fn run(o: &Opt) -> ExitCode {
 
 /// `Game` from the dir/exe/args; `MemFs` keeps savegames off disk.
 fn boot(dir: &Path, stem: &str, o: &Opt, cfg: Config) -> Option<Game> {
-    let img = match load_img(dir, o.exe.clone()) {
+    let img = match load_img(o.exe.clone()) {
         Ok(i) => i,
         Err(e) => {
             eprintln!("exe: {e}");
@@ -151,8 +151,10 @@ fn ops(o: &Opt) -> Vec<dt::Rec> {
         .unwrap_or_default()
 }
 
-fn load_img(dir: &Path, exe: Option<PathBuf>) -> std::io::Result<Vec<u8>> {
-    std::fs::read(exe.unwrap_or_else(|| dir.join("../decompiled/GAME.unpacked.exe")))
+/// The unpacked image — `--exe` reads an alternate file, otherwise the
+/// committed `data/*.bin` blobs (GAM-55).
+fn load_img(exe: Option<PathBuf>) -> std::io::Result<Vec<u8>> {
+    exe.map_or_else(|| Ok(supremacy::img::image()), std::fs::read)
 }
 
 /// Mode palette — the `run.rs` selection: MCGA from the image's DAC

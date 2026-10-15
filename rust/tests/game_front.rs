@@ -4,7 +4,7 @@
 
 mod common;
 
-use common::{game_dir, gsim, read, root};
+use common::{game_dir, gsim};
 use supremacy::args::{Sound, Video};
 use supremacy::assets::{heap_segment, load_set};
 use supremacy::front::{Game, Host, Phase, Pump};
@@ -16,7 +16,7 @@ use supremacy::palette::{from_dac, DAC_OFS, ROWS_OFS, WORK_OFS};
 use supremacy::video::Screen;
 
 fn img() -> Vec<u8> {
-    read(&root().join("decompiled/GAME.unpacked.exe"))
+    supremacy::img::image()
 }
 
 fn host() -> Host {
