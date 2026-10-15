@@ -1,21 +1,66 @@
-# `game` (2/4) — the scripted-event VM (`cs:0x773D`)
+# `game` (2/6) — the scripted-event VM (`cs:0x773D`)
+
+Page 2 of the `game` module docs — start with
+[game-state.md](game-state.md) for the data model and
+[concepts.md](concepts.md) for notation.
+
+## What the VM is for
+
+Much of the game's *scripted* behaviour — timed events, ambushes,
+tributes, uprisings, endgame checks, HUD reprints — is not hardcoded
+into the tick loop. Instead the game ships a tiny interpreter: a table
+of event slots in `ds` points at bytecode scripts, and each tick the VM
+runs one slot's worth of opcodes. Each opcode is an index into a jump
+table of routines — guard conditions that *suspend* the event until a
+fact is true, and actions that mutate `ds` cells, print to the ticker,
+or call host services.
+
+A useful mental model: the VM is a **rules engine**, not a scripting
+language. A script like "when planet X is conquered and day ≥ 5, spawn
+raiders" is encoded as opcodes *polling* `ds` cells each tick, not as
+coroutines that resume where they stopped.
+
+The single most important semantic: **`si` (the instruction pointer) is
+never written back**. A suspended event re-runs from its first opcode
+next tick, so scripts aren't resumable coroutines — they're
+**guard+action rules** whose persistent state lives in `ds` cells
+(flags, counters, delay cells), not in the instruction pointer. When a
+doc says "suspends", it means the handler returned `Flow::Ret` and the
+script will retry from the top next time.
+
+Why this design? A `ret`-suspending interpreter needs no saved state
+per event beyond its slot — the script itself is stateless, so the same
+script object serves as an event's *declaration*. The cost is that
+expensive guards re-run every tick, which the scripts buy back with
+`delay` cells that gate re-entry.
 
 ## `Vm` (`vm.rs`) — memory model
 
-The interpreter runs over the whole `ds` space, split three ways:
+The interpreter runs over the whole `ds` space, split three ways so
+reads/writes land in the right owner:
 
 - `low: Box<[u8]>` — `ds:0x0000..0x7D39`: event scripts (`0x51FB`+),
   the `ds:0x50E3` op table, the `ds:0x5183` event slots, message
   strings, VM flag cells.
-- `State` — `ds:0x7D39..0x9CC4` (the saveable block).
+- `State` — `ds:0x7D39..0x9CC4` (the saveable block — see
+  [game-state.md](game-state.md); VM writes land in savegames).
 - `hi: Box<[u8]>` — `ds:0x9CC4..=0xFFFF`: menu records and scratch.
 
-Plus `modal` (the `cs:0xE713` modal-dialog flag — a code-segment cell in
-the asm), `end`/`title`/`title_done` (the parked `cs:0x8B17`/`0x8C65`
-ending and `cs:0x85B1` attract machines — the asm blocks inside them,
-the port steps them one unit per frame) and `stage` (the heap segment
-the `0x8432`/`0x844B` routines copy the save block into/out of,
-`ds:0x3829` in the asm).
+The split mirrors what the regions *mean*: `low` is shipped script +
+message data (never saved), `State` is the live game (the save block),
+`hi` is runtime menu structures. `r8`/`r16`/`w8`/`w16` dispatch on the
+offset so a script that pokes `0x91B8` writes `State` while one poking
+`0x51FB` writes `low` — a savegame captures exactly the middle slice.
+
+Plus the non-`ds` state the asm kept in code-segment cells:
+
+- `modal` (the `cs:0xE713` modal-dialog flag),
+- `end`/`title`/`title_done` (the parked `cs:0x8B17`/`0x8C65` ending
+  and `cs:0x85B1` attract machines — the asm *blocks inside* these
+  routines; the port steps them one unit per frame instead),
+- `stage` (the heap segment the `0x8432`/`0x844B` routines copy the
+  save block into/out of, `ds:0x3829` in the asm — the "restore
+  checkpoint" the act_stage action loads).
 
 Key addresses: `JT_BASE = 0x50E3` (op jump table — 40 far pointers
 `{ofs, 0x286B}` shipped in the image; `ofs` is a near offset in the
@@ -29,7 +74,8 @@ Key addresses: `JT_BASE = 0x50E3` (op jump table — 40 far pointers
   offset) into the port's `cs:` label space (`file − 0x30000`,
   `−0x6D50`). The shipped image already holds the real op table, event
   slots, scripts and keymap at their runtime `ds:` offsets — a live
-  `ds` dump of the original confirms byte-identical content.
+  `ds` dump of the original confirms byte-identical content. See
+  [front.md](front.md) § "The two `cs:` spaces" for why two constants.
 - `r8`/`r16`/`w8`/`w16` — byte/word access across the three regions
   (routed by offset; unaligned-safe LE).
 - `stage_save`/`stage_load` — the `0x8432`/`0x844B` block copies
@@ -37,7 +83,9 @@ Key addresses: `JT_BASE = 0x50E3` (op jump table — 40 far pointers
 - `rec_ofs(st, i)` — `[0x9158] + i·0x3A` via `r16`.
 - Operand fetchers: `slot(si)` reads a 4-byte `{val, tag}` (tag `0x0FAA`
   shipped, consumed but unused) advancing `si += 4`; `imm(si)` reads a
-  bare `u16`, `si += 2`.
+  bare `u16`, `si += 2`. Two operand widths because the bytecode mixes
+  word immediates and wider `{value, tag}` slots — the `0x77B4`-style
+  wide ops read the 4-byte form.
 
 ## Dispatch (`vops.rs`)
 
@@ -46,21 +94,30 @@ Tick codes `0x38+2N .. 0x56+2N` index the `ds:0x5183` event table; word
 address (the shipped image stores `{ofs, 0x286B}` far pointers —
 `jtab::fix` normalises `ofs` to `cs:` labels at load; op words step by
 4). `Flow`: `Cont` = `jmp 0x7758` (fetch next), `Ret` =
-`ret` (suspend). **`si` is never written back** — a suspended event
-re-runs from its entry next tick, so scripts are guard+action rules
-whose state lives in `ds` cells, not the instruction pointer.
+`ret` (suspend).
+
+So a VM step is: *read event's `si` → loop { fetch op word, look up
+handler, run it } → stop on the first `Ret`*. A script is a chain of
+guards — each returns `Cont` if it can proceed, `Ret` if the event
+should wait. One event runs to its first unmet guard per tick.
 
 `run(c, idx)` = the `cs:0x773D` entry + `cs:0x7758` fetch loop: `si` from
 the event table, loop `{w = r16(si); t = r16(JT_BASE+w); si += 2}` until
-a handler returns `Ret`; returns the op count.
+a handler returns `Ret`; returns the op count — the `Tick` enum's
+payload for the Script arm (see [game-tick.md](game-tick.md)).
 
 `Ctx<'a>` — the five borrow contexts every op takes: `vm`, `st`, `rng`,
 `host: &mut dyn VmHost`, `files: &mut dyn DosFiles`. `vsync(c)` = one
 `0x2CA9` frame boundary (`Call::Ui(0x2CA9)` + `host.pump_input`).
+The contexts exist because ops span every subsystem — a `delay` op
+writes a `ds` cell, a `menu` op calls the host, an `add_imm` writes
+`State`, and a single `Ctx` bundles all five borrows the ops need.
 
 Scratch registers (inside the save block): `R_SEL 0x81EE` (selected
 record), `R_MACH 0x81F2` (found machine), `R_PLANET 0x81F6`, `R_A
-0x81F7`, `R_B 0x81F8`, `R_C 0x81FA` (dword).
+0x81F7`, `R_B 0x81F8`, `R_C 0x81FA` (dword) — the VM's "registers" are
+just more `ds` cells, so they persist in savegames too. An event that
+picked a planet into `R_SEL` keeps it across ticks *and* across saves.
 
 Helpers: `planet_rec` (`[0x81F6]`·`0x3A` + base), `faction_rec`
 (`[0x91B8]`·`0x3A` + base), `uimode`, `kind_of(rec)`, `set_bits` (`or
@@ -69,6 +126,10 @@ whose `+2` link points at `rec`; `false` on the `[0x914C]` early-out in
 UI mode 1.
 
 ### Op table (`op`/`op2`/`op3`)
+
+The `cs:` targets below are the port's label space (`file − 0x30000`);
+the shipped image stores the `0x292B0`-space near offsets, which
+`jtab::fix` translates at load.
 
 | `cs:` target | handler | effect |
 |---|---|---|
@@ -97,9 +158,16 @@ UI mode 1.
 | `0x7BE8` | `print_at` | print `[R_MACH]` name |
 | `0x7BF4`/`0x7C05` | `depopulate`/`charge` | sel `pop=0` / `energy=0x74CC` (vplan) |
 
-Unmapped targets → `Flow::Ret`.
+Unmapped targets → `Flow::Ret`. That default is the honest choice: an
+opcode the port doesn't know suspends rather than guessing — the same
+way `Host::dropped` counts unmodelled calls.
 
 ## Event routines (tick-direct, all `Ret`-suspending)
+
+These are the big multi-step events the tick dispatcher reaches directly
+(code ≥ `0xA7` arms — see [game-tick.md](game-tick.md)). They look like
+ops but live one level up: `tick_step` calls them by code, and they
+themselves run `Ret`-suspending sequences.
 
 - `vdir::disaster` (`cs:0x7A45`) — modal print `0x5D7B`, menu, sound
   seq (`Chan(0x8A5B)`/`Chan(0x8A3B,8)`/`Sound(0x15)`, `[0x91D3]`-gated),
@@ -201,4 +269,69 @@ function, `[0x91D3]` gate applied before emitting),
 `trait VmHost { svc(call) -> u16; cs_word(ofs) -> u16; pump_input(vm, st);
 key_flush(); }` — `cs_word` serves the draw sequencer's `cs:` reads;
 `pump_input` re-mirrors input at every `0x2CA9` boundary so modal loops
-see input; `key_flush` resets channel A. `NullHost` drops everything.
+see input; `key_flush` resets channel A. `NullHost` drops everything;
+`front::Host` is the real implementor ([front.md](front.md)).
+
+The trait is deliberately tiny — four methods cover every host touch the
+VM needs: *emit an effect* (`svc`), *read a `cs:` word* (`cs_word`),
+*refresh input cells* (`pump_input`), *drain the LIFO* (`key_flush`).
+Everything richer (fonts, starfields, audio routing) lives behind
+`Call` variants so the VM never knows a screen exists.
+
+## Pitfalls
+
+- **`Ret` is not an error.** It is the *normal* "wait until next tick"
+  answer — a script returning `Ret` from `wait_eq_b` is doing its job.
+- **`si` re-runs from the top.** A script with a side effect *before*
+  its guard will repeat the side effect each suspended tick — the asm
+  relies on guards coming first, and tests should too.
+- **`cs:` values in streams are runtime offsets.** They differ from the
+  doc labels by `0x6D50` — `cs_word` reads the runtime space; don't add
+  the doc delta twice.
+- **VM registers are `ds` cells.** `R_SEL`/`R_A`/etc. live in the save
+  block — a savegame *contains* the in-flight VM state, and `difftest`
+  can compare it.
+
+## File map
+
+| file | item |
+|---|---|
+| `vm.rs` | `Vm` — low/State/hi split, `from_image`, `r8`/`w8`/…, `stage_*` |
+| `vops.rs` | `run`/`Ctx`/`Flow`, the fetch-dispatch loop |
+| `vimpl.rs` | the simple ops (`wait_b`/`wait_eq_*`/`ld_ind`/`cp`/`add_imm`/`st_imm`/`delay`/`menu`/`dialog`/`native`) |
+| `vdir.rs` | `disaster`/`jingle`/`msg_op`/`redraw`/`clear_msg` |
+| `vev.rs` | `tribute`/`pirate` + the `0x7D5A` victim pick |
+| `vup.rs` | `uprising`/`name_gen` |
+| `vplan.rs` | `kill_sel`/`levy`/`depopulate`/`charge` |
+| `vmac.rs` | `unhide`/`raze`/`wait_derelict`/`reset_timers`/`wait_ripe` |
+| `vord.rs` | `orders` — the orders popup |
+| `vend/` | `endgame`, `end_step`, `tail` + `seq/` subroutines |
+| `vhud.rs` | the `0xA7`/`0xAA`/`0xFC`/`0xFD` HUD arms |
+| `vhost.rs` | `Call` enum + `VmHost` trait + `NullHost` |
+| `jtab.rs` | `JT_BASE`/`fix` — the op-table label rewrite |
+
+## Worked example — one event's tick
+
+Suppose event slot 7's script `si` points at a `delay`-then-`print`
+sequence. One `vops::run(c, 7)`:
+
+1. `si = r16(TAB_BASE + 7*4)` — the event's script cursor.
+2. `w = r16(si)` — the first opcode word; `t = r16(JT_BASE + w)` —
+   the handler's `cs:` label (label-space after `jtab::fix`).
+3. Handler runs. If it's `delay` on a nonzero countdown cell:
+   decrement, return `Ret` — the run stops; op count = 1.
+4. Next tick the same `si` is re-fetched from the table (not saved) —
+   the script re-runs from the top; when the delay cell finally hits
+   0, `delay` returns `Cont` and the *next* opcode executes this tick.
+
+The whole "wait 30 ticks then print" is `delay` re-running 30 times —
+there's no suspended frame, just a cell that isn't 0 yet.
+
+## How a script ends up in the table
+
+The `ds:0x5183` event table ships populated: each `{cur, base}` pair's
+`cur` word is the script's `si` — a `ds:` offset into the `0x51FB`+
+script region inside `low`. The tick codes `0x38+2N..0x56+2N` index
+this table, so "which scripts run" is fixed by the shipped data — the
+port never builds the table, it inherits it from the image the same
+way `Vm::from_image` inherits the op table and keymap.
