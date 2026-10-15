@@ -197,7 +197,7 @@ fn shipped_op_table_maps_to_handlers() {
     // The image ships the `ds:0x50E3` table as `{ofs, 0x286B}` far
     // pointers (`ofs` = `file − 0x292B0`); `Vm::from_image` rewrites
     // them into `cs:` labels (`file − 0x30000`).
-    let img = common::read(&common::root().join("decompiled/GAME.unpacked.exe"));
+    let img = supremacy::img::image();
     let vm = Vm::from_image(&img);
     let st = State::new();
     assert_eq!(vm.r16(&st, JT_BASE), 0x7769); // op 0x00 → wait_b

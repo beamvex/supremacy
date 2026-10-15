@@ -93,7 +93,7 @@ Verified against the DOS-side DAC dump `difftest/out/P05.BIN`: regs
 ## Example
 
 ```rust
-let img = std::fs::read("decompiled/GAME.unpacked.exe")?;
+let img = supremacy::img::image();    // the embedded image (rust/data/*.bin)
 let pal = supremacy::palette::from_dac(
     &img[supremacy::palette::DAC_OFS..supremacy::palette::DAC_OFS + 768],
 );

@@ -52,7 +52,7 @@ fn run(
     let tail = tail_bytes(pos.get(1), pos.get(2), pos.get(3));
     let cfg = parse(&tail);
     let stem = stem.unwrap_or_else(|| cfg.video.stem().to_owned());
-    let img = match load_img(dir, exe) {
+    let img = match load_img(exe) {
         Ok(i) => i,
         Err(e) => return fail("exe", &e),
     };
@@ -135,8 +135,10 @@ fn palette(img: &[u8], v: supremacy::args::Video) -> Palette {
     }
 }
 
-fn load_img(dir: &std::path::Path, exe: Option<PathBuf>) -> std::io::Result<Vec<u8>> {
-    std::fs::read(exe.unwrap_or_else(|| dir.join("../decompiled/GAME.unpacked.exe")))
+/// The unpacked image — `--exe` reads an alternate file (difftest
+/// debugging), otherwise the committed `data/*.bin` blobs (GAM-55).
+fn load_img(exe: Option<PathBuf>) -> std::io::Result<Vec<u8>> {
+    exe.map_or_else(|| Ok(supremacy::img::image()), std::fs::read)
 }
 
 fn fail(what: &str, e: &std::io::Error) -> ExitCode {

@@ -26,6 +26,8 @@
 //! - [`game`]: the `0x1F8B`-byte saveable state block (`ds:0x7D39`),
 //!   save/load (`0x383CE`/`0x383F3`), the `cs:0x55B2` LCG, the `0x3A`-byte
 //!   record layout, galaxy presets and the `cs:0x9DAB` new-game init.
+//! - [`img`]: the embedded image — the read regions of
+//!   `GAME.unpacked.exe` as committed `data/*.bin` blobs (GAM-55).
 //! - [`smoke`]: the headless CI mode — N deterministic `Game::step`s
 //!   hashed into a framebuffer/audio/state [`smoke::Digest`].
 
@@ -41,6 +43,7 @@ pub mod exepack;
 pub mod front;
 pub mod game;
 pub mod gph;
+pub mod img;
 pub mod lzss;
 pub mod palette;
 pub mod platform;

@@ -8,7 +8,7 @@
 
 mod common;
 
-use common::{game_dir, read, root};
+use common::game_dir;
 use supremacy::args::{Sound, Video};
 use supremacy::assets::{heap_segment, load_set};
 use supremacy::difftest as dt;
@@ -20,7 +20,7 @@ use supremacy::smoke::{self, Digest};
 /// The `supremacy-smoke GAME` bundle — MCG set, image palette, speaker,
 /// K-mode off (no `K` letter), preset 3, seed `0x42`.
 fn game() -> Game {
-    let img = read(&root().join("decompiled/GAME.unpacked.exe"));
+    let img = supremacy::img::image();
     let set = load_set(&game_dir(), "MCG", heap_segment()).unwrap();
     let pal = from_dac(&img[DAC_OFS..DAC_OFS + DAC_LEN]);
     Game::new(

@@ -65,9 +65,11 @@ use in about ten minutes. Then pick your path:
 - A Rust toolchain (`cargo`; edition 2021 — `#![forbid(unsafe_code)]` is
   set, everything is safe Rust).
 - The shipped game data in `../GAME/` (asset sets `MCG.BIN`/`MCG.GPH`,
-  `*IN`, `*DTH`, `*WIN` pairs for the other stems) and
-  `../decompiled/GAME.unpacked.exe` — the binaries expect these relative
-  to the `rust/` directory.
+  `*IN`, `*DTH`, `*WIN` pairs for the other stems) — the binaries expect
+  it relative to the `rust/` directory. The unpacked-exe bytes the port
+  reads are embedded from `rust/data/*.bin` (GAM-55), so
+  `../decompiled/GAME.unpacked.exe` is *not* needed; it only matters
+  for blob regeneration (`extract-img`) and the DOS-side difftest.
 - Optional: `minifb` build deps for `supremacy-run` (a window opens),
   `nasm` + `dosbox-x` only for the differential harness.
 
@@ -88,7 +90,7 @@ cargo build
 # 2. Build with the playable window binary too (optional).
 cargo build --features minifb
 
-# 3. Run the whole integration suite (needs ../GAME and ../decompiled).
+# 3. Run the whole integration suite (needs ../GAME).
 cargo test
 
 # 4. House checks — both are part of the repo's style rules.
@@ -97,11 +99,14 @@ cargo fmt
 ```
 
 Step 3 is worth a caveat: the integration tests read the *real* game
-files — `../GAME/MCG.GPH` etc. and `../decompiled/GAME.unpacked.exe`.
-If you cloned the repo without the game-data directory, library unit
-tests still compile but the integration tests fail at file-open time.
-That is expected; the suite is a black-box check against the shipped
-assets, not a self-contained fixture set.
+files — `../GAME/MCG.GPH` etc. — while the image comes from the
+committed `rust/data/*.bin` blobs. The git-ignored exes (`GAME.EXE`,
+`GAME.unpacked.exe`, `SUPCHT.*`) only feed the `exepack`/`difftest`
+checks, which skip cleanly when they aren't on disk. If you cloned the
+repo without the game-data directory, library unit tests still compile
+but the integration tests fail at file-open time. That is expected; the
+suite is a black-box check against the shipped assets, not a
+self-contained fixture set.
 
 `#![forbid(unsafe_code)]`, `#![warn(missing_docs)]` and
 `#![warn(clippy::pedantic)]` are set in `lib.rs`. Code style: one
@@ -127,8 +132,9 @@ the 1991 `.exe` does at boot, minus the parts this binary doesn't need:
 ```
 GAME.EXE on disk                 rust/ port
 ───────────────                  ──────────
-MZ + EXEPACK image        →      exepack::unpack      (only if you ask;
-                                 GAME.unpacked.exe is already shipped)
+MZ + EXEPACK image        →      img::image()         (embedded
+                                 rust/data/*.bin — GAM-55; --exe reads
+                                 an alternate unpacked file)
 PSP tail "GAME M M A"     →      args::parse          → Config {video,
                                  keyboard_mouse, sound, timer_variant}
 video letter 'M'          →      Video::stem() = "MCG",
@@ -162,6 +168,7 @@ becomes pixels in the `minifb` window or samples in the `cpal` stream.
 ```
 rust/
 ├── Cargo.toml          # crate `supremacy`; optional `minifb`/`audio` features
+├── data/               # committed image blobs — low/dgroup/cs.bin (GAM-55)
 ├── src/
 │   ├── lib.rs          # module docs + `#![forbid(unsafe_code)]`
 │   ├── args/           # GAME <V> <K> <S> command-line parser
@@ -171,6 +178,7 @@ rust/
 │   ├── front/          # concrete VmHost frontend + minifb window
 │   ├── game/           # state block, event VM, tick, UI shell
 │   ├── gph/            # 12-byte .GPH index records
+│   ├── img/            # embedded GAME.unpacked.exe regions → file layout
 │   ├── lzss/           # Okumura LZSS decoder (4 asm variants)
 │   ├── palette/        # 256×3 master DAC table + runtime ops
 │   ├── platform/       # int 21h files, int-8 timer, int-9 kbd, int-33h
@@ -179,6 +187,7 @@ rust/
 │   └── bin/
 │       ├── supremacy.rs   # `supremacy` — renders one record → PPM
 │       ├── difftest.rs    # `difftest` — DOSBox-X differential driver
+│       ├── extract_img.rs # `extract-img` — regenerate data/ from GAME.EXE
 │       ├── run.rs         # `supremacy-run` — playable minifb shell
 │       └── smoke.rs       # `supremacy-smoke` — headless digest runner
 └── tests/              # integration tests + fixtures + common rigs
@@ -202,7 +211,7 @@ bottom in a minute.
 repo root/
 ├── GAME/                 # shipped game data — .BIN/.GPH sets, not code
 ├── decompiled/           # the reverse-engineering artefacts:
-│   ├── GAME.unpacked.exe #   the image every doc's file offsets cite
+│   ├── GAME.unpacked.exe #   (git-ignored) the image the docs' offsets cite
 │   ├── ANALYSIS.md       #   the full RE report
 │   ├── FUNCTIONS.md      #   verified function/address map
 │   ├── disasm/           #   GAME.linear.asm — the disassembly
@@ -281,10 +290,13 @@ The `game` module is large enough to split across six pages:
 
 ## Binaries
 
-All four take the DOS letter args positionally; `tail_bytes` synthesises a
-PSP command tail (count byte, space, letters at `0x82`/`0x84`/`0x86`) so
-`args::parse` sees exactly what the asm sees (see
-[concepts.md](concepts.md) §4 and [args.md](args.md)).
+The four runners take the DOS letter args positionally; `tail_bytes`
+synthesises a PSP command tail (count byte, space, letters at
+`0x82`/`0x84`/`0x86`) so `args::parse` sees exactly what the asm sees
+(see [concepts.md](concepts.md) §4 and [args.md](args.md)). Everywhere
+`--exe PATH` appears it swaps the embedded image for an alternate
+unpacked exe (difftest debugging); without it the `rust/data/*.bin`
+blobs make the binaries self-contained from any cwd.
 
 - `supremacy <GAME-dir> [V] [K] [S] [--set STEM] [--idx N] [--exe PATH]
   [--out frame.ppm]` — parses the PSP-style tail, loads one asset set,
@@ -305,6 +317,10 @@ PSP command tail (count byte, space, letters at `0x82`/`0x84`/`0x86`) so
   gates it (exit 3 on mismatch). See [smoke](smoke.md).
 - `difftest <script.scr> [--root DIR] [--port-only] …` — the DOSBox-X
   differential driver (`bin/difftest.rs`); see [difftest](difftest.md).
+- `extract-img [GAME.EXE] [--out DIR] [--check]` — regenerates
+  `rust/data/*.bin` by running `exepack::unpack` on the packed
+  `GAME.EXE` and slicing each `img::Region` range; `--check` verifies
+  the committed blobs match without writing (`bin/extract_img.rs`).
 
 Typical invocations:
 
@@ -329,8 +345,11 @@ cargo run --bin supremacy-smoke -- ../GAME --ticks 300 \
   records in every asset set**, checked for decoded length + FNV-1a hash
   against the verified Python decoder (`decompiled/tools/extract_png.py`);
   `tests/fixtures/manifest.tsv` carries the expected rows.
-- `exepack_unpack.rs` — unpacks `tests/fixtures/SUPCHT.EXE` and
-  cross-checks `to_exe` repacking with a minimal MZ parser.
+- `exepack_unpack.rs` — unpacks `GAME.EXE` and `tests/fixtures/SUPCHT.EXE`
+  byte-for-byte against the verified images, cross-checks `to_exe`
+  repacking with a minimal MZ parser, and pins `img::image()` to
+  `unpack`'s output (each check skips its git-ignored inputs on a fresh
+  clone).
 - `args_parse.rs`, `gph_index.rs`, `palette_dac.rs`, `assets_load.rs`,
   `platform_dos.rs`, `audio_dev.rs`, `video_draw.rs` — unit-level
   coverage of each leaf module (port-sequence recording via a mock
@@ -346,9 +365,9 @@ asserted as ordered call sequences rather than mocked pixels (see
 
 ## Troubleshooting / FAQ
 
-- **`cargo test` fails opening `../GAME/…` or `GAME.unpacked.exe`** — the
-  suite needs the game data next to the repo. Run from `rust/` (not the
-  repo root) and check `../GAME`/`../decompiled` exist.
+- **`cargo test` fails opening `../GAME/…`** — the suite needs the game
+  data next to the repo. Run from `rust/` (not the repo root) and check
+  `../GAME` exists; the image itself is embedded (`rust/data/*.bin`).
 - **`supremacy-run` won't compile** — it needs `--features minifb` (the
   `[[bin]]` is gated with `required-features`). Audio additionally needs
   `audio`. `cargo build --features minifb,audio` builds everything.

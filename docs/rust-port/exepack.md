@@ -174,10 +174,11 @@ std::fs::write("GAME.unpacked.exe", &up.image)?;   // the image the docs cite
 let exe = up.to_exe();
 ```
 
-Most users never call this — `GAME.unpacked.exe` is already committed
-under `decompiled/` — but it is how that file was produced, and it is
-the reference for any future packed file (e.g. the `SUPCHT.EXE` fixture
-is a second packed exe from the same era).
+Most users never call this — the regions the port reads are already
+embedded as `rust/data/*.bin` (GAM-55) and served by `img::image()` —
+but `unpack` is the blobs' provenance (`extract-img` re-slices them
+from `GAME.EXE`) and the reference for any future packed file (e.g.
+the `SUPCHT.EXE` fixture is a second packed exe from the same era).
 
 ## Pitfalls
 

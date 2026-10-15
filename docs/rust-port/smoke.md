@@ -30,8 +30,8 @@ as `supremacy`/`supremacy-run` — see [args.md](args.md)), plus
 `--set STEM`, `--exe PATH`, `--preset N`, `--seed N`, `--galaxy`,
 `--ticks N`, `--script F.scr`, `--expect "k=v,…"`, `--frame F.ppm`.
 
-The boot is `run.rs`'s: unpacked exe (`--exe`, default
-`<dir>/../decompiled/GAME.unpacked.exe`), one asset set, the mode
+The boot is `run.rs`'s: the image (`--exe` overrides the embedded
+`rust/data/*.bin` blobs — GAM-55), one asset set, the mode
 palette, `Game::new` over a `MemFs` (savegames never touch disk),
 `set_assets` for `Call::Load`, `--galaxy` for `enter_galaxy` (see
 [front.md](front.md)).

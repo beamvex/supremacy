@@ -27,6 +27,19 @@ pub fn read(p: &Path) -> Vec<u8> {
     fs::read(p).unwrap_or_else(|e| panic!("{}: {e}", p.display()))
 }
 
+/// Read a git-ignored shipped file (`GAME.EXE`, the unpacked
+/// references), or `None` — the caller early-returns, matching the
+/// "black-box check against shipped assets" posture on a fresh clone.
+pub fn try_read(p: &Path) -> Option<Vec<u8>> {
+    match fs::read(p) {
+        Ok(b) => Some(b),
+        Err(e) => {
+            eprintln!("{}: {e} — skipped", p.display());
+            None
+        }
+    }
+}
+
 /// FNV-1a 64 — same parameters as the Python fixture generator.
 pub fn fnv(b: &[u8]) -> u64 {
     let mut h = 0xcbf2_9ce4_8422_2325u64;

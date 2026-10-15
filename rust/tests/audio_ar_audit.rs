@@ -5,11 +5,10 @@
 mod common;
 
 use common::rec::Rec;
-use common::{read, root};
 use supremacy::audio::Ar;
 
 fn img() -> Vec<u8> {
-    read(&root().join("decompiled/GAME.unpacked.exe"))
+    supremacy::img::image()
 }
 
 /// The title song record (see `audio_ar.rs`).
