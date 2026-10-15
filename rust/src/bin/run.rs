@@ -1,7 +1,8 @@
 //! Windowed frontend — `supremacy-run <GAME-dir> [V] [K] [S]
 //! [--set STEM] [--exe PATH] [--preset N] [--seed N] [--galaxy]`.
 //!
-//! Loads the unpacked exe, one asset set and the mode palette, builds a
+//! Loads the embedded image (`--exe` reads an alternate unpacked exe),
+//! one asset set and the mode palette, builds a
 //! [`supremacy::front::Game`], then runs the `minifb` loop. The default
 //! boot runs the `0x85B1` title attract + scenario picker (the `*IN`
 //! set); `--preset N` or `--galaxy` skip it straight to a fresh galaxy

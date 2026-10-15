@@ -6,8 +6,8 @@
 //!
 //! `V`/`K`/`S` are the single-letter DOS arguments (`GAME M M A` =
 //! `supremacy GAME M ' ' A`); the MCGA palette comes from the master DAC
-//! table in `GAME.unpacked.exe` (`--exe`, default `../decompiled` next to
-//! the game dir).
+//! table in the embedded image (`img::image()`; `--exe` reads an
+//! alternate unpacked exe).
 
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -34,7 +34,9 @@ fn main() -> ExitCode {
         }
     }
     let Some(dir) = pos.first() else {
-        eprintln!("usage: supremacy <GAME-dir> [V] [K] [S] [--set S] [--idx N] [--out f.ppm]");
+        eprintln!(
+            "usage: supremacy <GAME-dir> [V] [K] [S] [--set S] [--idx N] [--exe f] [--out f.ppm]"
+        );
         return ExitCode::from(2);
     };
     let dir = PathBuf::from(dir);
