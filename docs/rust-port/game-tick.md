@@ -1,4 +1,19 @@
-# `game` (3/4) — the tick dispatcher and simulation
+# `game` (3/6) — the tick dispatcher and simulation
+
+Page 3 of the `game` module docs — see
+[game-state.md](game-state.md) for the data model and
+[game-vm.md](game-vm.md) for the event VM the `Script` arm drives.
+
+## What the tick is
+
+`tick_step` (`cs:0x73D9`) is the game's heartbeat: it runs once per
+frame and does **one unit of simulation work** per call. A code counter
+(`SEQ`, `[0x91CE]`) rotates through the work items — first the machines,
+then the ships, then each planet's economy sim, each planet's defence
+resolution, the scripted events (the VM), the UI reprints, and finally
+the day rollover. So a single frame never simulates "the whole galaxy" —
+it advances one slice, which is how the 1991 original keeps frame time
+bounded.
 
 ## `tick.rs` — `tick_step` (`cs:0x73D9`, file `0x373D9`–`0x376C5`)
 
@@ -28,12 +43,16 @@ One game tick, called once per frame. `[0x91B0]` nonzero → cleared
 | `0xFF` | `Day` | `day_tick` `cs:0x6A7B` |
 | other | `Idle(bl)` | the `cs:0x76C5` `ret` |
 
-`Tick` enum carries each arm's payload (`MachOut`, starvation flag,
-`Battle`, `ShipOut`, op count, `Option<Ending>`).
+`N` is the planet count `[0x91B8]` — the code ranges are built from it,
+so a 32-planet galaxy spends 64 codes on planet sims + defences before
+the fixed `0xA7+` UI/event codes. `Tick` enum carries each arm's payload
+(`MachOut`, starvation flag, `Battle`, `ShipOut`, op count,
+`Option<Ending>`).
 
 ## `machine.rs` — `machine_tick` (`cs:0x742C` region, `0x37423`–`0x375C1`)
 
-Per `M_TYPE==0` skip → `Quiet`. Otherwise, in asm order:
+Per `M_TYPE==0` skip → `Quiet` (a cleared slot does nothing). Otherwise,
+in asm order:
 
 - `countdown` — `M_TIMER−1`, dirty `0x800` (`0x3742C`–`0x3743D`).
 - `produce` (skipped while flag `0x4` = mining mode): online (`0x20`)
@@ -42,7 +61,8 @@ Per `M_TYPE==0` skip → `Quiet`. Otherwise, in asm order:
   `0x8000`+`0x3`; online type 7 `farm` → burns 1 energy (empty stock
   clears flag `0x20` instead), food `+0xC` (`+0x19` `G_FARMTECH` /
   `+0x1C` owner-4), dirty `0x4000`. Each add is gated on the current
-  stock being under `0x7530` — not a hard cap.
+  stock being under `0x7530` — not a hard cap, just "don't produce when
+  the stockpile is already full".
 - `solar` — type 3 unconditionally: energy `+6` (`+7` more for owner
   3) while under `0x7530`, dirty `0x2` (`DIRTY1`).
 - `mine` (`mine.rs`, `0x3752B`–`0x375A4`) — while flag `0x8` and `M_OPS`
@@ -61,14 +81,17 @@ Per `M_TYPE==0` skip → `Quiet`. Otherwise, in asm order:
 
 ## `sim.rs` — `sim_planet` (`cs:0x3D1E`, `0x33D1E`–`0x33F17`)
 
-Only `F_KIND == 0xA` records simulate. Order:
+The per-planet economy sim. Only `F_KIND == 0xA` (inhabited) records
+simulate. Order:
 
 1. `consume` — food `−= min(food, pop/0xF0)`; shortfall (or empty stock)
    forces `F_COVER = 0`; dirty `0x40`/`0x4000`. Returns the starvation
    warning — true when `food < need` and `TICK.trailing_zeros() ≥ 4`
    (every 16th tick; the asm splices the name into `0x8305` and prints
    `0x82C0`).
-2. `coverage` — `F_COVER` tracks `100 − tax` by `±1`; dirty `0xC0`.
+2. `coverage` — `F_COVER` tracks `100 − tax` by `±1`; dirty `0xC0` —
+   the food-coverage percentage slides toward its target one point per
+   tick rather than snapping.
 3. Odd `TICK` → `income`: `credits += pop·tax / (owner∈{1,2} ? 125 :
    200)`; dirty `0x4`. Even → `scores` (`F_GROWTH = cover/3`, halved by
    `G_FAMINE`; `F_DECLINE = (100−cover)/4 + tax/4`; dirty `0x40`) and
@@ -76,14 +99,16 @@ Only `F_KIND == 0xA` records simulate. Order:
 4. `population` — `net = growth − decline`; growth `net·pop/0x190 + 1`
    (skipped when `pop < 2`), decline same magnitude clamped to `pop`,
    cap `0x7530`, dirty `0x20`; then `delayed_kill` — when `G_KILL_ON`
-   and `G_KILL_REC == r`, `pop = 0` and `G_KILL_AUX` clears.
+   and `G_KILL_REC == r`, `pop = 0` and `G_KILL_AUX` clears — the
+   "population dies N ticks later" mechanism disasters arm.
 
 ## `defence.rs` + `battle.rs` — `defence_tick` (`cs:0x4434`, `0x34434`–`0x34973`)
 
 `SCAN_REC` = the record; ownerless → `Quiet`. `fleet_scan`: for each of
-`0x17` ships with `S_LINK == rec` and flag `0x2`: `F_ATTACK += pow`;
+`0x17` ships with `S_LINK == rec` and flag `0x2` (armed): `F_ATTACK += pow`;
 `F_DEFENCE += pow + (((pow·crew/0x48) & 0xFFFF)·(guns+load+F_29+1) &
-0xFFFF)` — both multiply stages truncate to 16 bits like `mul`/`div`.
+0xFFFF)` — both multiply stages truncate to 16 bits like `mul`/`div`,
+preserving the original's overflow behaviour exactly.
 Selected record → dirty `0x8`/`0x10`.
 
 Then: `F_TROOPS == 0` → `Quiet` when defence is also zero, else
@@ -117,30 +142,32 @@ when `LINK_REC` points at the first fleet slot.
 ## `fleet.rs` — `ship_tick` (`cs:0x60EE`, `0x360EE`–`0x361E4`)
 
 `bx = code − 0x20` indexes the fleet array. `S_FLAGS & 2` **set** →
-`Skip`. `age`: crew `+1`, `+1` more when diff ≠ 2, `+1` more on diff 0
-(`+3`/`+2`/`+1`), clamp `0x64`. UI-mode-1 selected ship
-(`[LINK_REC] == si`) → `panel`: stash `si` at `0x9150`, zero crew when
-`word[si] == 0`, `SHIP_RATE 0x91D6 = 9 − crew/16` (`0xFF` uncrewed),
-`SHIP_ACTIVE 0x91DE` (`0xFF`/0), print crew at `(0x46,0xC0)` and the
-`crew/10`-indexed `0x13`-byte status line from `ds:0x7438` at
-`(0x3B,0x3F)` → `Panel`, else `Aged`.
+`Skip` (an armed ship doesn't age). `age`: crew `+1`, `+1` more when
+diff ≠ 2, `+1` more on diff 0 (`+3`/`+2`/`+1`), clamp `0x64`. UI-mode-1
+selected ship (`[LINK_REC] == si`) → `panel`: stash `si` at `0x9150`,
+zero crew when `word[si] == 0`, `SHIP_RATE 0x91D6 = 9 − crew/16`
+(`0xFF` uncrewed), `SHIP_ACTIVE 0x91DE` (`0xFF`/0), print crew at
+`(0x46,0xC0)` and the `crew/10`-indexed `0x13`-byte status line from
+`ds:0x7438` at `(0x3B,0x3F)` → `Panel`, else `Aged`.
 
 ## `day.rs` — `day_tick` (`cs:0x6A7B`)
 
 `TICK` runs `1..=0x40`, wraps to `1` and increments `DAY`. (The asm's
-readout redraw is the shell's job.)
+readout redraw is the shell's job — `tick_day` in
+[game-ui.md](game-ui.md).)
 
 ## `seq.rs` — `seq_step` (`cs:0x5C1E`, `0x35C1E`–`0x35C96`)
 
-Timed draw sequencer, once per frame. `[0x91A0]` delay counts down
-first; `[0x91D6]` period `0xFF` disables; `[0x91D7]` phase wraps at the
-period and only fires a command on wrap-to-0. `[0x9198]` is a `cs:`
-cursor into 4-byte `{op, pad}` records:
+Timed draw sequencer, once per frame — the mechanism behind animated
+screens: a `cs:`-resident stream of commands, paced by a period cell.
+`[0x91A0]` delay counts down first; `[0x91D6]` period `0xFF` disables;
+`[0x91D7]` phase wraps at the period and only fires a command on
+wrap-to-0. `[0x9198]` is a `cs:` cursor into 4-byte `{op, pad}` records:
 
 - `0xFFFF` — end: clear `0x9198`/`0x919A`.
 - `0x01F4` — delay: next record's op word → `[0x91A0]`; skip both.
 - `0` — link: `si = cs:[si]` (next record's op word is a `cs:` ptr);
-  resume without suspending.
+  resume without suspending — how sequences chain.
 - else — image index: commit `0x9198`, `Call::Image(img)` (the
   `[0x125A]` draw slot).
 
@@ -149,16 +176,17 @@ come from the host.
 
 ## `ticker.rs` — `ticker_step` (`cs:0x6B8F`, `0x36B8F`–`0x36C26`)
 
-Status-line ticker, once per shell frame while `BLINK_T` is idle.
-`[0x91C2]` countdown = records left (`0` disables). `[0x91D2]` per-step
-delay. `[0x915C]` points at 4-byte `{msg-cursor, unused}` records
-(rooted `0x928D`, `0xFE` sentinel wraps). The msg cursor walks the
-message one byte per step:
+Status-line ticker, once per shell frame while `BLINK_T` is idle — the
+scrolling message strip. `[0x91C2]` countdown = records left (`0`
+disables). `[0x91D2]` per-step delay. `[0x915C]` points at 4-byte
+`{msg-cursor, unused}` records (rooted `0x928D`, `0xFE` sentinel wraps).
+The msg cursor walks the message one byte per step:
 
-- `0xFC` — next byte → `[0x91D2]`.
+- `0xFC` — next byte → `[0x91D2]` (per-message pace change).
 - `0xFD` — arm `BLINK_T = 1`, `TICK_X = 0x29` (next line's x).
 - `0xFB` — end-of-record step, then print the word at `di` via
   `num::num` at `([0x91C0],0xB8)`.
 - `0xFF` — end of record: clear `0x91E8`, wrap cursor on `0xFE`,
   `[0x91C2]−1`, commit.
-- else — `Call::Glyph(ch, TICK_X++, 0xB8)`.
+- else — `Call::Glyph(ch, TICK_X++, 0xB8)` — draw one character and
+  advance.

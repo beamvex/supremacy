@@ -1,10 +1,15 @@
 # `smoke` — headless CI mode (GAM-24)
 
+## What this is for
+
 GAM-9's "run N ticks deterministically and hash the framebuffer/audio
 state so regressions are testable without a display". The
 `supremacy-smoke` binary builds with default features — no `minifb`,
 no `cpal` — so a CI runner with no windowing or audio device can compile
-and run it.
+and run it. It steps the game a fixed number of frames, then prints one
+line of hashes: if *any* behaviour changed — a pixel, a palette entry,
+a PCM sample, a state byte, the RNG stream — one of the five numbers
+changes and the field names which subsystem regressed.
 
 ## Running
 
@@ -15,14 +20,15 @@ cargo run --bin supremacy-smoke -- ../GAME --ticks 300
 ```
 
 Args: `<GAME-dir> [V] [K] [S]` positionally (the same PSP-tail letters
-as `supremacy`/`supremacy-run`), plus `--set STEM`, `--exe PATH`,
-`--preset N`, `--seed N`, `--galaxy`, `--ticks N`, `--script F.scr`,
-`--expect "k=v,…"`, `--frame F.ppm`.
+as `supremacy`/`supremacy-run` — see [args.md](args.md)), plus
+`--set STEM`, `--exe PATH`, `--preset N`, `--seed N`, `--galaxy`,
+`--ticks N`, `--script F.scr`, `--expect "k=v,…"`, `--frame F.ppm`.
 
 The boot is `run.rs`'s: unpacked exe (`--exe`, default
 `<dir>/../decompiled/GAME.unpacked.exe`), one asset set, the mode
 palette, `Game::new` over a `MemFs` (savegames never touch disk),
-`set_assets` for `Call::Load`, `--galaxy` for `enter_galaxy`.
+`set_assets` for `Call::Load`, `--galaxy` for `enter_galaxy` (see
+[front.md](front.md)).
 
 ## The digest
 
@@ -33,8 +39,7 @@ palette, `Game::new` over a `MemFs` (savegames never touch disk),
 | `steps` | `Game::step`s run (wait-loop steps an op consumed count too) |
 | `video` | FNV-1a of `Host::scr.buf` (mode-laid-out VRAM) |
 | `pal` | FNV-1a of the 768 palette bytes |
-| `audio` | FNV-1a of every rendered PCM `f32` — `SAMPLES_PER_STEP`
-  (`BOOT_RATE`/30 = 1470) per step, the window loop's stride |
+| `audio` | FNV-1a of every rendered PCM `f32` — `SAMPLES_PER_STEP` (`BOOT_RATE`/30 = 1470) per step, the window loop's stride |
 | `state` | FNV-1a of `difftest::ds_image` (the reassembled 64 KiB `ds`) |
 | `rng` | the final `Rng` LCG state, raw `u32` |
 
@@ -50,6 +55,7 @@ through the shared `difftest::input` (identical `Pump`/poke/wait
 semantics as the DOSBox-X harness): `key`, `mouse`, `pokew`,
 `waitcell`; `done` ends the run early. The artefact ops (`dump`,
 `pal`, `stat`) are no-ops here — the hash channels are the snapshot.
+See [difftest.md](difftest.md) § Script for the op table.
 
 ## Gating
 

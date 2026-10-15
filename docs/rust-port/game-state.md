@@ -1,4 +1,16 @@
-# `game` (1/4) — state block, record layouts, init, save/load
+# `game` (1/6) — state block, record layouts, init, save/load
+
+This is page 1 of the `game` module docs — see the
+[README](README.md#module-guide) for the full page list.
+[concepts.md](concepts.md) explains the `ds:`/`cs:` notation used
+throughout.
+
+## What this module covers
+
+Everything about the game's *data*: the `0x1F8B`-byte saveable state
+block every routine reads and writes, the layouts of the three record
+types inside it (planets/factions, machines, ships), the PRNG, the
+galaxy presets, the new-game init, and savegame I/O.
 
 ## `State` (`state.rs`, `consts.rs`)
 
@@ -6,17 +18,23 @@ The saveable game-state block: exactly the `0x1F8B` bytes at
 `ds:0x7D39..0x9CC4` that the save routine writes whole (`int 21`
 create/write at file `0x383F3`) and load reads back (`0x383CE`), and
 that the heap-staging copies (`0x8432` save/`0x844B` restore) move
-to/from the loader heap segment.
+to/from the loader heap segment. Because a save file *is* this byte
+range, every game variable lives at a fixed `ds:` offset — the "cells"
+the docs keep citing.
 
 - `block: Box<[u8; STATE_LEN]>` — `STATE_OFS = 0x7D39`,
   `STATE_LEN = 0x1F8B`. Accessors take **real `ds:` offsets** and
   subtract `STATE_OFS` internally: `word`/`set_word`, `dword`/
-  `set_dword`, `byte`/`set_byte` (all little-endian).
+  `set_dword`, `byte`/`set_byte` (all little-endian) — so code reads
+  `st.word(0x91B8)` exactly where the asm reads `[0x91B8]`.
 - `from_image(img)` — the shipped initial state at file
   `STATE_OFS + DS_BASE` (`0x183D9`).
-- `rec_ofs(i)` — `cs:0x5E3A` accessor: `[0x9158] + i·0x3A`.
+- `rec_ofs(i)` — `cs:0x5E3A` accessor: `[0x9158] + i·0x3A` — the
+  `ds:` address of record `i` (multiply index by the `0x3A` = 58-byte
+  record stride, add the array base read from the cell).
 - `planets()` — `[0x91B8]` = planet count = index of the appended
-  player-faction record.
+  player-faction record (the faction is stored as an extra record
+  right after the last planet).
 
 ### `consts.rs` — `ds:` cell map (the real asm addresses)
 
@@ -70,6 +88,12 @@ Dialogs: `DLG_FLAG 0x91DA`, `LOAD_TO 0x91E5` (post-load screen switch),
 `S_LOADED 0x7C50`, `S_CNF_T 0x78B8`, `S_CNF_B 0x7C72`.
 
 ## Record layouts
+
+The galaxy's planets are `0x3A`-byte records in an array anchored at
+`[0x9158]`; machines (stations/farms/miners the player builds) are
+`0x28`-byte records at `0x9491`; ships are `0xC`-byte records at
+`0x9991`. Offsets below are byte offsets inside one record — `+0xC` in
+doc shorthand — all little-endian.
 
 ### `rec.rs` — the `0x3A`-byte planet/faction record
 
@@ -137,7 +161,9 @@ menu-order pickers (`0x36792`/`0x367B2`/`0x367CD`/`0x367E8`, shared tail
 
 `select_galaxy(st, idx)` (`0x36801`–`0x3681F`): writes `base` into
 `REC_SEL`/`REC_CUR`/`REC_BASE`/`REC_ALT`, `total` → `REC_TOTAL`,
-`total−1` → `REC_COUNT` and byte `0x91C6`, `difficulty` → `0x91E4`.
+`total−1` → `REC_COUNT` and byte `0x91C6`, `difficulty` → `0x91E4` —
+i.e. it points the record array at the preset's `ds:` base and fixes
+the counts/difficulty before `new_game` fills it.
 
 ## `init.rs` — `new_game` (`cs:0x9DAB`, file `0x3305B`–`0x331C2`)
 
@@ -174,7 +200,8 @@ the `0x331C4` tail — int-33 restrict (`ax=0x14`, mask `0x1E`),
 leaked handle, `open_write`, `write` the whole `0x1F8B` block, `close`;
 `false` mirrors the carry-flag error return (short write counts).
 `State::load(fs, name)` — `0x383CE`: `open`, `read` the block, `close`;
-`false` on error. Both generic over `DosFiles`.
+`false` on error. Both generic over `DosFiles` — so a `MemFs` test can
+save and load without touching disk (see [platform.md](platform.md)).
 
 ## `keymap.rs` — the `ds:0x7CBD` keymap
 

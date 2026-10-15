@@ -14,22 +14,88 @@ LZSS ring cursor and the EXEPACK backward copy), while host-dependent
 effects (screen, ports, int calls) are abstracted behind traits so tests
 and the `minifb` frontend can drive them.
 
+## Start here
+
+The docs assume some DOS vocabulary — segments, `ds:`/`cs:` offsets,
+interrupts, I/O ports, VGA planes. If any of that is new, read
+[concepts.md](concepts.md) first: it explains every notation these pages
+use in about ten minutes. Then pick your path:
+
+- **"I just want to run it"** → § Building and testing, § Binaries.
+- **"I want to understand the graphics pipeline"** →
+  [gph](gph.md) → [lzss](lzss.md) → [video](video.md) →
+  [palette](palette.md) → [assets](assets.md).
+- **"I want to understand the game engine"** →
+  [game-state](game-state.md) → [game-vm](game-vm.md) →
+  [game-tick](game-tick.md) → [game-ui](game-ui.md) →
+  [game-text](game-text.md) → [game-dialogs](game-dialogs.md).
+- **"I want to understand the host layer / run the game"** →
+  [platform](platform.md) → [args](args.md) → [audio](audio.md) →
+  [front](front.md).
+- **"I want to test or verify"** → [smoke](smoke.md) →
+  [difftest](difftest.md) → § Test suite.
+
+## Prerequisites
+
+- A Rust toolchain (`cargo`; edition 2021 — `#![forbid(unsafe_code)]` is
+  set, everything is safe Rust).
+- The shipped game data in `../GAME/` (asset sets `MCG.BIN`/`MCG.GPH`,
+  `*IN`, `*DTH`, `*WIN` pairs for the other stems) and
+  `../decompiled/GAME.unpacked.exe` — the binaries expect these relative
+  to the `rust/` directory.
+- Optional: `minifb` build deps for `supremacy-run` (a window opens),
+  `nasm` + `dosbox-x` only for the differential harness.
+
+## Building and testing — step by step
+
+```bash
+cd rust
+
+# 1. Build the library and the `supremacy` binary.
+cargo build
+
+# 2. Build with the playable window binary too (optional).
+cargo build --features minifb
+
+# 3. Run the whole integration suite (needs ../GAME and ../decompiled).
+cargo test
+
+# 4. House checks — both are part of the repo's style rules.
+cargo clippy --all-targets -- -W clippy::pedantic
+cargo fmt
+```
+
+`#![forbid(unsafe_code)]`, `#![warn(missing_docs)]` and
+`#![warn(clippy::pedantic)]` are set in `lib.rs`. Code style: one
+item (function/type) per file where practical, methods ≤ 23 lines,
+files ≤ 200 lines; `u16::try_from(..).unwrap_or(0)` is the standard
+`ds:`-offset narrowing idiom (see [concepts.md](concepts.md) §8).
+
+A quick smoke test that everything works end-to-end:
+
+```bash
+cargo run --bin supremacy -- ../GAME M ' ' A --idx 0 --out frame.ppm
+# → writes a 320×200 P6 PPM of asset record 0 drawn in MCGA layout.
+cargo run --bin supremacy-smoke -- ../GAME --ticks 300
+# → prints e.g. `smoke steps=300 video=… pal=… audio=… state=… rng=…`
+```
+
 ## Layout
 
 ```
 rust/
-├── Cargo.toml          # crate `supremacy`; optional `minifb` feature
+├── Cargo.toml          # crate `supremacy`; optional `minifb`/`audio` features
 ├── src/
 │   ├── lib.rs          # module docs + `#![forbid(unsafe_code)]`
 │   ├── args/           # GAME <V> <K> <S> command-line parser
 │   ├── assets/         # .GPH index + .BIN heap loading
-│   ├── audio/          # OPL2 / MPU-401 / PC-speaker device halves
+│   ├── audio/          # OPL2 / MPU-401 / PC-speaker device halves + drivers
 │   ├── exepack/        # Microsoft EXEPACK unpacker
 │   ├── front/          # concrete VmHost frontend + minifb window
 │   ├── game/           # state block, event VM, tick, UI shell
 │   ├── gph/            # 12-byte .GPH index records
 │   ├── lzss/           # Okumura LZSS decoder (4 asm variants)
-│   ├── palette/        # 256×3 master DAC table
+│   ├── palette/        # 256×3 master DAC table + runtime ops
 │   ├── platform/       # int 21h files, int-8 timer, int-9 kbd, int-33h
 │   ├── smoke/          # headless CI run → FNV-1a digest (GAM-24)
 │   ├── video/          # per-mode VRAM + draw-image-by-index
@@ -41,27 +107,11 @@ rust/
 └── tests/              # integration tests + fixtures + common rigs
 ```
 
-## Building and testing
-
-```bash
-cd rust
-cargo build                       # library + `supremacy` bin
-cargo build --features minifb     # adds `supremacy-run`
-cargo test                        # integration suite
-cargo clippy --all-targets -- -W clippy::pedantic
-cargo fmt
-```
-
-`#![forbid(unsafe_code)]`, `#![warn(missing_docs)]` and
-`#![warn(clippy::pedantic)]` are set in `lib.rs`. Code style: one
-item (function/type) per file where practical, methods ≤ 23 lines,
-files ≤ 200 lines; `u16::try_from(..).unwrap_or(0)` is the standard
-`ds:`-offset narrowing idiom.
-
 ## Address spaces
 
-All numbers in doc comments are real addresses in one of three spaces
-(see `decompiled/FUNCTIONS.md` § "Address spaces"):
+All numbers in doc comments are real addresses in one of three spaces —
+see [concepts.md](concepts.md) §2 for the full explanation and a worked
+example:
 
 | space | meaning | conversion |
 |---|---|---|
@@ -79,15 +129,18 @@ segment).
 
 ## Module guide
 
+Each page below pairs the module's public API with the asm it ports.
+
 | module | asm provenance | notes |
 |---|---|---|
+| [concepts](concepts.md) | — | primer: segments, ints, ports, VGA, notation |
 | [`exepack`](exepack.md) | stub at file `0x23A90` | EXEPACK unpacker + repacker |
 | [`lzss`](lzss.md) | `0x2EBEF`, `0x2EC8C`, `0x2FC5D`, `0x2FCF9` | Okumura LZSS, 4 variants |
 | [`gph`](gph.md) | `0x320D8` fixup loop | 12-byte image index records |
 | [`args`](args.md) | `0x31FF8`–`0x3207D` | PSP-tail argument parser |
 | [`assets`](assets.md) | `0x3208E`–`0x3215A` | `.BIN`/`.GPH` loaders |
 | [`palette`](palette.md) | file `0x15034` (dgroup `0x4994`) | 256×3 6-bit DAC table |
-| [`audio`](audio.md) | `0x3470`–`0x3F52`, `0x0E9F` | OPL2, MPU-401, PIT speaker |
+| [`audio`](audio.md) | `0x3470`–`0x3F52`, `0x0E9F` | OPL2, MPU-401, PIT speaker, drivers |
 | [`platform`](platform.md) | `0x31D74`, `0x353D`+ | DOS services layer |
 | [`video`](video.md) | `0x2EB8A`, `0x2FB36`, `0x30620`, `0x310CE` | VRAM + draw-by-index |
 | [`front`](front.md) | GAM-9 frontend | `VmHost` impl, `minifb` window |
@@ -114,16 +167,23 @@ The `game` module is large enough to split across six pages:
 
 ## Binaries
 
+All four take the DOS letter args positionally; `tail_bytes` synthesises a
+PSP command tail (count byte, space, letters at `0x82`/`0x84`/`0x86`) so
+`args::parse` sees exactly what the asm sees (see
+[concepts.md](concepts.md) §4 and [args.md](args.md)).
+
 - `supremacy <GAME-dir> [V] [K] [S] [--set STEM] [--idx N] [--exe PATH]
   [--out frame.ppm]` — parses the PSP-style tail, loads one asset set,
   draws record `idx` into a `Screen` and writes a `320×200` P6 PPM
-  through the mode palette (`bin/supremacy.rs`).
+  through the mode palette (`bin/supremacy.rs`). Good first look at the
+  pipeline: `args::parse` → `assets::load_set` → `Screen::draw_image` →
+  `Palette::rgb` → file.
 - `supremacy-run <GAME-dir> [V] [K] [S] [--set STEM] [--exe PATH]
   [--preset N] [--seed N] [--galaxy]` (feature `minifb`) — boots a
   `front::Game` into the `0x85B1` title attract on the `*IN` set
   (`--preset`/`--galaxy` skip it to a fresh galaxy via `select_galaxy` +
   `new_game`; saves via `HostFs` rooted at the game dir) and runs the
-  `minifb` loop (`bin/run.rs`).
+  `minifb` loop (`bin/run.rs`). See [front](front.md).
 - `supremacy-smoke <GAME-dir> [V] [K] [S] [--ticks N] [--script F.scr]
   [--expect "k=v,…"] [--frame F.ppm]` — the headless CI mode: steps the
   game deterministically with no display or audio device and prints a
@@ -131,10 +191,6 @@ The `game` module is large enough to split across six pages:
   gates it (exit 3 on mismatch). See [smoke](smoke.md).
 - `difftest <script.scr> [--root DIR] [--port-only] …` — the DOSBox-X
   differential driver (`bin/difftest.rs`); see [difftest](difftest.md).
-
-All four take the DOS letter args positionally; `tail_bytes` synthesises a
-PSP command tail (count byte, space, letters at `0x82`/`0x84`/`0x86`) so
-`args::parse` sees exactly what the asm sees.
 
 ## Test suite
 
@@ -156,4 +212,5 @@ PSP command tail (count byte, space, letters at `0x82`/`0x84`/`0x86`) so
   `Vm`+`State`+`Rng`+recording `VmHost`+`MemFs` for VM/tick/UI tests.
 
 Test rigs record every `Call` a routine emits, so host-side effects are
-asserted as ordered call sequences rather than mocked pixels.
+asserted as ordered call sequences rather than mocked pixels (see
+[concepts.md](concepts.md) §9).

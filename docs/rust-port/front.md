@@ -1,8 +1,16 @@
 # `front` — the GAM-9 frontend
 
-A concrete `VmHost` that replays the game's service calls against a real
-framebuffer, palette and asset set, plus the input pump that mirrors
-window events into the `ds:` latch cells.
+## What this module does
+
+`front` is the host that makes the port playable. The `game` module
+deliberately stops at every host-side effect — it emits `Call`s through
+the `VmHost` trait instead of drawing, beeping, or reading files (see
+[game-vm.md](game-vm.md) § `vhost.rs` and [concepts.md](concepts.md)
+§9). `front` provides the concrete `VmHost`: a real framebuffer and
+palette, the asset-set loader, the input pump that mirrors window events
+into the `ds:` latch cells, the font renderer, the sound backend, and
+the `Game` runner that drives the title/shell/galaxy loops — plus the
+`minifb` window that puts it all on screen.
 
 ## `font/` — the shipped 4×6 font
 
@@ -21,17 +29,21 @@ argument, so `Host::ink` only feeds the popup frame.
 
 The asm reads its `es:di` row bases from shipped `u16` tables
 (`ds:0x28D9`/`0x2A69`/`0x2BF9`/`0x2D89`) whose values equal
-`Video::di_at`, so each mode computes rows through that. `mod.rs` owns
-the `DS` mapping plus the shared `sub al,0x20` index/read helpers;
-codes past `0x5B` draw the same table-bleed garbage as DOS (the index
-keeps reading the next mode's bytes out of `img`), and only reads
-landing past `img`'s end are skipped.
+`Video::di_at`, so each mode computes rows through that (see
+[video.md](video.md)). `mod.rs` owns the `DS` mapping plus the shared
+`sub al,0x20` index/read helpers; codes past `0x5B` draw the same
+table-bleed garbage as DOS (the index keeps reading the next mode's
+bytes out of `img`), and only reads landing past `img`'s end are
+skipped — the port keeps even the original's out-of-bounds behaviour
+where it's cheap to do so.
 
 ## `Pump` (`pump.rs`) — input mirror
 
 Tracks host-side cursor/button/key state and writes it into the `ds:`
 cells the ported menu service polls (`[0x9CD6]`/`[0x9CD8]` cursor,
-`[0x9CCB]`/`[0x9CCC]` latch, `[0x9CCD]` K-mode flag).
+`[0x9CCB]`/`[0x9CCC]` latch, `[0x9CCD]` K-mode flag — the same cells
+`platform::Mouse`/`Keyboard` model, driven the other way: from the
+window into the game).
 
 - `set_buttons(left, right)` — edge-detects both buttons and queues the
   same synthetic codes the DOS driver's `0x2A18E` handler emits:
@@ -46,16 +58,17 @@ cells the ported menu service polls (`[0x9CD6]`/`[0x9CD8]` cursor,
   whether motion still mirrors into the `ds:` cursor cells.
 - `write(vm, st)` — once per frame: mirrors cursor (if `motion`),
   K-mode flag, and drops at most one queued code into the latch, only
-  when `[0x9CCB]` is free.
+  when `[0x9CCB]` is free — the pace the DOS driver would inject at.
 
 ## `Host` (`host.rs`) — the `VmHost` impl
 
 Owns `Screen`, `Palette`, `Pump`, `AssetSet`, the unpacked exe image and
 a `dropped` counter for unmodelled calls. `cs:` reads map through
 `CS_OFS = 0x30000` (game code) — `cs_word(ofs)` reads a LE word at
-`img[0x30000+ofs]`.
+`img[0x30000+ofs]` (see [concepts.md](concepts.md) §2 for why the
+constant is `0x30000`).
 
-`svc` dispatch:
+`svc` dispatch — what each `Call` variant actually does here:
 
 - `Call::Image(i)` → `Screen::draw_image` (the `[0x125A]` slot) — the
   mode's own decoder: MCG linear, EGA four plane streams, CGA/TGA
@@ -82,7 +95,8 @@ a `dropped` counter for unmodelled calls. `cs:` reads map through
 - `Call::Load(ofs)` → `front/load.rs` `Loader` — `ds:0x1208`+ cell →
   `{stem}{sfx}.{BIN,GPH}`; the `.GPH` half swaps `set`
   (`Host::set_assets` configures dir + stem; the endings' `*DTH`/`*WIN`
-  and the restart tail's `*IN`/base pairs ride it).
+  and the restart tail's `*IN`/base pairs ride it) — see
+  [assets.md](assets.md).
 - `Call::Text(ofs)` → `front/text.rs` — one `menu_text` page of the
   `ss:0x20000` stream; returns `end<<8 | fb15`; the 16×24 glyph tiles
   are counted `dropped` (menu font not drawn).
@@ -108,13 +122,15 @@ ports the init tail before `shell_enter`: `Vm::from_image` (shipped `ds`
 image), `State::new`, `Rng::new(seed)`, `Host::new`, the `[0x143]`
 BIOS-mode word the mode select leaves, then `select_galaxy(preset)` →
 `new_game` (whose head runs `stage_save`/`0x8432`, so the preset lands
-in the staging snapshot) → `shell_enter`.
+in the staging snapshot) → `shell_enter` — a straight-line new game,
+skipping the attract.
 
 `Game::new_title` is the asm's boot path instead: `State::from_image`
 (the picker's template records ship in the save block) then
 `title_enter` — the `0x85B1` attract parked in `Vm::title`; the picker's
 start action selects the preset and the shared `0x1D60` tail runs
-`act_newgame` (the full `0x305B` — head, repaint and shell re-entry).
+`act_newgame` (the full `0x305B` — head, repaint and shell re-entry;
+see [game-ui.md](game-ui.md) § `title.rs`).
 
 `step()` = one frame: `pump_input` mirrors inputs into `ds:` (plus
 the `[0x91D3]` gate byte into the audio layer), then — in precedence
@@ -127,17 +143,18 @@ through the `0x3906` action.
 
 ## `window.rs` (feature `minifb`)
 
-`run(g)` — a `320×200` `minifb` window at `Scale::X4`, `set_target_fps(30)`:
-per frame `input()` polls cursor/buttons/keys into the pump (scancodes
-are set-1: the whole `ds:0x7CBD` keymap — alnum rows, `-`/`=`/`;`/`\`/
-`,`/`.`/`/`/space, keypad digits and the edit cluster — plus the
-`K`-mode nav arrows `0x48`/`0x50`/`0x4B`/`0x4D`, Enter `0x1C`, Esc
-`0x01`; break = `scan | 0x80`), `g.step()`, then
+`run(g)` — a `320×200` `minifb` window at `Scale::X4`,
+`set_target_fps(30)`: per frame `input()` polls cursor/buttons/keys
+into the pump (scancodes are set-1: the whole `ds:0x7CBD` keymap —
+alnum rows, `-`/`=`/`;`/`\`/`,`/`.`/`/`/space, keypad digits and the
+edit cluster — plus the `K`-mode nav arrows `0x48`/`0x50`/`0x4B`/`0x4D`,
+Enter `0x1C`, Esc `0x01`; break = `scan | 0x80`), `g.step()`, then
 `blit` expands `Screen::pixels()` through `Palette::rgb` into
-`0xRRGGBB` `u32`s for `update_with_buffer`. With the `audio`
-feature a cpal `audio::Out` stream is opened first (rate negotiated
-back into `snd`), and each stepped frame renders `rate/30` mono
-samples into its bounded queue.
+`0xRRGGBB` `u32`s for `update_with_buffer` — the same `pixels()` →
+`rgb()` path as [video.md](video.md). With the `audio` feature a cpal
+`audio::Out` stream is opened first (rate negotiated back into `snd`),
+and each stepped frame renders `rate/30` mono samples into its bounded
+queue.
 
 ## `audio` (`audio/`) — the sound backend (GAM-7/31)
 
@@ -160,4 +177,5 @@ while the driver's `0x61 | 0x60` Tandy-enable write holds); `0x388`/
 dropped). `Audio::render` runs the driver's `ah=0` tick (the A/R
 export-2 `service`) at the ~50 Hz rate `install_drivers` programs
 into PIT channel 0 (`0x5CEC`; the `0x5D37` at `cs:[0x1C00]` is the
-A/R module's own install) inside the sample stream.
+A/R module's own install) inside the sample stream — see
+[audio.md](audio.md) for the devices this drives.

@@ -1,5 +1,12 @@
 # `game` (6/6) — dialogs, save/load I/O, line editor
 
+Page 6 of the `game` module docs — the modal dialogs: the save/load
+dialog and its actions, the yes/no confirm, and the blocking filename
+line editor. These are the routines that *take over the UI* — they swap
+the hotspot list for their own and run their own frame loop until
+dismissed. See [game-ui.md](game-ui.md) for the shell/menu machinery
+they reuse.
+
 ## `dialog.rs` — dialog plumbing (`0x32E21`–`0x33039`)
 
 Both dialogs reuse the shell's frame phases (vsync, input stub, menu
@@ -11,17 +18,19 @@ for the main dialog, `[0x9CDA] & 2` (right button).
   `BLINK_HOLD=0xFF`: `{vsync, blink, ≤3 ticker steps, seq, oval,
   mark_sel, FRAME++}` while `[0x91C2] ≠ 0`; tail clears hold and, mode
   0 only, resets the blink phase + reprints `0x77E3` (the `jmp 0x2D86`
-  tail).
+  tail) — so a dialog can't open mid-scroll: queued messages finish
+  first.
 - `dlg_enter` (`cs:0x2E21`) — sound, pump, `Slot(0x1274)`, frame rect
   (`Rect(0x14,0x5A,8,0x66)`), install the 3-record `0xB05A`/`0xB05C`
   list (`dlg_list`), `Image(0x12B)`. `dlg_step` (`cs:0x2E60`) = one
   modal iteration (`vsync`, `0xA369`, menu, oval, seq, `KeyPop`);
   `true` on `[0x9CDA]&2`. `dlg_close` (`0x2E7A`) — frame,
   `Slot(0x1272)`, restore the `0xA0AA`/`0xA0AC`/`0x31` list
-  (`main_list`).
+  (`main_list`) — restore is what hands the shell its hotspots back.
 - `confirm` (`cs:0x2F9B`) — title `0x78B8` + body `0x7C72` prints,
   2-record `0xB098`/`0xB09A` list, modal wait on `[0x91DA]` written by
-  the `0x2F01`/`0x2F08`/`0x2F95` actions, then restore the dialog list.
+  the `0x2F01`/`0x2F08`/`0x2F95` actions, then restore the dialog list —
+  the cell is the *result channel*: `1` yes / `2` no / `0xFF` cancel.
 - `snd_block` — the shared `0x8A5B`/`0x8A3B`/`Sound(0xA)` chirp;
   `install`/`dlg_text` (`cs:0x2F24`, print at `(0x2A,0xB1)`)/`frame_rect`
   (`cs:0x2FD7`) helpers.
@@ -29,13 +38,15 @@ for the main dialog, `[0x9CDA] & 2` (right button).
 ## `dlg_io.rs` — save/load dialog actions (`0x32E94`–`0x32F9A`)
 
 The filename buffer is `ds:0..0x20`; the input routine sanitises
-`0x20` → NUL (terminate) and `0x5B` ('[') → `0x5C` ('\\').
+`0x20` → NUL (terminate) and `0x5B` ('[') → `0x5C` ('\\') — the keymap
+can't produce a backslash, so '[' stands in.
 
 - `load_game` (`cs:0x2E94`) — prompt `0x78E5`, `input_name`,
   `slot_mode(1)` (`[0x9CCA]` + `Slot(0x1278)` pre-load), `st.load(files,
   name)`; carry → `0x7929` error print + `None`. Success →
   `slot_mode(2)`, `ppanel::planet_panel`, `0x7C50` print, then the `[0x91E5]`
-  switch → `Loaded::{A,B,C,D}` (`jmp 0x685A`/`0x6847`/`0x6834`/`0x6821`).
+  switch → `Loaded::{A,B,C,D}` (`jmp 0x685A`/`0x6847`/`0x6834`/`0x6821`) —
+  the saved game itself records which screen to return to.
 - `save_game` (`cs:0x2ED2`) — prompt, input, `st.save`; `0x7C2E` ok /
   `0x7929` error.
 - `input_name` (`cs:0x2F2D`) — `NAME_LEN=0`, `NAME_MAX=0x1E`, legend
@@ -44,7 +55,9 @@ The filename buffer is `ds:0..0x20`; the input routine sanitises
   `NAME_MAX=9`, then the `ds:0..0x20` sanitiser. `filename()` reads the
   ASCIIZ result.
 - `act_yes`/`act_no`/`act_cancel` — `[0x91DA]` = `1`/`2`/`0xFF`;
-  `act_stage` (`cs:0x2F91`) — the `0x844B` heap restore.
+  `act_stage` (`cs:0x2F91`) — the `0x844B` heap restore (loads the
+  checkpoint `stage_save` snapshotted at `new_game` time — "restart
+  scenario").
 
 ## `linein.rs` — `line_input` (`cs:0xE66E`, `0x2E66E`–`0x2E77C`)
 
@@ -56,7 +69,10 @@ backspaces (blank, echo `Slot(0x1268,0x20)`, `NAME_LEN−1`), `2` pads
 the field with spaces and exits, else appends while
 `NAME_LEN < NAME_MAX` (`Slot(0x1268,ch)` echo). `IN_DIRTY` is the
 key-held debounce — a processed key sets it, a non-matching poll clears
-it. Idle iterations always `vsync`; when `LINE_MODE==0` they also run
+it, so a held key doesn't auto-repeat: each make produces one
+character.
+
+Idle iterations always `vsync`; when `LINE_MODE==0` they also run
 `seq_step`/overlay/`tick_step`/mode-0 `[0x1278]` reload + `FRAME++` —
 the filename caller brackets with `[0x9CC5]=1` so dialog waits are
-vsync-only (the world pauses during text input).
+vsync-only (**the world pauses during text input** — no ticks run).

@@ -1,15 +1,26 @@
 # `difftest` — DOSBox-X differential testing (GAM-25)
 
-Runs the original `GAME.EXE` under DOSBox-X and the port on the same
-scripted input, then diffs guest state — GAM-9's "run original vs port
-side-by-side on scripted input and compare state" stretch.
+## What this is for
+
+The strongest verification tool in the repo: it runs the **original
+`GAME.EXE` under DOSBox-X** and the Rust port on the *same* scripted
+input, dumps guest memory/palette/state from both, and diffs the bytes —
+GAM-9's "run original vs port side-by-side on scripted input and compare
+state" stretch. When the port disagrees with the original, the diff
+names the exact byte that diverged.
+
+Think of it as a two-player replay: a TSR probe inside the emulator and
+the port-side driver both consume the same op schedule (keys, mouse
+moves, pokes, waits, dumps), then `report.txt` compares the artefacts
+byte-for-byte.
 
 ## Pieces
 
 - `difftest/probe.asm` → `difftest/probe.com` (`nasm -f bin`). A TSR
   loaded before the game: hooks int 21h (segment discovery), int 33h
   (mouse-handler capture) and the game's int 8h timer chain (tick +
-  scheduler). One tick = one int-8 chain call ≈ 55–60 ms.
+  scheduler). One tick = one int-8 chain call ≈ 55–60 ms — the probe's
+  notion of a frame.
 - `rust/src/difftest/` — `op`/`script` (record codec + text parser),
   `seg` (`ds`/`drv`/absolute selectors), `dump` (artefact names +
   24-byte debug block), `snap` (port-side byte images), `input` (the
@@ -58,21 +69,26 @@ run writes `difftest/out/Dxx.BIN`/`Pxx.BIN`/`Sxx.BIN`/`ARMED.BIN`/
 `report.txt` diffs them byte-for-byte and lists the first eight
 mismatches per artefact.
 
-## Checkpoints
+## Checkpoints and timing skew
 
 The game's `ds:0x91D4` frame cell doesn't free-run in the shell, so the
 probe schedules on its own tick; `waitcell` gives exact sync on a game
 byte (e.g. `waitcell 91CD 5` = hold until `uimode` = galaxy). The port
 maps one tick to one `Game::step`, and skew is absorbed by comparing at
-quiescent checkpoints.
+quiescent checkpoints — dumps scheduled after the machines on both
+sides have settled, not mid-animation.
+
+## Booting the port from a DOS dump (the RNG problem)
 
 For runs beyond boot the RNG matters — `new_game` consumes the LCG and
-the original reseeds it from the timer, so a script typically dumps
-`ds` (`0..0x8000`, `0x8000..0x10000` = `D01`/`D02`) and the
-`drv:0x55A2` dword (`D03`) early; `boot` then restores the port from
-those dumps (`Rng::set_state`) and replays only ops scheduled after
-`boot_tick`, making later dumps comparable without needing the seeds
-to coincide.
+the original reseeds it from the timer, so the two sides' seeds can
+never coincide. A script therefore typically dumps `ds`
+(`0..0x8000`, `0x8000..0x10000` = `D01`/`D02`) and the `drv:0x55A2`
+dword (`D03`) early; `boot` then restores the port from those dumps
+(`Rng::set_state`) and replays only ops scheduled after `boot_tick`,
+making later dumps comparable without needing the seeds to coincide.
+The port doesn't need to *reproduce* the original's random boot — it
+needs to *continue identically from an identical state*.
 
 The E2E test is opt-in — `DIFFTEST_E2E=1` plus a `dosbox-x` binary and
 `difftest/probe.com`; it writes into `difftest/out/`.

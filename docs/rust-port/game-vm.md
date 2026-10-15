@@ -1,21 +1,49 @@
-# `game` (2/4) — the scripted-event VM (`cs:0x773D`)
+# `game` (2/6) — the scripted-event VM (`cs:0x773D`)
+
+Page 2 of the `game` module docs — start with
+[game-state.md](game-state.md) for the data model and
+[concepts.md](concepts.md) for notation.
+
+## What the VM is for
+
+Much of the game's *scripted* behaviour — timed events, ambushes,
+tributes, uprisings, endgame checks, HUD reprints — is not hardcoded
+into the tick loop. Instead the game ships a tiny interpreter: a table
+of event slots in `ds` points at bytecode scripts, and each tick the VM
+runs one slot's worth of opcodes. Each opcode is an index into a jump
+table of routines — guard conditions that *suspend* the event until a
+fact is true, and actions that mutate `ds` cells, print to the ticker,
+or call host services.
+
+The single most important semantic: **`si` (the instruction pointer) is
+never written back**. A suspended event re-runs from its first opcode
+next tick, so scripts aren't resumable coroutines — they're
+**guard+action rules** whose persistent state lives in `ds` cells
+(flags, counters, delay cells), not in the instruction pointer. When a
+doc says "suspends", it means the handler returned `Flow::Ret` and the
+script will retry from the top next time.
 
 ## `Vm` (`vm.rs`) — memory model
 
-The interpreter runs over the whole `ds` space, split three ways:
+The interpreter runs over the whole `ds` space, split three ways so
+reads/writes land in the right owner:
 
 - `low: Box<[u8]>` — `ds:0x0000..0x7D39`: event scripts (`0x51FB`+),
   the `ds:0x50E3` op table, the `ds:0x5183` event slots, message
   strings, VM flag cells.
-- `State` — `ds:0x7D39..0x9CC4` (the saveable block).
+- `State` — `ds:0x7D39..0x9CC4` (the saveable block — see
+  [game-state.md](game-state.md); VM writes land in savegames).
 - `hi: Box<[u8]>` — `ds:0x9CC4..=0xFFFF`: menu records and scratch.
 
-Plus `modal` (the `cs:0xE713` modal-dialog flag — a code-segment cell in
-the asm), `end`/`title`/`title_done` (the parked `cs:0x8B17`/`0x8C65`
-ending and `cs:0x85B1` attract machines — the asm blocks inside them,
-the port steps them one unit per frame) and `stage` (the heap segment
-the `0x8432`/`0x844B` routines copy the save block into/out of,
-`ds:0x3829` in the asm).
+Plus the non-`ds` state the asm kept in code-segment cells:
+
+- `modal` (the `cs:0xE713` modal-dialog flag),
+- `end`/`title`/`title_done` (the parked `cs:0x8B17`/`0x8C65` ending
+  and `cs:0x85B1` attract machines — the asm *blocks inside* these
+  routines; the port steps them one unit per frame instead),
+- `stage` (the heap segment the `0x8432`/`0x844B` routines copy the
+  save block into/out of, `ds:0x3829` in the asm — the "restore
+  checkpoint" the act_stage action loads).
 
 Key addresses: `JT_BASE = 0x50E3` (op jump table — 40 far pointers
 `{ofs, 0x286B}` shipped in the image; `ofs` is a near offset in the
@@ -46,13 +74,12 @@ Tick codes `0x38+2N .. 0x56+2N` index the `ds:0x5183` event table; word
 address (the shipped image stores `{ofs, 0x286B}` far pointers —
 `jtab::fix` normalises `ofs` to `cs:` labels at load; op words step by
 4). `Flow`: `Cont` = `jmp 0x7758` (fetch next), `Ret` =
-`ret` (suspend). **`si` is never written back** — a suspended event
-re-runs from its entry next tick, so scripts are guard+action rules
-whose state lives in `ds` cells, not the instruction pointer.
+`ret` (suspend).
 
 `run(c, idx)` = the `cs:0x773D` entry + `cs:0x7758` fetch loop: `si` from
 the event table, loop `{w = r16(si); t = r16(JT_BASE+w); si += 2}` until
-a handler returns `Ret`; returns the op count.
+a handler returns `Ret`; returns the op count — the `Tick` enum's
+payload for the Script arm (see [game-tick.md](game-tick.md)).
 
 `Ctx<'a>` — the five borrow contexts every op takes: `vm`, `st`, `rng`,
 `host: &mut dyn VmHost`, `files: &mut dyn DosFiles`. `vsync(c)` = one
@@ -60,7 +87,8 @@ a handler returns `Ret`; returns the op count.
 
 Scratch registers (inside the save block): `R_SEL 0x81EE` (selected
 record), `R_MACH 0x81F2` (found machine), `R_PLANET 0x81F6`, `R_A
-0x81F7`, `R_B 0x81F8`, `R_C 0x81FA` (dword).
+0x81F7`, `R_B 0x81F8`, `R_C 0x81FA` (dword) — the VM's "registers" are
+just more `ds` cells, so they persist in savegames too.
 
 Helpers: `planet_rec` (`[0x81F6]`·`0x3A` + base), `faction_rec`
 (`[0x91B8]`·`0x3A` + base), `uimode`, `kind_of(rec)`, `set_bits` (`or
@@ -100,6 +128,9 @@ UI mode 1.
 Unmapped targets → `Flow::Ret`.
 
 ## Event routines (tick-direct, all `Ret`-suspending)
+
+These are the big multi-step events the tick dispatcher reaches directly
+(code ≥ `0xA7` arms — see [game-tick.md](game-tick.md)).
 
 - `vdir::disaster` (`cs:0x7A45`) — modal print `0x5D7B`, menu, sound
   seq (`Chan(0x8A5B)`/`Chan(0x8A3B,8)`/`Sound(0x15)`, `[0x91D3]`-gated),
@@ -201,4 +232,5 @@ function, `[0x91D3]` gate applied before emitting),
 `trait VmHost { svc(call) -> u16; cs_word(ofs) -> u16; pump_input(vm, st);
 key_flush(); }` — `cs_word` serves the draw sequencer's `cs:` reads;
 `pump_input` re-mirrors input at every `0x2CA9` boundary so modal loops
-see input; `key_flush` resets channel A. `NullHost` drops everything.
+see input; `key_flush` resets channel A. `NullHost` drops everything;
+`front::Host` is the real implementor ([front.md](front.md)).
