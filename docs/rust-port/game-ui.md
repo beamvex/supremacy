@@ -10,16 +10,18 @@ once per frame.
 The **outer loops** of the game: the galaxy-screen frame body
 (`frame_step`), the main shell (`shell_step`), the menu/hotspot input
 service (`menu::service`), the action dispatch table those hotspots
-point at, the title/attract phase, record selection, the type selector
-and the info panel. Where [game-tick.md](game-tick.md) describes what
-one tick *does*, this page describes the loop that calls it, polls
-input, and repaints.
+point at, the title/attract phase, the per-mode screen entries
+(`screens/`), record selection, the type selector and the info panel.
+Where [game-tick.md](game-tick.md) describes what one tick *does*, this
+page describes the loop that calls it, polls input, and repaints.
 
 The asm versions of these routines *block* — `frame_step`'s original
 `jmp 0x395B`s until the right-button exit, `shell_step` loops forever.
 The port turns each into "advance one frame's worth of work and return
 a status", which is what `front::Game::step` alternates (see
-[front.md](front.md)).
+[front.md](front.md)). This is the recurring port idiom for blocking
+loops: a loop that ends on an input edge becomes a step function +
+a status enum the runner switches on.
 
 ## `frame.rs` — `frame_step` (`cs:0x395B`, `0x3395B`–`0x33A44`)
 
@@ -40,7 +42,10 @@ bit) → `[0x9CDA]&2` → `exit` (clear `0x91EA`, `Mouse(8,0,0xBC)`, stash
 `HOT_SEL` at `0xA81A`) → `Frame::Shell`, else `Frame::Run(tick)`.
 
 Note the ordering: input and menu service run *before* the tick work, so
-a click this frame is visible to the sim next frame.
+a click this frame is visible to the sim next frame. The `dirty_flags`
+one-bit-per-frame budget is the same bounded-work trick the tick
+scheduler uses — the panel refresh can take many frames, and the asm
+*accepts* the visible stagger rather than spending a frame on it all.
 
 ## `shell.rs` — the UI shell (`cs:0x2CC5`, `0x32CC5`–`0x32D85`)
 
@@ -52,8 +57,8 @@ reproduces by running both blocks unconditionally. Then `setup`: slots
 `0x1260`/`0x125C`, `Native(0x89B3)` CGA border, `Image(0)` backdrop,
 `Present(0)`, `Slot(0x1272)`, `[0x928B] = [0x91A6]`, `Refresh`, hotspot
 install (`[0x9CC8]=[0xA0AA]`, `[0x9194]=0xA0AC`, `[0x91A8]=0x31`,
-`uimode=0`), `ppanel::planet_panel`, `mark_sel`, `tick_day`, `Native(0xA3BC)`,
-`Slot(0x1278)`, `Native(0xA36A)`.
+`uimode=0`), `ppanel::planet_panel`, `mark_sel`, `tick_day`,
+`Native(0xA3BC)`, `Slot(0x1278)`, `Native(0xA36A)`.
 
 `shell_step` — one shell frame (`cs:0x2D5B`–`0x2D84`): `vsync` →
 `seq_step` → `Native(0xA369)` → `menu::service` → `tick_step` →
@@ -70,7 +75,9 @@ Polled input then debounced hit-test over the `0x14`-byte hotspot list
 hotspot records. Hotspot record: `+0/+2/+4/+6` = inclusive
 `x1,y1,x2,y2`; `+8` = pressed-state image index; `+0xC` = action `cs:`
 pointer (`jmp [si+0xC]`); `+0x10..+0x13` = nav links (`0xFF` = stay) —
-the keyboard-navigation graph the `K`-mode arrows walk.
+the keyboard-navigation graph the `K`-mode arrows walk. (The nav links
+are per-direction indices into the same list — a hotspot's `+0x10` is
+"which record to focus when the user presses Up".)
 
 - `keys` — `synth` first: in real-driver mode the latch codes
   `0x7E`/`0x7D`/`0xFE`/`0xFD` → `press` writes `[0x9CDA] = 1/2/0`
@@ -109,7 +116,32 @@ the keyboard-navigation graph the `K`-mode arrows walk.
 
 Unmapped action pointers become `Call::Native(t)` — the frontend gets
 to decide (or count them as `dropped`), which is how unported menu
-targets surface instead of silently no-opping.
+targets surface instead of silently no-opping. A hotspot action that
+the port doesn't own is *visible* this way — a `Native` in the call log
+is a menu entry nobody ported yet.
+
+## `screens/` — the per-mode menu entries
+
+Each hotspot's `+0xC` `jmp`s into a `screens::*` entry — the routine that
+installs the screen's hotspot list and runs its inline frame loop until
+right-button exits back to `shell_enter`. Every entry does a leading
+`pop ax` (abandoning the menu hit-test's return address — the port just
+returns into `menu::service`) and most come in `N`/`N+3` pairs: the
+`N+3` variant runs the `[0x1274]` window slot first.
+
+| entry | `cs:` | screen |
+|---|---|---|
+| `galaxy::enter_galaxy` | `0x3906`/`0x3909` | uimode 5 galaxy view → `Phase::Galaxy` |
+| `build` | — | build-machine screen |
+| `detail` (`enter_detail`/`_sel`/`_win`) | — | planet detail |
+| `fleet` | — | fleet screen |
+| `orders` | `0x9F42`/`0x9F45` | uimode-3 orders list |
+| `spy` / `status` / `surface` / `galbuild` / `galmsg` / `launch` / `machd` / `open` | — | the other per-mode screens |
+| `misc` | — | `cell_pick`, `map_click`, `mode_pick`, `report`, `restart`, `snd_toggle`, `stub` shared actions |
+
+The galaxy entry is special: its loop is the port's `Phase::Galaxy`,
+keyed off `uimode == 5` by the runner — the one screen whose frame loop
+escaped into the runner rather than living in `screens/`.
 
 ## `title.rs` — the `0x85B1` attract + `0x8840` scenario picker
 
@@ -182,3 +214,49 @@ glyph, then `[0x91BC]` — the `tick/day` readout. `sel_name`
 (`cs:0x6AD2`, mode 0) — `+0xC == 1` prints the `0x71B9` "alien" string
 at `(0x33,0x4A)`, else a `0x3E` ('>') marker at `(0x33,0x4A)` plus the
 record name at `(0x34,0x4A)`.
+
+## Pitfalls
+
+- **Blocking loops became step functions.** `frame_step` returning
+  `Frame::Run` is "the asm looped"; a test that expects a loop has to
+  drive `step` repeatedly until it returns `Frame::Shell`.
+- **`menu::service` is debounced by `ARMED`.** One press → one hit —
+  feeding the same button state twice won't re-fire until a release.
+- **Screen entries abandon their caller.** The `pop ax` means an action
+  that `jmp`s into a `screens::*` entry never returns to
+  `menu::service`'s caller — the port models it by returning early.
+- **`uimode` decides the loop, not the phase.** `Phase::Galaxy` is
+  entered through `enter_galaxy` which sets `uimode = 5` — check the
+  mode cell, not the Rust enum, when comparing against the asm.
+
+## File map
+
+| file | item |
+|---|---|
+| `frame.rs` | `frame_step` — the galaxy loop body |
+| `shell.rs` | `shell_enter`, `shell_step` |
+| `menu.rs` | `menu::service`, `keys`, `hit_test`, `nav`, `snap` |
+| `actions.rs` | `dispatch_action` — the `+0xC` table |
+| `title/` | `title.rs` + `show`/`credits`/`pick` — attract + picker |
+| `screens/` | the per-mode screen entries (build/detail/fleet/orders/…) |
+| `selrec.rs` | `mark_sel`/`unmark_sel`/`select_rec`/`sel_next`/`row_click` |
+| `select.rs` | `select_type` — the type selector |
+| `panel.rs` | `info_panel` — the stat reprint |
+| `status.rs` | `tick_day`/`sel_name` |
+| `ppanel.rs` | `ppanel::planet_panel` — the selected-planet viewscreen |
+
+## Worked example — a click's journey
+
+Left button at (0x64, 0x30), mid-shell:
+
+1. `Pump::set_buttons` edge-detects → queues `0x7E` (real-driver code).
+2. `menu::service`'s `synth` reads the latch → `press` writes
+   `[0x9CDA] = 1`.
+3. `hit_test` walks `[0x9194]`'s list: record 2's `+0/+2/+4/+6` =
+   `0x50/0x28/0x90/0x40` — `0x50≤0x64≤0x90 && 0x28≤0x30≤0x40` → hit.
+4. `hit`: `[0x9188] = rec+8` image (drawn via `Image` if nonzero),
+   `ARMED = 1`, selection word → `[0x9194]−2`, then
+   `dispatch_action(rec + 0xC)` — a `cs:` pointer the table maps to an
+   action or `Call::Native`.
+5. Next frame: `ARMED` is set → repeats swallowed until the button
+   releases (`[0x9CDA] = 0` clears it).

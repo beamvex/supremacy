@@ -12,6 +12,31 @@ into the `ds:` latch cells, the font renderer, the sound backend, and
 the `Game` runner that drives the title/shell/galaxy loops — plus the
 `minifb` window that puts it all on screen.
 
+Think of `front` as everything the 1991 program got "for free" by being
+a DOS binary: video memory, a keyboard ISR, a mouse driver, the DAC,
+file access, sound hardware. `game/` decided *what* to do; `front/`
+decides *what that means on a real machine*.
+
+### The two `cs:` spaces — read this first
+
+There are **two** `cs:` coordinate systems and the docs use both:
+
+- **Doc labels** (`file − 0x30000`): the `cs:0x…` numbers these pages
+  cite. `cs:0x73D9` means "the routine at file `0x373D9`". Purely a
+  naming convention for matching prose to code.
+- **Runtime offsets** (`file − 0x292B0`): the near offsets the *shipped
+  image* actually stores — op-table pointers, `cs:` stream cursors,
+  seq records. `Vm::from_image`'s `jtab::fix` rewrites these into doc
+  labels at load (subtract `0x6D50`) so `vops` can match the documented
+  handlers.
+
+`Host::cs_word` serves the *runtime* space — the seq/draw streams in
+the image hold real near offsets, so `cs_word(ofs)` reads
+`img[0x292B0 + ofs]` (`TPL_OFS` in `host/svc.rs`/`host/draw.rs`/`map`).
+The `0x30000` constant only ever appears in label translation. When a
+doc says a stream cursor holds a `cs:` pointer, it means the runtime
+kind unless it says otherwise.
+
 ## `font/` — the shipped 4×6 font
 
 Replays each mode's `[0x1268]` put byte-for-byte out of `Host::img`:
@@ -45,6 +70,12 @@ cells the ported menu service polls (`[0x9CD6]`/`[0x9CD8]` cursor,
 `platform::Mouse`/`Keyboard` model, driven the other way: from the
 window into the game).
 
+In the asm a hardware interrupt drops a byte into a cell and the menu
+service reads it next frame; the port inverts the direction: the
+windowing backend *sees* an event, and `Pump` writes the cell the ISR
+would have written — so the ported `menu::service` reads exactly the
+memory the asm's menu service read.
+
 - `set_buttons(left, right)` — edge-detects both buttons and queues the
   same synthetic codes the DOS driver's `0x2A18E` handler emits:
   `0x7E`/`0x7D` down, `0xFE`/`0xFD` up (`code` submodule).
@@ -59,16 +90,19 @@ window into the game).
 - `write(vm, st)` — once per frame: mirrors cursor (if `motion`),
   K-mode flag, and drops at most one queued code into the latch, only
   when `[0x9CCB]` is free — the pace the DOS driver would inject at.
+  The one-at-a-time latch is the fidelity point: the asm can't see two
+  keypresses in one poll either.
 
 ## `Host` (`host.rs`) — the `VmHost` impl
 
 Owns `Screen`, `Palette`, `Pump`, `AssetSet`, the unpacked exe image and
 a `dropped` counter for unmodelled calls. `cs:` reads map through
-`CS_OFS = 0x30000` (game code) — `cs_word(ofs)` reads a LE word at
-`img[0x30000+ofs]` (see [concepts.md](concepts.md) §2 for why the
-constant is `0x30000`).
+`TPL_OFS = 0x292B0` (the runtime near-offset space — see § "The two
+`cs:` spaces" above) — `cs_word(ofs)` reads a LE word at
+`img[0x292B0+ofs]`.
 
-`svc` dispatch — what each `Call` variant actually does here:
+`svc` dispatch (`host/svc.rs`, `host/draw.rs`) — what each `Call`
+variant actually does here:
 
 - `Call::Image(i)` → `Screen::draw_image` (the `[0x125A]` slot) — the
   mode's own decoder: MCG linear, EGA four plane streams, CGA/TGA
@@ -96,7 +130,7 @@ constant is `0x30000`).
   `{stem}{sfx}.{BIN,GPH}`; the `.GPH` half swaps `set`
   (`Host::set_assets` configures dir + stem; the endings' `*DTH`/`*WIN`
   and the restart tail's `*IN`/base pairs ride it) — see
-  [assets.md](assets.md).
+  [assets.md](assets.md) for the full cell→name table.
 - `Call::Text(ofs)` → `front/text.rs` — one `menu_text` page of the
   `ss:0x20000` stream; returns `end<<8 | fb15`; the 16×24 glyph tiles
   are counted `dropped` (menu font not drawn).
@@ -113,7 +147,9 @@ constant is `0x30000`).
 - Menu/Dialog/Refresh/Present/Flash/Blit/other
   `Slot`/`Native`/`Ui`/`Draw` → `dropped += 1`
   (GAM-7/GAM-9 stubs — the window's per-frame blit supersedes the
-  refresh-list copy and palette flushes).
+  refresh-list copy and palette flushes). The `dropped` counter is the
+  honest accounting: anything the port chooses not to model is counted
+  rather than silently eaten, so a test can assert the set.
 
 ## `Game`/`Phase` (`runner.rs`)
 
@@ -140,6 +176,11 @@ restart), else `shell_step` (Phase::Shell, `cs:0x2CC5`) or `frame_step`
 (Phase::Galaxy, `cs:0x395B`; returns `Frame::Shell` → back to shell on
 the `[0x9CDA] & 2` exit edge). `enter_galaxy()` forces the galaxy loop
 through the `0x3906` action.
+
+The precedence is the port's answer to the asm's *blocking* routines:
+the original `title`/`end` routines loop in place until the user acts;
+the port parks them as state machines stepped once per `step()`, so a
+single `step` is always "one frame of whichever loop is live".
 
 ## `window.rs` (feature `minifb`)
 
@@ -168,14 +209,79 @@ wrapper semantics (files `0x38A5B`, `0x38A3B`, `0x38A80`, `0x38577`):
 gates `[0x155] <= 2`, so the A/R module is only reached through its
 `cs:0x126C` far table (`init`/`load_song`/`select`/`reset`).
 
-`Bus` is the concrete `audio::Ports`: `0x43`/`0x42` latch the PIT-2
-divisor, `0x61` is the gate, and `sample()` emits the square wave;
-`0xC0` feeds the `psg` SN76489 (three tone voices + LFSR noise, mixed
-while the driver's `0x61 | 0x60` Tandy-enable write holds); `0x388`/
-`0x389` write an `oplon` OPL2 rendered in the same frame; `0x330`/
-`0x331` answer as a quiescent MPU-401 (MIDI bytes accepted and
-dropped). `Audio::render` runs the driver's `ah=0` tick (the A/R
+`Bus` (`audio/bus.rs`, `bus_io.rs`) is the concrete `audio::Ports`:
+`0x43`/`0x42` latch the PIT-2 divisor, `0x61` is the gate, and
+`sample()` emits the square wave; `0xC0` feeds the `psg` SN76489
+(three tone voices + LFSR noise, mixed while the driver's `0x61 |
+0x60` Tandy-enable write holds); `0x388`/`0x389` write an `oplon` OPL2
+rendered in the same frame; `0x330`/`0x331` answer as a quiescent
+MPU-401 (MIDI bytes accepted and dropped). `Audio::render`
+(`audio/engine.rs`) runs the driver's `ah=0` tick (the A/R
 export-2 `service`) at the ~50 Hz rate `install_drivers` programs
 into PIT channel 0 (`0x5CEC`; the `0x5D37` at `cs:[0x1C00]` is the
 A/R module's own install) inside the sample stream — see
 [audio.md](audio.md) for the devices this drives.
+
+`out.rs` is the cpal boundary — `audio::Out` opens a mono stream and
+drains the rendered queue each callback; `psg*.rs` are the SN76489
+synth model (latch regs, tone counters, LFSR noise, channel mix).
+
+## `text/` — `menu_text` + the crawl
+
+`text/mod.rs` (`cs:0x2F629`) is the `menu_text` renderer the title
+attract and the `0xFA` endings call through `[0x1296]` — a stream of
+`{fb14, fb15}` blocks whose line records the `text/walk.rs` walker
+decodes (`0x00` end, `0xFF` suspend, `0xF0`+arg new line, `0x20` clear,
+else a 16×24 tile index). `text/mcg.rs` is the tile painter.
+
+The shipped binary *pages* — its scroll slots are `ret`s — so each
+block repaints in place over the previous one (the GAM-46 "prints over
+itself" bug). The port runs it as a continuous upward crawl (`Crawl`)
+like the non-DOS originals: a `Call::Text` arm renders the first block
+at once, `Call::Scroll` shifts VRAM up and feeds the next block's rows
+in at the bottom, and `u16::MAX` `Call::Text` calls pull the next block.
+Only the MCG variant is ported — the EGA/CGA/TGA twins' tile ops land in
+`dropped` like the pre-render walk.
+
+## `map/` — the galaxy map painters
+
+`map/mod.rs` — `Map::draw`, the MCG `0x2F2C5` routine behind
+`Call::Slot(0x1278)`: the system-oval orbit markers and the
+`ds:0x4C95` route overlay, reading the `ds:` cells only that routine
+touches. `map/pos.rs` is the `cs:0xE93C`-seeded position walk (the
+sin/cos lookup the orbit markers polar-plot from); `map/grid.rs` the
+`0x2F398`/`0x2F3CB`/`0x2F3FE` star-grid painters — the
+`Slot(0x127C/0x127E/0x1280)` arms. All MCG-only: the other modes' twins
+are unported.
+
+## `stars.rs` — the `cs:0x4EC4` starfield
+
+`Call::Stars(cx)`'s host side: walk `cx+1` stars and mark them in `ink`
+— the attract/ending backdrop twinkle. MCG only.
+
+## File map
+
+| file | item |
+|---|---|
+| `mod.rs` | module docs, re-exports |
+| `host.rs` | `Host` struct — Screen/Palette/Pump/AssetSet/img/`dropped` |
+| `host/svc.rs` | `impl VmHost for Host` — `svc`/`svc_st`/`cs_word`/`pump_input` |
+| `host/draw.rs` | the `Image`/`Glyph`/`Rect`/`dac0` bodies |
+| `pump.rs` | `Pump` — window events → `ds:` input cells |
+| `runner.rs` | `Game`, `Phase`, `step` — the frame loops |
+| `window.rs` | `run` — the `minifb` shell |
+| `load.rs` | `Loader` — `Call::Load` cell→file + set swap |
+| `stars.rs` | `Call::Stars` — the `cs:0x4EC4` starfield walk |
+| `font/` | the 4×6 per-mode glyph puts (`mcg`/`ega`/`cga`/`tga`) |
+| `text/` | `menu_text` block walk + MCG tile painter + `Crawl` |
+| `map/` | `Map::draw` + `grid`/`pos` — galaxy-map painters |
+| `audio/` | `Audio`/`Drv`/`engine`/`Bus`/`psg*`/`out` — the sound backend |
+
+## Worked example — a `Call::Image` round trip
+
+`tick_step`'s seq arm emits `Call::Image(0x12B)` (a seq record's image
+op). In `Host::svc`: `draw_image(&set, 0x12B)` reads the record, picks
+`di_at(x, y)`, runs the mode's decoder into `scr.buf` — the same write
+the asm's `call word [0x125A]` performed. A test asserting "the seq
+command drew record 0x12B" checks the call log for `Image(0x12B)`, not
+pixels — the call *is* the observable effect.

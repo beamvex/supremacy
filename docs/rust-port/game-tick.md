@@ -15,6 +15,13 @@ the day rollover. So a single frame never simulates "the whole galaxy" —
 it advances one slice, which is how the 1991 original keeps frame time
 bounded.
 
+This is a **round-robin scheduler**, not a batch update: the galaxy
+doesn't tick all-at-once, it ticks *one record* per frame — planet 5's
+economy runs this frame, planet 6's next. A full sweep of a 32-planet
+galaxy takes ~`0x38 + 2·32 + ~50` codes ≈ 170 frames (≈ 5–6 seconds at
+30 fps), which is why the game's economy visibly ripples rather than
+snapping.
+
 ## `tick.rs` — `tick_step` (`cs:0x73D9`, file `0x373D9`–`0x376C5`)
 
 One game tick, called once per frame. `[0x91B0]` nonzero → cleared
@@ -47,7 +54,9 @@ One game tick, called once per frame. `[0x91B0]` nonzero → cleared
 so a 32-planet galaxy spends 64 codes on planet sims + defences before
 the fixed `0xA7+` UI/event codes. `Tick` enum carries each arm's payload
 (`MachOut`, starvation flag, `Battle`, `ShipOut`, op count,
-`Option<Ending>`).
+`Option<Ending>`). The dispatch table is why the ranges look strange
+(`0x38..0x38+N` then `+2N`): the asm computes the bands inline from the
+live planet count, so the code layout *follows the galaxy size*.
 
 ## `machine.rs` — `machine_tick` (`cs:0x742C` region, `0x37423`–`0x375C1`)
 
@@ -62,7 +71,8 @@ in asm order:
   clears flag `0x20` instead), food `+0xC` (`+0x19` `G_FARMTECH` /
   `+0x1C` owner-4), dirty `0x4000`. Each add is gated on the current
   stock being under `0x7530` — not a hard cap, just "don't produce when
-  the stockpile is already full".
+  the stockpile is already full". The owner-differentiated rates are
+  how the game gives AI factions different economies.
 - `solar` — type 3 unconditionally: energy `+6` (`+7` more for owner
   3) while under `0x7530`, dirty `0x2` (`DIRTY1`).
 - `mine` (`mine.rs`, `0x3752B`–`0x375A4`) — while flag `0x8` and `M_OPS`
@@ -71,7 +81,9 @@ in asm order:
   `0x9B12 + (type−1)·0x30`); `M_OPS−1` — mid-flight: `MSG_MINE` = ops
   when flag `0x1`, dirty `0x2000` if selected; on `0`: clear flag `0x8`,
   `M_HOST` = byte at `[M_LINK]+0x28`, flag `0x1` promotes the whole
-  byte to `0x11`, dirty `0x3000` if selected.
+  byte to `0x11`, dirty `0x3000` if selected. The "promotes to `0x11`"
+  line is the asm's bit trick — `M_FLAGS |= 0x10` (powered) combined
+  with the already-set `0x1` countdown bit reads `0x11`.
 - `build` — flag `0x1` countdown `M_BUILD` (`MSG_BUILD` = remaining);
   at zero clears `0x1` and `colonise`s the `QUEUED_REC` planet: kind
   `0xA`, owner from `next16 & 7` rejected until `{1,3,4,5}`,
@@ -88,14 +100,16 @@ simulate. Order:
    forces `F_COVER = 0`; dirty `0x40`/`0x4000`. Returns the starvation
    warning — true when `food < need` and `TICK.trailing_zeros() ≥ 4`
    (every 16th tick; the asm splices the name into `0x8305` and prints
-   `0x82C0`).
+   `0x82C0`). The `trailing_zeros` check is the asm's cheap "% 16"
+   without a divide — the warning only fires on ticks divisible by 16.
 2. `coverage` — `F_COVER` tracks `100 − tax` by `±1`; dirty `0xC0` —
    the food-coverage percentage slides toward its target one point per
-   tick rather than snapping.
+   tick rather than snapping — that's why a tax change visibly eases in
+   over ~100 ticks.
 3. Odd `TICK` → `income`: `credits += pop·tax / (owner∈{1,2} ? 125 :
    200)`; dirty `0x4`. Even → `scores` (`F_GROWTH = cover/3`, halved by
    `G_FAMINE`; `F_DECLINE = (100−cover)/4 + tax/4`; dirty `0x40`) and
-   `population`.
+   `population`. Alternating by tick parity halves the per-tick cost.
 4. `population` — `net = growth − decline`; growth `net·pop/0x190 + 1`
    (skipped when `pop < 2`), decline same magnitude clamped to `pop`,
    cap `0x7530`, dirty `0x20`; then `delayed_kill` — when `G_KILL_ON`
@@ -108,7 +122,10 @@ simulate. Order:
 `0x17` ships with `S_LINK == rec` and flag `0x2` (armed): `F_ATTACK += pow`;
 `F_DEFENCE += pow + (((pow·crew/0x48) & 0xFFFF)·(guns+load+F_29+1) &
 0xFFFF)` — both multiply stages truncate to 16 bits like `mul`/`div`,
-preserving the original's overflow behaviour exactly.
+preserving the original's overflow behaviour exactly. (The `& 0xFFFF`
+is load-bearing: `pow·crew` and the second product are 16-bit `mul`s in
+the asm, and the truncating values are what the original battles were
+balanced around.)
 Selected record → dirty `0x8`/`0x10`.
 
 Then: `F_TROOPS == 0` → `Quiet` when defence is also zero, else
@@ -154,7 +171,8 @@ zero crew when `word[si] == 0`, `SHIP_RATE 0x91D6 = 9 − crew/16`
 
 `TICK` runs `1..=0x40`, wraps to `1` and increments `DAY`. (The asm's
 readout redraw is the shell's job — `tick_day` in
-[game-ui.md](game-ui.md).)
+[game-ui.md](game-ui.md).) So one game day = `0x40` = 64 ticks = one
+full `SEQ` sweep of the code space — the scheduler period *is* the day.
 
 ## `seq.rs` — `seq_step` (`cs:0x5C1E`, `0x35C1E`–`0x35C96`)
 
@@ -172,7 +190,10 @@ wrap-to-0. `[0x9198]` is a `cs:` cursor into 4-byte `{op, pad}` records:
   `[0x125A]` draw slot).
 
 One command (or delay reload) per period boundary; `cs_word` fetches
-come from the host.
+come from the host — the stream lives in the code segment, so reading
+it needs the runtime `cs:` mapping ([front.md](front.md) § two `cs:`
+spaces). Think of `seq_step` as "a playlist of image draws paced by a
+metronome" — `SEQ_PERIOD` is the tempo, the stream is the frames.
 
 ## `ticker.rs` — `ticker_step` (`cs:0x6B8F`, `0x36B8F`–`0x36C26`)
 
@@ -190,3 +211,46 @@ The msg cursor walks the message one byte per step:
   `[0x91C2]−1`, commit.
 - else — `Call::Glyph(ch, TICK_X++, 0xB8)` — draw one character and
   advance.
+
+So a ticker message is a `ds:` string with inline `0xFC`/`0xFB`/`0xFD`
+control bytes, walked one byte per `ticker_step` — the same bytecode
+trick `print_str` uses, at scroll speed instead of whole-string.
+
+## Pitfalls
+
+- **`tick_step` is per-frame, not per-event.** The code counter `SEQ`
+  picks *one* arm; calling it twice doesn't "finish" a sweep.
+- **The bands scale with planet count.** `0x38..0x38+N` widens as
+  `REC_COUNT` grows — a code that's `Script` in an 8-planet galaxy can
+  be `Planet` in a 32-planet one.
+- **Dirty flags are the redraw journal.** `DIRTY0`/`DIRTY1` bits are
+  *set* by the sim arms and *consumed* by `dirty_flags` on the UI side
+  ([game-ui.md](game-ui.md)) — a bit means "this part of the panel is
+  stale", not "this happened".
+- **Truncation is deliberate.** The `& 0xFFFF` on the defence multiply
+  isn't defensive — it's the original's 16-bit `mul`, and changing it
+  changes battle outcomes.
+
+## File map
+
+| file | item |
+|---|---|
+| `tick.rs` | `tick_step` + the `SEQ` dispatch table |
+| `machine.rs` / `mine.rs` | `machine_tick` + the mining arm |
+| `sim.rs` | `sim_planet` — the economy sim |
+| `defence.rs` / `battle.rs` / `reinf.rs` | `defence_tick` + `resolve`/`overrun`/`repelled`/`reinforce` |
+| `fleet.rs` | `ship_tick` — ship ageing/panel |
+| `day.rs` | `day_tick` — TICK wrap + DAY++ |
+| `seq.rs` | `seq_step` — the draw sequencer |
+| `ticker.rs` | `ticker_step` — the status-line scroller |
+
+## Worked example — what `SEQ = 0x41` does
+
+With `REC_COUNT = 8` (a small galaxy): `bl = 0x41` lands in
+`0x38..0x38+8`, so `sim_planet(0x41 − 0x38 = 9)`… but `0x41−0x38 = 9`
+is past 8 — the bands are computed `0x38+N` so `0x41` is actually
+`Defence` for planet `0x41 − 0x38 − 8 = 1`. The table's `+N`/`+2N`
+bands move with `N` — always compute the band from the live count,
+not the hex. At `SEQ = 0xFF` regardless of `N` the arm is `Day`:
+TICK wraps to 1 and `DAY` increments — the fixed codes after `+2N` are
+the UI/event half of every sweep.
