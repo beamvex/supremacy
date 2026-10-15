@@ -13,6 +13,12 @@
 //! for `DONE.BIN`, then replays the script on the port — booting from
 //! the `D01`/`D02`/`D03` checkpoint dumps when present — and diffs the
 //! artefact sets into `out/report.txt`.
+//!
+//! The port's image follows the original exe on disk (see
+//! [`difftest::port_img`][supremacy::difftest::port_img]) —
+//! `GAME/GAME.EXE`, the same file DOSBox-X boots, unpacked at run
+//! time — unless a dev's `decompiled/GAME.unpacked.exe` is present;
+//! the embedded blobs are only the no-exe `--port-only` fallback.
 
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -115,6 +121,11 @@ fn dos_pass(o: &Opt) -> bool {
         eprintln!("dosbox-x not found — port-only pass");
         return false;
     };
+    let exe = o.root.join("GAME/GAME.EXE");
+    if !exe.is_file() {
+        eprintln!("{}: not found — port-only pass", exe.display());
+        return false;
+    }
     let _ = std::fs::remove_dir_all(&o.out);
     let _ = std::fs::create_dir_all(&o.out);
     let conf_path = o.out.join("dosbox-x.conf");
@@ -131,10 +142,8 @@ fn dos_pass(o: &Opt) -> bool {
 }
 
 fn game(o: &Opt, boot: bool) -> Option<Game> {
-    // An unpacked exe on disk still wins — difftest debugging may swap
-    // in a patched image; otherwise the committed `data/*.bin` blobs.
-    let img = std::fs::read(o.root.join("decompiled/GAME.unpacked.exe"))
-        .unwrap_or_else(|_| supremacy::img::image());
+    let (img, src) = dt::port_img(&o.root);
+    println!("port image: {src}");
     let set = load_set(&o.root.join("GAME"), "MCG", heap_segment()).ok()?;
     let pal = from_dac(img.get(0x15034..0x15034 + 768).unwrap_or(&[]));
     let files = Box::new(MemFs::new()) as Box<dyn supremacy::platform::DosFiles>;

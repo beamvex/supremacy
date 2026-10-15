@@ -17,9 +17,11 @@
 //! blobs from the shipped `GAME.EXE` with `cargo run --bin extract-img`.
 
 mod blobs;
+mod from_exe;
 mod image;
 
 pub use blobs::{Region, REGIONS};
+pub use from_exe::from_exe;
 pub use image::image;
 
 /// Byte length of the file layout [`image`] reconstructs — the verified
