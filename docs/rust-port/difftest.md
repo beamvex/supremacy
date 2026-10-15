@@ -40,9 +40,10 @@ referee is the original binary.
   `seg` (`ds`/`drv`/absolute selectors), `dump` (artefact names +
   24-byte debug block), `snap` (port-side byte images), `input` (the
   key/mouse/poke/wait op application, shared with `smoke`), `drive`
-  (the replay loop), `boot` (start the port from a DOS `ds` dump), `conf`
-  (the generated `dosbox-x.conf`), `spawn` (headless DOSBox-X),
-  `report` (the diff).
+  (the replay loop), `boot` (start the port from a DOS `ds` dump),
+  `exe` (which binary the port boots — the original `GAME.EXE` before
+  the embedded blobs), `conf` (the generated `dosbox-x.conf`), `spawn`
+  (headless DOSBox-X), `report` (the diff).
 - `rust/src/bin/difftest.rs` — the driver binary.
 - `rust/tests/difftest.rs` — codec/replay/boot tests plus a gated E2E.
 
@@ -100,6 +101,14 @@ run writes `difftest/out/Dxx.BIN`/`Pxx.BIN`/`Sxx.BIN`/`ARMED.BIN`/
 `DONE.BIN` on the DOS side and mirrors under `difftest/out/port/`;
 `report.txt` diffs them byte-for-byte and lists the first eight
 mismatches per artefact.
+
+The port boots the same binary DOSBox-X does (GAM-57): `port_img`
+unpacks `GAME/GAME.EXE` at run time, so a swapped or patched exe
+changes both halves of the diff. A `decompiled/GAME.unpacked.exe` on
+disk still wins — that's the patched-image debugging hook — and the
+embedded `data/*.bin` blobs are only the fallback when no exe exists
+(a `--port-only` run on a fresh clone). The driver prints which source
+it used (`port image: …`).
 
 Reading a report: each artefact gets a line (`D01.BIN: 128/8067 bytes
 differ, first @ 0x024`), then the first few mismatching offsets with
@@ -167,6 +176,7 @@ The E2E test is opt-in — `DIFFTEST_E2E=1` plus a `dosbox-x` binary and
 | `input.rs` | `key`/`mouse`/`pokew`/`waitcell` application (shared with smoke) |
 | `drive.rs` | the replay loop over a script |
 | `boot.rs` | port boot from DOS `ds` dumps (`Rng::set_state`) |
+| `exe.rs` | port-side image precedence — dev `unpacked.exe` → `GAME.EXE` → blobs |
 | `conf.rs` | generated `dosbox-x.conf` |
 | `spawn.rs` | headless DOSBox-X subprocess |
 | `report.rs` | byte-for-byte artefact diff |

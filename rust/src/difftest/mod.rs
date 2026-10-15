@@ -11,7 +11,9 @@
 //! Port side: [`drive::run`] replays the same [`script`] ops against
 //! [`crate::front::Game`] and writes matching dumps; [`boot`] can start
 //! the port from a DOS `ds` dump so runs only need an aligned state,
-//! not an aligned RNG seed. [`report`] diffs the two dump sets.
+//! not an aligned RNG seed. The port's exe image comes from the
+//! original `GAME.EXE` itself ([`exe::port_img`]), so a swapped binary
+//! changes both halves of the diff. [`report`] diffs the two dump sets.
 //!
 //! Ops/timing: script ticks are the probe's int-8 chain calls
 //! (~16.7 Hz); the port maps one tick to one `Game::step`. Transient
@@ -22,6 +24,7 @@ mod boot;
 mod conf;
 mod drive;
 mod dump;
+mod exe;
 mod input;
 mod op;
 mod report;
@@ -34,6 +37,7 @@ pub use boot::{boot_tick, from_dumps, have_boot, port_ds, read_boot};
 pub use conf::conf;
 pub use drive::run;
 pub use dump::{dbg_parse, dump_name, pal_name, stat_name, Dbg, ARMED_NAME, DBG_LEN, DONE_NAME};
+pub use exe::{port_img, ImgSrc};
 pub use input::input;
 pub use op::{Op, Rec};
 pub use report::{compare, Diff, Report};
