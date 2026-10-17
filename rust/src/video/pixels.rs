@@ -19,6 +19,17 @@ impl Screen {
         px
     }
 
+    /// Read one pixel in the mode's layout — the read-side inverse of
+    /// [`Screen::put_pixel`], for the starfield's prev-dot tests (which
+    /// must see the same colour the mark wrote, whatever the packing).
+    #[must_use]
+    pub fn peek(&self, x: usize, y: usize) -> u8 {
+        if x >= W || y >= H {
+            return 0;
+        }
+        self.pixel_at(x, y)
+    }
+
     fn pixel_at(&self, x: usize, y: usize) -> u8 {
         match self.mode {
             Video::Mcga => self.buf[y * W + x],

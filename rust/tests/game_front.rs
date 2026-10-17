@@ -340,6 +340,35 @@ fn menu_text_tile_lands_in_every_layout() {
     assert!(h.scr.buf[0x474..0x47C].iter().any(|&b| b != 0));
 }
 
+/// GAM-59 — the snow sweep must work on the packed modes too:
+/// `Stars::clear` early-returned and `mark` never tracked `prev` off
+/// MCG, so the warm-up's dots stayed painted through the whole crawl
+/// (and trailed during the warm-up itself). Now every mode erases
+/// `prev` like `0x2F59B` and the arm clears them all.
+#[test]
+fn snow_sweeps_in_every_mode() {
+    for mode in [Video::Ega, Video::Cga, Video::Tga] {
+        let mut h = mode_host(mode);
+        for _ in 0..0x40 {
+            h.svc(Call::Stars(0x63));
+        }
+        let dot = if mode == Video::Cga { 3 } else { 0xF };
+        let px = h.scr.pixels();
+        let before: Vec<usize> = (0..px.len()).filter(|&i| px[i] == dot).collect();
+        assert!(
+            !before.is_empty() && before.len() <= 0x64,
+            "{mode:?}: {} dots (trails?)",
+            before.len()
+        );
+        h.svc(Call::Text(0x5012));
+        let after = h.scr.pixels();
+        assert!(
+            before.iter().all(|&i| after[i] != dot),
+            "{mode:?} snow still on screen at crawl"
+        );
+    }
+}
+
 /// GAM-46 follow-up — the MCG `[0x1294]` star mark (`0x2F59B`) must
 /// erase the star's previous pixel (only when it's still the `1`
 /// colour) and only plot onto empty cells, so the attract's starfield

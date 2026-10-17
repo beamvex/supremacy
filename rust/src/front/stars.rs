@@ -84,16 +84,13 @@ impl Stars {
     }
 
     /// The `0x4E3C` init the crawl runs at page arm — wipe every live
-    /// dot (the same `prev`-is-`1` test `0x2F59B` uses) so the snow is
-    /// gone before the text starts.
-    pub fn clear(&mut self, scr: &mut Screen) {
-        if scr.mode != Video::Mcga {
-            return;
-        }
+    /// dot (the same `prev`-still-`dot` test `mark` uses) so the snow is
+    /// gone before the text starts, in every mode (GAM-59 — the non-MCG
+    /// early-return left the warm-up's dots over the whole crawl).
+    pub fn clear(&mut self, scr: &mut Screen, ink: u8) {
+        let dot = dot_ink(scr.mode, ink);
         for s in self.tab.iter_mut() {
-            if s.prev != 0 && scr.buf.get(usize::from(s.prev)) == Some(&1) {
-                scr.buf[usize::from(s.prev)] = 0;
-            }
+            erase(scr, s.prev, dot);
             s.prev = 0;
         }
     }
@@ -132,19 +129,35 @@ impl Stars {
 /// The `[0x1294]` mark. MCG (`0x2F59B`): clear `es:[prev]` when it's
 /// still the `1` star colour, then set `es:[y·0x140 + x] = 1` only
 /// when the cell is empty — moving dots, no trails, no text clobber.
-/// The other modes' twins (`0x3061E`/`0x3061F`/`0x310CD`) keep the
-/// `put_pixel` approximation.
+/// The other modes' twins (`0x3061E`/`0x3061F`/`0x310CD`) run the same
+/// logic in pixel space — `prev` is the packed `y·0x140 + x` pixel
+/// index for every mode (identical to the MCG byte offset).
 fn mark(scr: &mut Screen, s: &mut Star, ink: u8) {
-    if scr.mode != Video::Mcga {
-        scr.put_pixel(usize::from(s.x), usize::from(s.y), ink);
-        return;
+    let dot = dot_ink(scr.mode, ink);
+    erase(scr, s.prev, dot);
+    let (x, y) = (usize::from(s.x), usize::from(s.y));
+    s.prev = u16::try_from(y * usize::from(W) + x).unwrap_or(0);
+    if scr.peek(x, y) == 0 {
+        scr.put_pixel(x, y, dot);
     }
-    if scr.buf.get(usize::from(s.prev)) == Some(&1) {
-        scr.buf[usize::from(s.prev)] = 0;
+}
+
+/// The star colour as `peek` reports it — the MCG `[0x1294]` writes a
+/// literal `1`; the other modes plot the caller's `ink` clipped to the
+/// packing (CGA 2bpp, EGA/TGA nibbles).
+fn dot_ink(mode: Video, ink: u8) -> u8 {
+    match mode {
+        Video::Mcga => 1,
+        Video::Cga => ink & 3,
+        _ => ink & 0xF,
     }
-    let di = (usize::from(s.y) * 0x140 + usize::from(s.x)) & 0xFFFF;
-    s.prev = u16::try_from(di).unwrap_or(0);
-    if scr.buf.get(di) == Some(&0) {
-        scr.buf[di] = 1;
+}
+
+/// Erase the `prev` pixel when it still holds the star colour —
+/// `prev` is a `y·0x140 + x` pixel index (`0` = never plotted).
+fn erase(scr: &mut Screen, prev: u16, dot: u8) {
+    let (x, y) = (usize::from(prev) % 0x140, usize::from(prev) / 0x140);
+    if prev != 0 && scr.peek(x, y) == dot {
+        scr.put_pixel(x, y, 0);
     }
 }
