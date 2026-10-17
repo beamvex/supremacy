@@ -36,7 +36,7 @@ impl Host {
     fn menu_text(&mut self, cur: u16) -> u16 {
         let ax = self.crawl.call(&mut self.scr, &self.img, cur);
         if cur != u16::MAX {
-            self.stars.clear(&mut self.scr);
+            self.stars.clear(&mut self.scr, self.ink);
         }
         ax
     }
