@@ -32,11 +32,9 @@ impl Host {
     /// `Call::Text` — the `menu_text` crawl (`front/text.rs`): a fresh
     /// cursor arms the sequence — the first block paints in place and
     /// the snow is swept before it shows; `u16::MAX` pulls the next
-    /// block. Tile ops the mode's variant doesn't model count toward
-    /// `dropped`.
+    /// block. All four video modes draw their tiles (GAM-59).
     fn menu_text(&mut self, cur: u16) -> u16 {
         let ax = self.crawl.call(&mut self.scr, &self.img, cur);
-        self.dropped += self.crawl.take_undrawn();
         if cur != u16::MAX {
             self.stars.clear(&mut self.scr);
         }
