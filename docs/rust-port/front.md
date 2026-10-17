@@ -232,16 +232,19 @@ synth model (latch regs, tone counters, LFSR noise, channel mix).
 attract and the `0xFA` endings call through `[0x1296]` — a stream of
 `{fb14, fb15}` blocks whose line records the `text/walk.rs` walker
 decodes (`0x00` end, `0xFF` suspend, `0xF0`+arg new line, `0x20` clear,
-else a 16×24 tile index). `text/mcg.rs` is the tile painter.
+else a 16×24 tile index). `text/lay.rs` holds the per-mode `si`-space
+parameters (`0x2F629`/`0x30520`/`0x30FFE`/`0x31CAA`); `text/mcg.rs`,
+`ega.rs`, `cga.rs`, `tga.rs` are the tile painters.
 
 The shipped binary *pages* — its scroll slots are `ret`s — so each
 block repaints in place over the previous one (the GAM-46 "prints over
 itself" bug). The port runs it as a continuous upward crawl (`Crawl`)
 like the non-DOS originals: a `Call::Text` arm renders the first block
 at once, `Call::Scroll` shifts VRAM up and feeds the next block's rows
-in at the bottom, and `u16::MAX` `Call::Text` calls pull the next block.
-Only the MCG variant is ported — the EGA/CGA/TGA twins' tile ops land in
-`dropped` like the pre-render walk.
+in at the bottom (`text/scroll.rs`, mode-native — banked interleave for
+CGA/TGA, per-plane for EGA), and `u16::MAX` `Call::Text` calls pull the
+next block. All four variants draw (GAM-59) — the non-MCG twins used to
+pace the crawl without painting, so the text was invisible there.
 
 ## `map/` — the galaxy map painters
 

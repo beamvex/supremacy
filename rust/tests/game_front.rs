@@ -295,14 +295,49 @@ fn crawl_drains_the_whole_stream() {
     assert!(h.scr.buf.iter().all(|&b| b == 0));
 }
 
-/// Non-MCG `menu_text` twins stay unported — the walk still decodes
-/// the stream and counts the tile ops it can't draw.
+/// GAM-59 — the non-MCG `menu_text` twins (`0x30520`/`0x30FFE`/
+/// `0x31CAA`) paint their credits blocks too: the same stream the MCG
+/// walk decodes lands pixels in each mode's own `buf` layout, and the
+/// crawl feeds and scrolls it like MCG's — the modes that used to
+/// pace an invisible crawl now show the text.
 #[test]
-fn menu_text_other_modes_count_undrawn_tiles() {
+fn menu_text_paints_in_every_mode() {
+    for mode in [Video::Ega, Video::Cga, Video::Tga] {
+        let mut h = mode_host(mode);
+        assert_eq!(h.svc(Call::Text(0x5012)), 0xF1, "{mode:?}");
+        assert!(
+            h.scr.buf.iter().any(|&b| b != 0),
+            "{mode:?} painted nothing"
+        );
+        assert_eq!(h.dropped, 0, "{mode:?} undrawn ops");
+        h.svc(Call::Text(u16::MAX)); // pull the next block
+        let before = h.scr.buf.clone();
+        h.svc(Call::Scroll(2));
+        assert_ne!(h.scr.buf, before, "{mode:?} scroll moved nothing");
+    }
+}
+
+/// GAM-59 — 'M' of "MELBOURNE HOUSE" lands at the same pixel in every
+/// mode's own layout: EGA row 45 plane bytes, CGA bank-1 row 22,
+/// TGA bank-0 line 7 — each variant's `si` space decode of the same
+/// stream byte.
+#[test]
+fn menu_text_tile_lands_in_every_layout() {
     let mut h = mode_host(Video::Ega);
-    assert_eq!(h.svc(Call::Text(0x5012)), 0xF1);
-    assert!(h.dropped > 0);
-    assert!(h.scr.buf.iter().all(|&b| b == 0));
+    h.svc(Call::Text(0x5012));
+    // 'M' plane-0 row 45: `si = 0x708 + 1 + 4` → `0x70D` bytes
+    // `0x00 0x7F` (font `0x27A24` glyph 0xC row 0 plane 0).
+    assert!(h.scr.buf[0x70D..0x70F].iter().any(|&b| b != 0));
+
+    let mut h = mode_host(Video::Cga);
+    h.svc(Call::Text(0x5012));
+    // 'M' bank-1 line 22: `si = 0x26E0 + 2 + 8` → `0x26EA`.
+    assert!(h.scr.buf[0x26EA..0x26EE].iter().any(|&b| b != 0));
+
+    let mut h = mode_host(Video::Tga);
+    h.svc(Call::Text(0x5012));
+    // 'M' bank-0 line 7: `si = 0x460 + 4 + 16` → `0x474`.
+    assert!(h.scr.buf[0x474..0x47C].iter().any(|&b| b != 0));
 }
 
 /// GAM-46 follow-up — the MCG `[0x1294]` star mark (`0x2F59B`) must
