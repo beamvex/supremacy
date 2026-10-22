@@ -27,7 +27,6 @@ impl Crawl {
         if !self.armed {
             return;
         }
-        self.scrolled = true;
         shift(scr, px);
         for y in (H - px)..H {
             self.emit(scr, y);

@@ -22,14 +22,17 @@ const H: u16 = 0xC8;
 const LEN: usize = 0x64;
 
 /// One `cs:0x4EC4` star — position `(x, y)`, velocity `(vx, vy)`,
-/// `prev` = the `[cs:si+8]` offset of the pixel it last marked.
+/// `prev` = the `[cs:si+8]` `y·0x140 + x` pixel index of the dot it
+/// last marked; `Some` even for index `0`, so a `(0,0)` dot stays
+/// erasable where the asm's zeroed-field sentinel could not tell it
+/// apart from "never plotted" (GAM-60).
 #[derive(Clone, Copy)]
 struct Star {
     x: u16,
     vx: i16,
     y: u16,
     vy: i16,
-    prev: u16,
+    prev: Option<u16>,
 }
 
 /// The host-side star table plus its respawn RNG.
@@ -50,7 +53,7 @@ impl Stars {
                     vx: 0,
                     y: 0,
                     vy: 0,
-                    prev: 0,
+                    prev: None,
                 }; LEN],
             ),
             rng: seed | 1,
@@ -91,7 +94,7 @@ impl Stars {
         let dot = dot_ink(scr.mode, ink);
         for s in self.tab.iter_mut() {
             erase(scr, s.prev, dot);
-            s.prev = 0;
+            s.prev = None;
         }
     }
 
@@ -107,7 +110,7 @@ impl Stars {
                     vx,
                     y,
                     vy,
-                    prev: 0,
+                    prev: None,
                 };
             }
         }
@@ -136,7 +139,7 @@ fn mark(scr: &mut Screen, s: &mut Star, ink: u8) {
     let dot = dot_ink(scr.mode, ink);
     erase(scr, s.prev, dot);
     let (x, y) = (usize::from(s.x), usize::from(s.y));
-    s.prev = u16::try_from(y * usize::from(W) + x).unwrap_or(0);
+    s.prev = Some(u16::try_from(y * usize::from(W) + x).unwrap_or(0));
     if scr.peek(x, y) == 0 {
         scr.put_pixel(x, y, dot);
     }
@@ -154,10 +157,13 @@ fn dot_ink(mode: Video, ink: u8) -> u8 {
 }
 
 /// Erase the `prev` pixel when it still holds the star colour —
-/// `prev` is a `y·0x140 + x` pixel index (`0` = never plotted).
-fn erase(scr: &mut Screen, prev: u16, dot: u8) {
+/// `prev` is a `y·0x140 + x` pixel index (`None` = never plotted).
+fn erase(scr: &mut Screen, prev: Option<u16>, dot: u8) {
+    let Some(prev) = prev else {
+        return;
+    };
     let (x, y) = (usize::from(prev) % 0x140, usize::from(prev) / 0x140);
-    if prev != 0 && scr.peek(x, y) == dot {
+    if scr.peek(x, y) == dot {
         scr.put_pixel(x, y, 0);
     }
 }

@@ -58,8 +58,6 @@ pub struct Crawl {
     armed: bool,
     /// The `0x00` terminator ran — only the blank tail is left to feed.
     ended: bool,
-    /// A real `Call::Scroll` step ran — the snow stays swept.
-    scrolled: bool,
     /// The pending block rendered in the mode's `si`/`buf` space —
     /// its rows feed in at the framebuffer bottom while the crawl runs.
     block: Vec<u8>,
@@ -81,7 +79,6 @@ impl Crawl {
             fb: 0,
             armed: false,
             ended: false,
-            scrolled: false,
             block: Vec::new(),
             brows: 0,
             fill: 0,
@@ -115,11 +112,16 @@ impl Crawl {
         self.ended && self.drained >= lay::ROWS
     }
 
-    /// High once a real scroll step ran — star marks stay suppressed
-    /// for the crawl's length (the snow stays swept).
+    /// High while a `Call::Text` cursor is live (arm → the `[0x125C]`
+    /// reset) — star marks stay suppressed for the crawl's whole
+    /// length, so the snow stays swept from the arm on rather than
+    /// only once a scroll step ran (GAM-60: the gap let `Call::Stars`
+    /// replot before the first step, and pages that arm but never
+    /// scroll — ending A's hold, the post-seq `0x58F2` input wait —
+    /// replotted it for their duration).
     #[must_use]
-    pub fn scrolling(&self) -> bool {
-        self.scrolled
+    pub fn sweeping(&self) -> bool {
+        self.armed
     }
 }
 

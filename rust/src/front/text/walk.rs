@@ -27,7 +27,6 @@ impl Crawl {
         self.cur = cur;
         self.armed = true;
         self.ended = false;
-        self.scrolled = false;
         self.drained = 0;
         self.pull(img, mode);
         self.fill = self.brows;

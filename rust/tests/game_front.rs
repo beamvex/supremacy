@@ -369,6 +369,58 @@ fn snow_sweeps_in_every_mode() {
     }
 }
 
+/// GAM-60 — the suppression used to latch on the first `Call::Scroll`
+/// step, so `Call::Stars` between the `Call::Text` arm and that step —
+/// and across pages that arm but never scroll (ending A's `0x8891`
+/// hold, the post-seq `0x58F2` input wait) — replotted the snow the
+/// arm had just swept. The arm itself must suppress marks for the
+/// crawl's whole length, and the starfield must resume once the
+/// `[0x125C]` reset ends it.
+#[test]
+fn snow_stays_swept_from_the_arm_until_reset() {
+    for mode in [Video::Mcga, Video::Ega, Video::Cga, Video::Tga] {
+        let mut h = mode_host(mode);
+        let dot = match mode {
+            Video::Mcga => 1,
+            Video::Cga => 3,
+            _ => 0xF,
+        };
+        for _ in 0..0x40 {
+            h.svc(Call::Stars(0x63));
+        }
+        assert!(
+            h.scr.pixels().contains(&dot),
+            "{mode:?} starfield never plotted"
+        );
+        h.svc(Call::Text(0x5012));
+        let armed = h.scr.buf.clone();
+        for _ in 0..0x10 {
+            h.svc(Call::Stars(0x63));
+        }
+        assert_eq!(
+            h.scr.buf, armed,
+            "{mode:?} snow replotted in the arm→scroll gap"
+        );
+        h.svc(Call::Scroll(2));
+        let scrolled = h.scr.buf.clone();
+        for _ in 0..0x10 {
+            h.svc(Call::Stars(0x63));
+        }
+        assert_eq!(
+            h.scr.buf, scrolled,
+            "{mode:?} snow replotted over the crawl"
+        );
+        h.svc(Call::Slot(0x125C, 0)); // the crawl's screen-blank reset
+        for _ in 0..0x40 {
+            h.svc(Call::Stars(0x63));
+        }
+        assert!(
+            h.scr.pixels().contains(&dot),
+            "{mode:?} starfield never resumed after the crawl"
+        );
+    }
+}
+
 /// GAM-46 follow-up — the MCG `[0x1294]` star mark (`0x2F59B`) must
 /// erase the star's previous pixel (only when it's still the `1`
 /// colour) and only plot onto empty cells, so the attract's starfield
@@ -376,19 +428,22 @@ fn snow_sweeps_in_every_mode() {
 #[test]
 fn stars_move_as_dots_and_never_clobber_text() {
     let mut h = host();
-    assert_eq!(h.svc(Call::Text(0x5012)), 0xF1); // a real credits page
+    for i in 0..8u16 {
+        h.svc(Call::Glyph(b'A', i * 4, 0)); // a text row (no crawl arm)
+    }
     let text: Vec<usize> = (0..h.scr.buf.len()).filter(|&i| h.scr.buf[i] > 1).collect();
     let before: Vec<u8> = text.iter().map(|&i| h.scr.buf[i]).collect();
+    let clean = h.scr.buf.clone();
     for _ in 0..0x40 {
         h.svc(Call::Stars(0x63));
     }
     let after: Vec<u8> = text.iter().map(|&i| h.scr.buf[i]).collect();
     assert_eq!(before, after, "stars overwrote text pixels");
-    let dots = h
-        .scr
-        .buf
-        .iter()
-        .fold(0usize, |n, &b| n + usize::from(b == 1));
+    // 'A' tiles bake their own 1-pixels — count only newly marked dots.
+    let dots = (0..h.scr.buf.len())
+        .filter(|&i| h.scr.buf[i] == 1 && clean[i] != 1)
+        .count();
+    assert!(dots > 0, "starfield never plotted");
     assert!(dots <= 0x63, "stars trailed: {dots} marked pixels");
 }
 
