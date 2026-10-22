@@ -143,22 +143,40 @@ pub fn dlg_close(c: &mut Ctx) {
 /// leave the dialog: without it the `0xB05C` list stayed installed
 /// and the shell's `0xA0AC` list never came back (GAM-47).
 pub fn dlg_open(c: &mut Ctx) {
+    c.vm.abandoned = false;
     dlg_enter(c);
-    while !dlg_step(c) {}
-    dlg_close(c);
+    // A `jmp`-out action (the confirm's `0x8427` restart record) pops
+    // this frame along with its own — the port unwinds on `abandoned`
+    // instead of resuming `0x2E60`.
+    while !dlg_step(c) && !c.vm.abandoned {}
+    // The `0x2E7A` close runs on the right-click exit; after a `jmp`-out
+    // the new owner's repaint stands.
+    if !c.vm.abandoned {
+        dlg_close(c);
+    }
+    c.vm.abandoned = false;
 }
 
 /// `cs:0x2F9B` — the two-option confirm: title + body prints, the
 /// `0xB098` list, then a modal wait on `[0x91DA]` written by the
 /// `0x2F01`/`0x2F08`/`0x2F95` actions; closes back into `0x2EEE`
-/// (file `0x32F9B`–`0x32FD6`).
+/// (file `0x32F9B`–`0x32FD6`). The shipped `0xB09A` record carries
+/// the `0x8427` restart instead — a `jmp`-out, caught below by the
+/// `abandoned` check.
 pub fn confirm(c: &mut Ctx) {
     text::print_str(c, a!(S_CNF_T), 0x2A, 0xB1);
     dlg_text(c, a!(S_CNF_B));
     install(c, a!(CNF_SEL), a!(CNF_LIST), 2);
+    c.vm.abandoned = false;
     c.vm.w8(c.st, a!(DLG_FLAG), 0);
     while c.vm.r8(c.st, a!(DLG_FLAG)) == 0 {
         cnf_iter(c);
+        // The restart record's `0x8427` action `pop si`×3s out of the
+        // dialog frames — its `jmp 0x30A0` never returns here, so the
+        // `0x2FD1` reprint/`0x2EEE` reinstall tail doesn't run either.
+        if c.vm.abandoned {
+            return;
+        }
     }
     text::print_str(c, a!(S_CNF_T), 0x2A, 0xB1);
     dlg_list(c);

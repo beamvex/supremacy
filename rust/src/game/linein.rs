@@ -31,20 +31,21 @@ macro_rules! a {
     };
 }
 
-/// `cs:0xE66E` entry — `si`/`bx`/`bp` are the caller's buffer cursor,
-/// x cursor, and field width (`0`/`0x2B`/`0x20` from `cs:0x2F2D`).
+/// `cs:0xE66E` entry — `si`/`bx`/`dx`/`bp` are the caller's buffer
+/// cursor, echo column, echo row, and field width
+/// (`0`/`0x2B`/`0xB9`/`0x20` from `cs:0x2F2D`).
 /// Clears `[0x9CDA]`/`[0x4FCF]`/`[0x4FCA]` and resets the channel-A
 /// stack (`cs:[0x8B7C] = -1`).
-pub fn line_input(c: &mut Ctx, si: u16, bx: u16, bp: i16) {
+pub fn line_input(c: &mut Ctx, si: u16, bx: u16, dx: u16, bp: i16) {
     c.vm.w16(c.st, a!(BUTTONS), 0);
     c.vm.w8(c.st, a!(IN_DONE), 0);
     c.vm.w8(c.st, a!(IN_DIRTY), 0);
     c.host.key_flush();
-    edit(c, si, bx, bp);
+    edit(c, si, bx, dx, bp);
 }
 
 /// The `0xE685` poll/dispatch loop.
-fn edit(c: &mut Ctx, si: u16, bx: u16, bp: i16) {
+fn edit(c: &mut Ctx, si: u16, bx: u16, dx: u16, bp: i16) {
     let (mut si, mut bx, mut bp) = (si, bx, bp);
     loop {
         let al = pop(c);
@@ -64,8 +65,8 @@ fn edit(c: &mut Ctx, si: u16, bx: u16, bp: i16) {
         match out {
             0 => return exit(c),
             2 => return pad(c, si, bp),
-            1 => back(c, &mut si, &mut bx, &mut bp),
-            ch => append(c, ch, &mut si, &mut bx, &mut bp),
+            1 => back(c, &mut si, &mut bx, dx, &mut bp),
+            ch => append(c, ch, &mut si, &mut bx, dx, &mut bp),
         }
     }
 }
@@ -110,7 +111,7 @@ fn exit(c: &mut Ctx) {
 
 /// Class 1 — `dec si/bx`, blank the char, echo, `dec [0x4FCB]`,
 /// `inc bp` (file `0x2E700`–`0x2E72D`).
-fn back(c: &mut Ctx, si: &mut u16, bx: &mut u16, bp: &mut i16) {
+fn back(c: &mut Ctx, si: &mut u16, bx: &mut u16, dx: u16, bp: &mut i16) {
     if c.vm.r8(c.st, a!(NAME_LEN)) == 0 {
         return;
     }
@@ -118,22 +119,23 @@ fn back(c: &mut Ctx, si: &mut u16, bx: &mut u16, bp: &mut i16) {
     *bx = bx.wrapping_sub(1);
     c.vm.w8(c.st, a!(IN_DIRTY), 0xFF);
     c.vm.w8(c.st, *si, 0x20);
-    c.host.svc(Call::Slot(0x1268, 0x20));
+    c.host.svc(Call::Glyph(0x20, *bx, dx));
     let len = c.vm.r8(c.st, a!(NAME_LEN));
     c.vm.w8(c.st, a!(NAME_LEN), len.wrapping_sub(1));
     *bp += 1;
 }
 
 /// Class ≥3 — append the mapped char while `[0x4FCB] != [0x4FCC]`
-/// (file `0x2E730`–`0x2E761`).
-fn append(c: &mut Ctx, ch: u8, si: &mut u16, bx: &mut u16, bp: &mut i16) {
+/// (file `0x2E730`–`0x2E761`). The `[0x1268]` echo is the `0x68D6`
+/// glyph put the port models as [`Call::Glyph`].
+fn append(c: &mut Ctx, ch: u8, si: &mut u16, bx: &mut u16, dx: u16, bp: &mut i16) {
     c.vm.w8(c.st, a!(IN_DIRTY), 0xFF);
     if c.vm.r8(c.st, a!(NAME_LEN)) == c.vm.r8(c.st, a!(NAME_MAX)) {
         return;
     }
     c.vm.w8(c.st, *si, ch);
     *si = si.wrapping_add(1);
-    c.host.svc(Call::Slot(0x1268, u16::from(ch)));
+    c.host.svc(Call::Glyph(ch, *bx, dx));
     *bx = bx.wrapping_add(1);
     let len = c.vm.r8(c.st, a!(NAME_LEN));
     c.vm.w8(c.st, a!(NAME_LEN), len.wrapping_add(1));

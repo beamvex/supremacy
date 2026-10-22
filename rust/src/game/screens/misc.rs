@@ -122,6 +122,7 @@ fn kind_str(c: &mut Ctx, rec: u16) -> u16 {
 /// [`init::newgame_body`] replays that tail; its `stage_load` head is
 /// an identity copy over the just-saved snapshot.
 pub fn restart(c: &mut Ctx) {
+    c.vm.abandoned = true;
     dlg_io::act_stage(c);
     init::newgame_body(c);
 }

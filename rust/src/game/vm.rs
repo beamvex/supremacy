@@ -71,6 +71,12 @@ pub struct Vm {
     /// [`title_step`][super::title::title_step] consumes it and runs
     /// the post tail.
     pub title_done: bool,
+    /// Set by `cs:0x8427` — the restart's `pop si`×3 that abandons the
+    /// dialog frames (`0x2F9B` confirm + the `0x2E60` modal) instead of
+    /// `ret`ing into them. The port returns from `restart`, so the
+    /// modal loops unwind on this flag instead; each modal clears it
+    /// at entry (file `0x38427`–`0x38430`).
+    pub abandoned: bool,
     /// The heap segment the `0x8432`/`0x844B` routines copy the save
     /// block into (`0x8432`, `ds:` → `0x3829:`) and back out of
     /// (`0x844B`, `0x3829:` → `ds:`). Seeded from the image so a
@@ -92,6 +98,7 @@ impl Vm {
             end: None,
             title: None,
             title_done: false,
+            abandoned: false,
             stage: Box::new([0; STATE_LEN]),
         };
         keymap::install(&mut vm.low);

@@ -25,7 +25,7 @@ const NAME_TPL: u16 = 0x9136;
 const NAME_W: u16 = 9;
 
 /// `cs:0xE77D` — template prompt + prefill, `NAME_LEN = NAME_MAX`,
-/// then the bracketed editor at `si+9`/`bx+9`/`bp-9`. The template
+/// then the bracketed editor at `si+9`/`bx+9`/`dx`/`bp-9`. The template
 /// serial bumps *before* the edit so the next launch gets the next
 /// number (file `0x2E77D`–`0x2E7CC`).
 pub fn prompt_edit(c: &mut Ctx, si: u16, bx: u16, dx: u16, bp: i16) {
@@ -34,7 +34,7 @@ pub fn prompt_edit(c: &mut Ctx, si: u16, bx: u16, dx: u16, bp: i16) {
     serial_bump(c, NAME_TPL.wrapping_add(8));
     let len = c.vm.r8(c.st, a!(NAME_MAX));
     c.vm.w8(c.st, a!(NAME_LEN), len);
-    edit(c, si, bx, bp);
+    edit(c, si, bx, dx, bp);
 }
 
 /// `cs:0xE7CD` — type-record prompt + prefill, `NAME_LEN = 9`, the
@@ -47,17 +47,24 @@ pub fn type_edit(c: &mut Ctx, si: u16, bx: u16, dx: u16, bp: i16) {
     text::print_str(c, t, bx, dx);
     copy9(c, t, si);
     c.vm.w8(c.st, a!(NAME_LEN), 9);
-    edit(c, si, bx, bp);
+    edit(c, si, bx, dx, bp);
     if c.vm.r8(c.st, a!(IN_DONE)) != 0xFF {
         serial_bump(c, t.wrapping_add(8));
     }
 }
 
 /// The `+9` cursor advance and the `[0x9CC5]` bracket around
-/// `cs:0xE66E` shared by both wrappers.
-fn edit(c: &mut Ctx, si: u16, bx: u16, bp: i16) {
+/// `cs:0xE66E` shared by both wrappers — the caller's `dx` is the
+/// echo row the editor's `[0x1268]` puts inherit.
+fn edit(c: &mut Ctx, si: u16, bx: u16, dx: u16, bp: i16) {
     c.vm.w8(c.st, a!(LINE_MODE), 1);
-    line_input(c, si.wrapping_add(NAME_W), bx.wrapping_add(NAME_W), bp - 9);
+    line_input(
+        c,
+        si.wrapping_add(NAME_W),
+        bx.wrapping_add(NAME_W),
+        dx,
+        bp - 9,
+    );
     c.vm.w8(c.st, a!(LINE_MODE), 0);
 }
 

@@ -164,3 +164,54 @@ fn hover_swallows_inside_oval() {
     game::hover_check(&mut r.ctx());
     assert!(r.host.0.is_empty());
 }
+
+/// GAM-61 — the shipped `0xB09A` confirm list's first record is the
+/// `0xF177` restart, whose `0x8427` asm body `pop si`×3s out of the
+/// dialog frames rather than `ret`ing into the `[0x91DA]` wait. The
+/// port's `screens::misc::restart` returns into the loop and sets the
+/// `Vm::abandoned` unwind flag; `confirm` must skip the `0x2FD1`
+/// reprint/`0x2EEE` reinstall tail — a dead `while [0x91DA]==0`
+/// otherwise spins forever on the just-restarted shell (the zombie
+/// modal behind the unresponsive New Game button).
+#[test]
+fn confirm_unwinds_when_the_action_replaces_the_list() {
+    let mut r = Rig::new();
+    r.vm.stage_save(&r.st); // restart's `0x2F91` restore needs a snapshot
+    let rec = 0xB09A;
+    r.w16(rec, 0);
+    r.w16(rec + 2, 0);
+    r.w16(rec + 4, 0x140);
+    r.w16(rec + 6, 0xC8);
+    r.w16(rec + 0xC, 0xF177); // shipped restart record
+    r.w16(game::CUR_X, 0x10);
+    r.w16(game::CUR_Y, 0x10);
+    r.w16(game::BUTTONS, 1);
+    r.w8(0x78B8, b'T');
+    r.w8(0x78B9, 0xFF);
+    game::confirm(&mut r.ctx());
+    assert_eq!(r.r8(0x91DA), 0); // never answered — the frame was abandoned
+    assert_eq!(r.r16(game::HOT_LIST), 0xA0AC); // restart's shell install stands
+    assert_eq!(r.r16(game::HOT_COUNT), 0x31);
+}
+
+/// Same unwind one frame up — `dispatch_action(0x2E21)` through a
+/// restart record on the dialog list: the `0x2E60` modal must break
+/// on `abandoned` and skip the `0x2E7A` close (`0x1272`) the
+/// right-click exit runs.
+#[test]
+fn dlg_modal_unwinds_after_a_jmp_out_action() {
+    let mut r = Rig::new();
+    r.vm.stage_save(&r.st);
+    let rec = 0xB05C;
+    r.w16(rec, 0);
+    r.w16(rec + 2, 0);
+    r.w16(rec + 4, 0x140);
+    r.w16(rec + 6, 0xC8);
+    r.w16(rec + 0xC, 0xF177);
+    r.w16(game::CUR_X, 0x10);
+    r.w16(game::CUR_Y, 0x10);
+    r.w16(game::BUTTONS, 1);
+    game::dispatch_action(&mut r.ctx(), 0x2E21);
+    assert_eq!(r.r16(game::HOT_LIST), 0xA0AC);
+    assert!(!r.host.0.contains(&Call::Slot(0x1272, 0))); // close skipped
+}
