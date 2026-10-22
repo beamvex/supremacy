@@ -50,14 +50,15 @@ impl Host {
 
     /// `Call::Stars` — `0x8891`'s `cs:0x4EC4` walk; the MCG `[0x1294]`
     /// mark erases each star's previous pixel and only plots onto
-    /// empty cells (no trails, no text clobber). While the crawl is
-    /// scrolling the marks stay suppressed — the snow is swept.
+    /// empty cells (no trails, no text clobber). While a `menu_text`
+    /// cursor is live the marks stay suppressed — the snow is swept
+    /// for the crawl's whole length, arm to `[0x125C]` reset (GAM-60).
     fn star(&mut self, cx: u16) {
         self.stars.step(
             usize::from(cx),
             &mut self.scr,
             self.ink,
-            !self.crawl.scrolling(),
+            !self.crawl.sweeping(),
         );
     }
 }
@@ -73,6 +74,7 @@ impl VmHost for Host {
             Call::Slot(0x1270, _) => self.msg_scroll(),
             Call::Slot(0x125C, _) => {
                 self.crawl.reset();
+                self.stars.clear(&mut self.scr, self.ink);
                 self.scr.buf.fill(0);
             }
             Call::Slot(0x127C, _) => self.grid(0x7120, 0x66, 0x48, 0xB0),
