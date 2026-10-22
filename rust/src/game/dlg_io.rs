@@ -139,7 +139,9 @@ fn slot_mode(c: &mut Ctx, m: u8) {
 pub fn input_name(c: &mut Ctx) {
     c.vm.w8(c.st, a!(NAME_LEN), 0);
     c.vm.w8(c.st, a!(NAME_MAX), 0x1E);
-    dlg_text(c, a!(S_LEGEND));
+    // `0x6709` directly at `(0x2A,0xB9)` — one row under the `0x2F24`
+    // prints, and the row `dx` still holds when `0xE66E` echoes there.
+    text::print_str(c, a!(S_LEGEND), 0x2A, 0xB9);
     input_capture(c);
     c.vm.w8(c.st, a!(NAME_MAX), 9);
     sanitize(c);
@@ -148,11 +150,12 @@ pub fn input_name(c: &mut Ctx) {
 /// The capture half (file `0x32F43`–`0x32F5E`) — `0xA3BC` swaps the
 /// int-33 handler to the buttons-only mask (`0x1E`, `ax=0x14`),
 /// line-input mode `1` around the `0xE66E` editor, then `0xA36A`
-/// reinstalls the full mask (`0x1F`). `si/bx/bp` = `0`/`0x2B`/`0x20`.
+/// reinstalls the full mask (`0x1F`). `si/bx/dx/bp` =
+/// `0`/`0x2B`/`0xB9`/`0x20`.
 fn input_capture(c: &mut Ctx) {
     c.host.svc(Call::Mouse(0x14, 0x1E, 0));
     c.vm.w8(c.st, a!(LINE_MODE), 1);
-    linein::line_input(c, 0, 0x2B, 0x20);
+    linein::line_input(c, 0, 0x2B, 0xB9, 0x20);
     c.vm.w8(c.st, a!(LINE_MODE), 0);
     c.host.svc(Call::Mouse(0x14, 0x1F, 0));
 }

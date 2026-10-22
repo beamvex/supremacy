@@ -694,3 +694,152 @@ fn title_boot_picker_start_reaches_the_shell() {
     assert!(g.host.scr.pixels().iter().any(|&p| p != 0));
     assert!((1..256).any(|n| g.host.pal.rgb(n) != [0, 0, 0]));
 }
+
+/// GAM-61 — the save/load dialog's three buttons through the real
+/// `Game` + `Pump` input path. Save: click → filename editor →
+/// `Enter` → the state block lands in the save file; the dialog still
+/// right-clicks closed afterwards.
+#[test]
+fn dialog_save_button_writes_a_savegame() {
+    let mut g = Game::new(
+        img(),
+        load_set(&game_dir(), "MCG", heap_segment()).unwrap(),
+        from_dac(&img()[DAC_OFS..DAC_OFS + 768]),
+        Video::Mcga,
+        Sound::PcSpeaker,
+        false,
+        3,
+        0x42,
+        Box::new(supremacy::platform::MemFs::new()),
+    );
+    // Save record `ds:0xB070`: x 0xF6..0x11C, y 0x85..0x93 → (0x109,0x8C).
+    // "TEST" = T E S T + Enter — make/break pairs (the break code's
+    // keymap miss is what clears the editor's `[0x4FCA]` debounce).
+    let mut n = 0usize;
+    g.host.set_vsync(Some(Box::new(move |h| {
+        n += 1;
+        let p = &mut h.pump;
+        match n {
+            10 => {
+                p.move_to(0x109, 0x8C);
+                p.set_buttons(true, false);
+            }
+            14 => p.key(0x14),
+            15 => p.key(0x94),
+            17 => p.key(0x12),
+            18 => p.key(0x92),
+            20 => p.key(0x1F),
+            21 => p.key(0x9F),
+            23 => p.key(0x14),
+            24 => p.key(0x94),
+            26 => p.key(0x1C),
+            27 => p.key(0x9C),
+            40 => p.set_buttons(false, true),
+            200 => panic!("dialog never closed"),
+            _ => p.set_buttons(false, false),
+        }
+    })));
+    game::dispatch_action(&mut g.ctx(), 0x2E21);
+    assert!(g.files.find_first("TEST"), "save file was not written");
+    assert_eq!(g.st.word(HOT_LIST), 0xA0AC);
+    assert_eq!(g.st.byte(UIMODE), 0);
+}
+
+/// GAM-61 — Load: click → filename editor → `Enter` → the savegame
+/// replaces the state block, and the `[0x91E5]` switch writes the
+/// preset banner at `ds:0x582B`.
+#[test]
+fn dialog_load_button_restores_state() {
+    let img = img();
+    let mut fs = supremacy::platform::MemFs::new();
+    let mut blk = vec![0u8; 0x1F8B];
+    blk[usize::from(0x91E5u16) - 0x7D39..][..2].copy_from_slice(&1u16.to_le_bytes());
+    fs.files.insert("S".to_owned(), blk);
+    let mut g = Game::new(
+        img.clone(),
+        load_set(&game_dir(), "MCG", heap_segment()).unwrap(),
+        from_dac(&img[DAC_OFS..DAC_OFS + 768]),
+        Video::Mcga,
+        Sound::PcSpeaker,
+        false,
+        3,
+        0x42,
+        Box::new(fs),
+    );
+    // Load record `ds:0xB05C`: x 0xB7..0xDD, y 0x85..0x93 → (0xC9,0x8C).
+    let mut n = 0usize;
+    g.host.set_vsync(Some(Box::new(move |h| {
+        n += 1;
+        let p = &mut h.pump;
+        match n {
+            10 => {
+                p.move_to(0xC9, 0x8C);
+                p.set_buttons(true, false);
+            }
+            14 => p.key(0x1F), // 'S'
+            15 => p.key(0x9F),
+            17 => p.key(0x1C),
+            18 => p.key(0x9C),
+            40 => p.set_buttons(false, true),
+            200 => panic!("dialog never closed"),
+            _ => p.set_buttons(false, false),
+        }
+    })));
+    game::dispatch_action(&mut g.ctx(), 0x2E21);
+    assert_eq!(g.st.word(0x91E5), 1, "load did not restore the block");
+    // `[0x91E5] == 1` → `cs:0x6847` → "SMINE" at `ds:0x582B`.
+    let got: Vec<u8> = (0..5).map(|i| g.vm.r8(&g.st, 0x582B + i)).collect();
+    assert_eq!(got, b"SMINE");
+    assert_eq!(g.st.word(HOT_LIST), 0xA0AC);
+}
+
+/// GAM-61 — New Game: the confirm's "yes" record is the `0xF177`
+/// restart, whose `0x8427` asm body `pop si`×3s out of the dialog
+/// frames. The port's `restart` returns into `confirm`'s
+/// `while [0x91DA]==0` loop, which used to spin forever under the
+/// just-restarted shell — `dispatch_action` never returned, leaving
+/// the game on a zombie modal that swallowed every later click. The
+/// unwind is keyed on the hotspot list the restart tail replaced.
+#[test]
+fn dialog_new_game_confirm_restarts_to_a_live_shell() {
+    let mut g = Game::new(
+        img(),
+        load_set(&game_dir(), "MCG", heap_segment()).unwrap(),
+        from_dac(&img()[DAC_OFS..DAC_OFS + 768]),
+        Video::Mcga,
+        Sound::PcSpeaker,
+        false,
+        3,
+        0x42,
+        Box::new(supremacy::platform::MemFs::new()),
+    );
+    // New Game record `ds:0xB084`: x 0xC7..0x10B, y 0x70..0x7E →
+    // (0xE9,0x77). Confirm "yes" `ds:0xB09A`: x 0xA5..0xE9,
+    // y 0xAE..0xB6 → (0xC6,0xB2).
+    let mut n = 0usize;
+    g.host.set_vsync(Some(Box::new(move |h| {
+        n += 1;
+        let p = &mut h.pump;
+        match n {
+            10 => {
+                p.move_to(0xE9, 0x77);
+                p.set_buttons(true, false);
+            }
+            20 => {
+                p.move_to(0xC6, 0xB2);
+                p.set_buttons(true, false);
+            }
+            300 => panic!("restart never unwound to the shell"),
+            _ => p.set_buttons(false, false),
+        }
+    })));
+    game::dispatch_action(&mut g.ctx(), 0x2E21);
+    // The restart's `0x331C4` tail re-entered the shell: main list
+    // installed, uimode 0, and `Game::step` runs real frames again.
+    assert_eq!(g.st.word(HOT_LIST), 0xA0AC);
+    assert_eq!(g.st.byte(UIMODE), 0);
+    g.host.set_vsync(None);
+    let f0 = g.st.byte(game::FRAME);
+    g.step();
+    assert_ne!(g.st.byte(game::FRAME), f0);
+}
