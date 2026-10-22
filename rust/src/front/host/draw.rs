@@ -92,6 +92,19 @@ impl Host {
     /// overwriting it. (The asm's `[0x1298]` head only registers a
     /// hover rect the port doesn't track; `0xA479` is the present.)
     pub(super) fn msg_scroll(&mut self) {
+        if self.msg_snow {
+            // The new-game wait's `[0x127C]` fill left the window's
+            // star grid painted — sweep its footprint before the copy
+            // carries the dots up behind the text (GAM-60). Rows
+            // `0x5A`/`0xBE..0xC0` sit outside the scroll's span, so the
+            // sweep has to cover the painter's whole rect.
+            self.msg_snow = false;
+            for y in 0x5A..0xC0usize {
+                for x in 0xA0..0x130usize {
+                    self.scr.put_pixel(x, y, 0);
+                }
+            }
+        }
         match self.scr.mode {
             Video::Mcga => scroll_region(&mut self.scr.buf, 0x140, 0xA0, 0x90, |_, _| 0),
             Video::Ega => {

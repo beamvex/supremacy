@@ -2,6 +2,7 @@
 //! per-call bodies the arms need (`load`, `menu_text`, `scroll`,
 //! `star`; the draw helpers live in [`draw`][super::draw]).
 
+use crate::args::Video;
 use crate::game::{Call, VmHost, SND_ON};
 
 use super::super::font;
@@ -75,9 +76,16 @@ impl VmHost for Host {
             Call::Slot(0x125C, _) => {
                 self.crawl.reset();
                 self.stars.clear(&mut self.scr, self.ink);
+                self.msg_snow = false;
                 self.scr.buf.fill(0);
             }
-            Call::Slot(0x127C, _) => self.grid(0x7120, 0x66, 0x48, 0xB0),
+            Call::Slot(0x127C, _) => {
+                self.grid(0x7120, 0x66, 0x48, 0xB0);
+                // The fill lands in the ticker window — arm the sweep
+                // for the next `[0x1270]` scroll (MCG only; the other
+                // modes' twin is dropped, so nothing was painted).
+                self.msg_snow = self.scr.mode == Video::Mcga;
+            }
             Call::Slot(0x127E, _) => self.grid(0x4610, 0x75, 0x28, 0xF0),
             Call::Slot(0x1280, _) => self.grid(0x4670, 0x75, 0x20, 0x100),
             Call::Slot(0x1258 | 0x1260, _) => {
