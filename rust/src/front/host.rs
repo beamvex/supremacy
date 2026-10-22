@@ -90,6 +90,10 @@ pub struct Host {
     /// `Call::Load`'s dir + set stem (`set_assets` installs it — the
     /// `ds:0x1208`+ cell → `{stem}{sfx}.{BIN,GPH}` mapping).
     loader: Option<Loader>,
+    /// The `[0x127C]` snow-grid filled the ticker window (`x 0xA0..
+    /// 0x130`, `y 0x5A..0xC0`) — the next `[0x1270]` scroll sweeps it
+    /// rather than scrolling the dots up behind the text (GAM-60).
+    msg_snow: bool,
     /// Live vsync hook — `window::run` installs one; `pump_input`
     /// runs it before each `ds:` mirror.
     vsync_src: Option<VsyncSrc>,
@@ -120,6 +124,7 @@ impl Host {
             stars: Stars::new(0x00C0_FFEE),
             map: Map::new(),
             loader: None,
+            msg_snow: false,
             vsync_src: None,
         }
     }
