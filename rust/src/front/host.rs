@@ -17,7 +17,7 @@
 //!   `pal_fade` — the row-table + `ds:0x4095` composite with the
 //!   `ds:[0x9CA1]` shade, dispatched via `svc_st` so the routine's
 //!   `ds:` read resolves (GAM-41).
-//! - `[0x1262]`/`[0x1268]` → the popup frame through
+//! - `[0x1262]`/`[0x1268]` → the black region clear through
 //!   [`Screen::put_pixel`] / the glyph put via `font::draw`, which
 //!   replays the mode's packed/planar record merge byte-for-byte.
 //! - `Call::Sound`/`Call::Chan`/`Call::Sfx` → [`Audio`] — the ported

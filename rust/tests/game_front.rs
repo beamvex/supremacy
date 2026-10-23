@@ -103,12 +103,18 @@ fn image_blit_reaches_every_mode() {
     }
 }
 
+/// `Call::Rect` (the `[0x1262]` slot) is the asm's black region clear —
+/// `(ax·8, bx)` origin, `(cx+1)·16 × dx` px — not a drawn frame.
 #[test]
-fn rect_outlines_in_every_mode() {
-    for mode in [Video::Ega, Video::Cga, Video::Tga] {
+fn rect_clears_a_region_in_every_mode() {
+    for mode in [Video::Mcga, Video::Ega, Video::Cga, Video::Tga] {
         let mut h = mode_host(mode);
-        h.svc(Call::Rect(0, 0, 1, 1));
-        assert!(h.scr.buf.iter().any(|&b| b != 0), "{mode:?}");
+        h.scr.buf.fill(0xFF);
+        h.svc(Call::Rect(1, 2, 0, 3)); // 16×3 px at (8, 2)
+        assert_eq!(h.scr.peek(8, 2), 0, "{mode:?}");
+        assert_eq!(h.scr.peek(23, 4), 0, "{mode:?}");
+        assert_ne!(h.scr.peek(24, 4), 0, "{mode:?}");
+        assert_ne!(h.scr.peek(8, 5), 0, "{mode:?}");
     }
 }
 
