@@ -49,7 +49,7 @@ fn golden_shell_run() {
     let d = smoke::run(&mut game(), &[], 90);
     let want = Digest {
         steps: 90,
-        video: 0x210E_DB76_C27B_F7C1,
+        video: 0xC183_A58C_BC47_34AB,
         pal: 0x8287_0345_2425_8EC2,
         audio: 0x99A3_2F12_5F1B_E6DB,
         state: 0xF4EB_549E_19C8_C893,

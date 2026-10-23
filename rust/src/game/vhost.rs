@@ -43,8 +43,10 @@ pub enum Call {
     Native(u16),
     /// `call 0x2CA9` — UI housekeeping used by several op blocks.
     Ui(u16),
-    /// `call word [0x1262]` — the `ax`/`bx`/`cx`/`dx` box op at
-    /// `cs:0x4309` (window frame before a popup).
+    /// `call word [0x1262]` — the `ax`/`bx`/`cx`/`dx` box op (MCG
+    /// `0x2EDCE`): a black region clear — `ax` = left edge in 8-px
+    /// columns, `bx` = top row, `cx` = `width/16 − 1`, `dx` = height
+    /// in rows — run before a popup/window paints.
     Rect(u16, u16, u16, u16),
     /// The int-21 asset loaders — `ax=0x4E00` find-first on the
     /// filename cell at `ds:arg` (the `ds:0x1208`+ `???.???` table the

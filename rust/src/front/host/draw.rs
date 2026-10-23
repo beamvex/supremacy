@@ -22,20 +22,20 @@ const TPL_OFS: usize = 0x292B0;
 const PAL_BUF: usize = 0x1384 + TPL_OFS;
 
 impl Host {
-    /// The `[0x1262]` popup frame — `(ax,bx)`/`(cx,dx)` are the opposing
-    /// corners in `(4px-col, row)` units, order unspecified; normalised
-    /// and drawn as a 1px outline (approximation of `0x2EDCE`; the asm
-    /// fills black, the outline keeps the bordered look in every mode).
+    /// The `[0x1262]` region clear (MCG `0x2EDCE`, file
+    /// `0x2EDCE`–`0x2EE1E`): `ax` = left edge in 8-px columns, `bx` =
+    /// top row, `cx` = `width/16 − 1`, `dx` = height in rows — then
+    /// `rep stosw`s colour 0 over the box. A black fill, not a frame:
+    /// the EGA twin `0x30198` runs the same register shuffle into a
+    /// per-plane `stosb` of the just-cleared background byte, and the
+    /// CGA/TGA twins match.
     pub(super) fn rect(&mut self, ax: u16, bx: u16, cx: u16, dx: u16) {
-        let (l, r) = (ax.min(cx).min(79) * 4, ax.max(cx).min(79) * 4 + 3);
-        let (t, bot) = (bx.min(dx).min(199), bx.max(dx).min(199));
-        for x in usize::from(l)..=usize::from(r) {
-            self.scr.put_pixel(x, usize::from(t), self.ink);
-            self.scr.put_pixel(x, usize::from(bot), self.ink);
-        }
-        for y in usize::from(t)..=usize::from(bot) {
-            self.scr.put_pixel(usize::from(l), y, self.ink);
-            self.scr.put_pixel(usize::from(r), y, self.ink);
+        let (x, w) = (usize::from(ax) * 8, usize::from(cx) * 16 + 16);
+        let (y, h) = (usize::from(bx), usize::from(dx));
+        for row in y..(y + h).min(200) {
+            for col in x..(x + w).min(320) {
+                self.scr.put_pixel(col, row, 0);
+            }
         }
     }
 
