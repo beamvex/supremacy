@@ -64,9 +64,9 @@ or pick one of 32 grid cells.
 The strategic starmap: system ovals + route overlay repainted by
 `map_draw` (`[0x1278]`), with a blinking marker on the selected system.
 A bottom bar (`Image(0x56)`, `MCG/086`: BUY, STARBASE/COST/CAPACITY/DATA)
-carries the **machine-type selector** — view_prev/view_next cycle the 7
-buildable types (colony ship, troops, defence, solar plant, mining,
-horticulture, etc. per `ds:0x9B12` table) — an **info panel** reprints
+carries the **machine-type selector** — view_prev/view_next cycle the
+`ds:0x9B12` type table (`[0x91ED]` steps 0–6, index 1 skipped) — an
+**info panel** reprints
 the selected type's stats, and **gal_build** (`0x642E`) charges the
 faction and constructs one (with a rename prompt). Ambient sfx vary by
 selected type.
@@ -207,19 +207,23 @@ click = accept.
 ## Endings
 
 ### 18. Defeat sequence — `cs:0x8B17` (`*DTH` asset set)
-Fired by the `0xFA` endgame monitor when the player's faction falls
-(record kind `7` conquered / no kind-`0xA` worlds of yours left… per
-the `0x37C7` scan): loads `*DTH.BIN`/`*DTH.GPH`, swaps to the defeat
-song, and plays a full-screen cinematic — the alien emperor looming
-(`MCGDTH/000`) — with scenario-keyed `menu_text` pages over a
-starfield, then waits for input and restarts via `0x1D35` → title.
+Fired by the `0xFA` endgame monitor when the player's faction record
+reads kind `7` (fallen/conquered), or a `0x37C7` scan finds no kind-`7`
+records left — the "lost last world" condition: loads
+`*DTH.BIN`/`*DTH.GPH`, swaps to the defeat song, and plays a
+full-screen cinematic — the alien emperor looming (`MCGDTH/000`) —
+with scenario-keyed `menu_text` pages over a starfield, then waits for
+input and restarts via `0x1D35` → title.
 - **Rust:** ported — `vend.rs` + `vend/{seq,tail,fx}.rs`
   (`Vm::end` phase; `tests/game_end.rs`).
 
 ### 19. Victory sequence — `cs:0x8C65` (`*WIN` asset set)
-Fired when no conquered (kind-`7`) opposition remains. Same structure:
-`*WIN` assets, victory song, the throne-room ceremony art
-(`MCGWIN/000`), credits `menu_text` pages, input wait → restart tail.
+Fired when record `0` (the home/starbase record) reads kind `0xA`
+(inhabited), or when the `0x37C7` scan finds no kind-`0xA` worlds
+remaining. Same structure: `*WIN` assets, victory song, the
+throne-room ceremony art (`MCGWIN/000`), credits `menu_text` pages —
+with a scenario-specific final page + image on the RORN preset —
+input wait → restart tail.
 - **Rust:** ported — same `vend` module.
 
 ### Transient: "insert disk 2" prompt — `cs:0x8AC0`
