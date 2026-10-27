@@ -9,6 +9,7 @@ use super::super::vhost::Call;
 use super::super::vops::{faction_rec, kind_of, set_bits, vsync, Ctx};
 use super::super::{dialog, menu, selrec, seq, status, tick_step};
 use super::{bump, install, leave};
+use super::{ordact, ordbar, ordlist};
 
 /// `u16` casts for the `ds:` slot constants.
 macro_rules! a {
@@ -47,10 +48,10 @@ pub fn enter_orders(c: &mut Ctx, win: bool) {
     c.host.svc(Call::Native(0x89C3));
     c.host.svc(Call::Image(0x40));
     c.host.svc_st(Call::Present(3), c.vm, c.st);
-    c.host.svc(Call::Native(0x38CE));
-    c.host.svc(Call::Native(0x6F53));
+    ordlist::list_frame(c);
+    ordlist::planet_list_paint(c);
     status::tick_day(c);
-    c.host.svc(Call::Native(0x334F));
+    ordact::mode_inner(c, 0);
     c.vm.w16(c.st, a!(SEQ_DELAY), 0);
     c.vm.w8(c.st, a!(SEQ_PHASE), 0);
     c.vm.w8(c.st, a!(SEQ_PERIOD), 6);
@@ -67,10 +68,10 @@ fn frame_loop(c: &mut Ctx) {
         seq::seq_step(c);
         c.host.svc(Call::Native(0xA369));
         menu::service(c);
-        c.host.svc(Call::Native(0x701D));
+        ordlist::list_click(c);
         let _ = tick_step(c);
         bump(c);
-        c.host.svc(Call::Native(0x3438));
+        ordbar::sidebar(c);
         if c.vm.r16(c.st, a!(BUTTONS)) & 2 != 0 {
             break;
         }

@@ -31,12 +31,14 @@ macro_rules! a {
 const TICK_BASE: u16 = 0x928D;
 
 /// `cs:0x6709` — print the string at `ds:si`, cursor `(bx, dx)`.
-pub fn print_str(c: &mut Ctx, mut si: u16, mut bx: u16, mut dx: u16) {
+/// Returns `bx` advanced past the emitted chars — the sidebar and
+/// machine-list sites chain the next print off it.
+pub fn print_str(c: &mut Ctx, mut si: u16, mut bx: u16, mut dx: u16) -> u16 {
     loop {
         let al = c.vm.r8(c.st, si);
         si = si.wrapping_add(1);
         if al == 0xFF || (al < 0x20 && !esc(c, al, &mut si, &mut bx, &mut dx)) {
-            return;
+            return bx;
         }
         if al >= 0x20 {
             put(c, al, bx, dx);

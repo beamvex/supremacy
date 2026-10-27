@@ -183,3 +183,49 @@ pub const TYPE_STRIDE: usize = 0x30;
 pub const SNAP0: usize = 0x9CBC;
 /// Snapshot of `DIRTY1` (file `0x33C76`).
 pub const SNAP1: usize = 0x9CBE;
+/// Orders-screen display mode `[0x91CB]` — `0`/`1`/`2` written by the
+/// `0x32DB`/`0x32FB`/`0x331B` inners, read by `0x71C4` (file
+/// `0x3333B`/`0x371C4`).
+pub const ORD_MODE: usize = 0x91CB;
+/// Launch-destination flag `[0x91E3]` — `0xFF` while the build modal
+/// pick is armed; the orders `list_click` honours it past the
+/// "NOT YOURS!" refuse (file `0x370CD`, armed at file `0x352C9`).
+pub const LAUNCH_F: usize = 0x91E3;
+/// Repeat-accelerator cells for the tax-rate arrows
+/// (`cs:0x36BD`/`0x36C4`, file `0x336D6`–`0x3370E`): `[0x91F5]` last
+/// frame, `[0x91F6]` interval, `[0x91F7]` countdown, `[0x91F8]` dir.
+pub const REP_AT: usize = 0x91F5;
+/// Repeat interval (the `0xC` seed and the ramped reload).
+pub const REP_IN: usize = 0x91F6;
+/// Repeat delay countdown — nonzero postpones the step.
+pub const REP_DL: usize = 0x91F7;
+/// Repeat direction — `0xFF` decrements, `0` increments.
+pub const REP_DIR: usize = 0x91F8;
+/// Food-trend cells (file `0x334F0`–`0x3352D`): `[0x91F9]` previous
+/// print, `[0x91FB]` current, `[0x91FD]` tick latch gating the arrow.
+pub const TREND_OLD: usize = 0x91F9;
+/// The just-printed value the arrow compares against.
+pub const TREND_NEW: usize = 0x91FB;
+/// Tick latch — the arrow reprints only when `[0x91BA]` moved on.
+pub const TREND_TK: usize = 0x91FD;
+/// The 9-byte name-edit scratch `ds:0x838E` — `order_rename` stages
+/// the record name there for the Esc restore (file `0x33831`–`0x3384B`).
+pub const NAME_BUF: usize = 0x838E;
+/// Dirty-region nest counter `[0x4C94]` — the `[0x1298]` push /
+/// `0xA479` pop bracket (file `0x2F5D5`/`0x3A479`).
+pub const REG_NEST: usize = 0x4C94;
+/// Mouse-cursor-live flag `[0x9CCE]` — the region test only hides an
+/// installed cursor (file `0x2F5E1`).
+pub const REG_ON: usize = 0x9CCE;
+/// Cursor-inside flag `[0x9CD0]` — set when the push hid the cursor,
+/// so the pop knows to restore it (file `0x2F611`/`0x3A47F`).
+pub const REG_HIT: usize = 0x9CD0;
+/// Region rect cells (file `0x2F617`–`0x2F622`): `[0x9CDC]` bottom,
+/// `[0x9CDE]` left, `[0x9CE0]` right, `[0x9CE2]` top.
+pub const REG_Y2: usize = 0x9CDC;
+/// Region left edge.
+pub const REG_X1: usize = 0x9CDE;
+/// Region right edge.
+pub const REG_X2: usize = 0x9CE0;
+/// Region top edge (`0xFFFF` after release).
+pub const REG_Y1: usize = 0x9CE2;

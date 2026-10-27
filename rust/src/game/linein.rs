@@ -44,6 +44,20 @@ pub fn line_input(c: &mut Ctx, si: u16, bx: u16, dx: u16, bp: i16) {
     edit(c, si, bx, dx, bp);
 }
 
+/// `cs:0xE652` — the "UN-NAMED!" prefill entry (file `0x2E652`–
+/// `0x2E66D`): the nine template bytes land at `[si]` and
+/// `[0x4FCB]` resets before falling into the `0xE66E` loop — the
+/// caller passes `si` at the buffer start so typing overwrites the
+/// prefill char by char (`order_rename`, `build_rename`, the
+/// `0xFC44` cheat prompt).
+pub fn unnamed_edit(c: &mut Ctx, si: u16, bx: u16, dx: u16, bp: i16) {
+    for (i, &ch) in b"UN-NAMED!".iter().enumerate() {
+        c.vm.w8(c.st, si.wrapping_add(u16::try_from(i).unwrap_or(0)), ch);
+    }
+    c.vm.w8(c.st, a!(NAME_LEN), 0);
+    line_input(c, si, bx, dx, bp);
+}
+
 /// The `0xE685` poll/dispatch loop.
 fn edit(c: &mut Ctx, si: u16, bx: u16, dx: u16, bp: i16) {
     let (mut si, mut bx, mut bp) = (si, bx, bp);

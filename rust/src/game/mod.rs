@@ -40,6 +40,7 @@ mod menu;
 mod mine;
 mod namedit;
 mod num;
+mod oreg;
 mod panel;
 mod ppanel;
 mod preset;
