@@ -6,7 +6,7 @@
 //! Boots a [`front::Game`][supremacy::front::Game] like `supremacy-run`
 //! — minus `minifb`/`cpal`, so it builds and runs with no display or
 //! audio device — steps `--ticks` frames (default 300), applies
-//! `--script` ops on their tick (the `difftest` text format; `done`
+//! `--script` ops on their tick (the `.scr` text format; `done`
 //! ends the run early), then prints the `smoke::Digest` line.
 //! `--expect` compares a `key=value` spec, exit 3 on mismatch;
 //! `--frame` dumps the final VRAM through the palette as a PPM.
@@ -16,7 +16,6 @@ use std::process::ExitCode;
 
 use supremacy::args::{parse, Config, Video};
 use supremacy::assets::{heap_segment, load_set};
-use supremacy::difftest as dt;
 use supremacy::front::Game;
 use supremacy::palette::{from_dac, Palette, DAC_LEN, DAC_OFS};
 use supremacy::platform::{DosFiles, MemFs};
@@ -143,11 +142,11 @@ fn boot(dir: &Path, stem: &str, o: &Opt, cfg: Config) -> Option<Game> {
     Some(g)
 }
 
-/// The `--script` ops, or none — same text format `difftest` parses.
-fn ops(o: &Opt) -> Vec<dt::Rec> {
+/// The `--script` ops, or none — the `.scr` text format.
+fn ops(o: &Opt) -> Vec<smoke::Rec> {
     o.script
         .as_ref()
-        .map(|p| dt::parse(&std::fs::read_to_string(p).unwrap_or_default()).0)
+        .map(|p| smoke::parse(&std::fs::read_to_string(p).unwrap_or_default()).0)
         .unwrap_or_default()
 }
 

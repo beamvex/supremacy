@@ -67,7 +67,7 @@ staging buffers simply never write them.
   black and is never tinted), while the `dx == 6` master path adds
   unconditionally.
 
-Verified against the DOS-side DAC dump `difftest/out/P05.BIN`: regs
+Verified against a DAC dump captured from the running original: regs
 `1..=31` match row `0xD` exactly, regs `33..` match `ds:0x4095`.
 
 ## API tour

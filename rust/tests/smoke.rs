@@ -11,7 +11,6 @@ mod common;
 use common::game_dir;
 use supremacy::args::{Sound, Video};
 use supremacy::assets::{heap_segment, load_set};
-use supremacy::difftest as dt;
 use supremacy::front::Game;
 use supremacy::palette::{from_dac, DAC_LEN, DAC_OFS};
 use supremacy::platform::MemFs;
@@ -76,7 +75,7 @@ fn golden_galaxy_run() {
 
 #[test]
 fn script_poke_lands_and_done_stops_early() {
-    let s = dt::parse("04 pokew ds F000 BEEF\n06 key 1C\n08 key 9C\n0A done\n");
+    let s = smoke::parse("04 pokew ds F000 BEEF\n06 key 1C\n08 key 9C\n0A done\n");
     let mut g = game();
     let d = smoke::run(&mut g, &s.0, 90);
     assert_eq!(d.steps, 0x0A);

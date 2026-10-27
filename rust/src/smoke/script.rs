@@ -1,5 +1,5 @@
-//! The human script format the harness turns into `SCRIPT.BIN` — one
-//! op per line, all fields hex (a leading `0x` is tolerated):
+//! The `.scr` script format — one op per line, all fields hex (a
+//! leading `0x` is tolerated):
 //!
 //! ```text
 //! # comment
@@ -16,24 +16,15 @@
 //! 3C  done
 //! ```
 //!
-//! Ops apply in file order once their tick has passed; scripts are kept
-//! sorted by tick at encode time (stable).
+//! Ops apply in file order once their tick has passed;
+//! [`run`][super::run] sorts the records by tick (stable) before
+//! replaying.
 
 use super::op::{Op, Rec};
 use super::seg::Seg;
 
 /// A parsed scenario — records in script order.
 pub struct Script(pub Vec<Rec>);
-
-impl Script {
-    /// The `SCRIPT.BIN` payload — records sorted by tick (stable).
-    #[must_use]
-    pub fn to_bin(&self) -> Vec<u8> {
-        let mut rs = self.0.clone();
-        rs.sort_by_key(|r| r.tick);
-        rs.iter().flat_map(Rec::encode).collect()
-    }
-}
 
 fn hx(t: &str) -> Option<u16> {
     u16::from_str_radix(t.trim_start_matches("0x"), 16).ok()

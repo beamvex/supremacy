@@ -289,8 +289,7 @@ Everything richer (fonts, starfields, audio routing) lives behind
   doc labels by `0x6D50` — `cs_word` reads the runtime space; don't add
   the doc delta twice.
 - **VM registers are `ds` cells.** `R_SEL`/`R_A`/etc. live in the save
-  block — a savegame *contains* the in-flight VM state, and `difftest`
-  can compare it.
+  block — a savegame *contains* the in-flight VM state.
 
 ## File map
 

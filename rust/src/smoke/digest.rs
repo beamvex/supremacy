@@ -16,7 +16,7 @@ pub struct Digest {
     pub pal: u64,
     /// FNV-1a of the rendered PCM `f32` bits.
     pub audio: u64,
-    /// FNV-1a of [`ds_image`][crate::difftest::ds_image].
+    /// FNV-1a of the reassembled 64 KiB `ds` image (`snap::ds_image`).
     pub state: u64,
     /// Final `Rng` state.
     pub rng: u32,
