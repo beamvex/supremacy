@@ -46,7 +46,7 @@ palette, `Game::new` over a `MemFs` (savegames never touch disk),
 | `video` | FNV-1a of `Host::scr.buf` (mode-laid-out VRAM) |
 | `pal` | FNV-1a of the 768 palette bytes |
 | `audio` | FNV-1a of every rendered PCM `f32` — `SAMPLES_PER_STEP` (`BOOT_RATE`/30 = 1470) per step, the window loop's stride |
-| `state` | FNV-1a of `difftest::ds_image` (the reassembled 64 KiB `ds`) |
+| `state` | FNV-1a of `snap::ds_image` (the reassembled 64 KiB `ds`) |
 | `rng` | the final `Rng` LCG state, raw `u32` |
 
 FNV-1a is the tiny non-cryptographic hash used everywhere in the test
@@ -66,16 +66,40 @@ render no audio: same input, same render points, still deterministic.
 
 ## Scripted input
 
-`--script` takes the `difftest` text format — ops apply on their tick
-through the shared `difftest::input` (identical `Pump`/poke/wait
-semantics as the DOSBox-X harness): `key`, `mouse`, `pokew`,
-`waitcell`; `done` ends the run early. The artefact ops (`dump`,
-`pal`, `stat`) are no-ops here — the hash channels are the snapshot.
-See [difftest.md](difftest.md) § Script for the op table.
+`--script` takes the `.scr` text format — one op per line, all fields
+hex (a leading `0x` is tolerated; `#` starts a comment):
 
-A scripted smoke run is the cheap version of a difftest: same input
-language, but the oracle is a pinned hash instead of a DOS twin —
-which is exactly the right tool when the original can't run in CI.
+```
+0A  key 1C            # Enter make at tick 0x0A
+0E  key 9C            # break
+14  mouse 1E 160 96 1 # event mask, x, y, buttons
+28  waitcell 91CD 5   # hold until ds:0x91CD == 5 (uimode == galaxy)
+32  pokew drv 55A2 1234
+1E  dump ds 7D39 1F8B 01
+1E  pal 05
+1E  stat 06
+3C  done
+```
+
+| op | fields | effect |
+|---|---|---|
+| `key` | scancode (bit 7 = break) | `[0x9CCB]`/`[0x9CCC]` latch + `drv:0x8B72` LIFO push — `Pump::key` |
+| `mouse` | mask, x, y, buttons | moves `Pump`'s cursor + button state like the int-33h handler |
+| `pokew` | seg, ofs, word | word write at `ds:`/`drv:` offset |
+| `waitcell` | ds ofs, byte | steps until `ds:[ofs] == val` (state sync point) |
+| `dump` | seg, ofs, len, id | no-op — snapshots here are the hash channels |
+| `pal` | id | no-op |
+| `stat` | id | no-op |
+| `done` | — | ends the run at its tick |
+
+`seg` is `ds` (game dgroup), `drv` (the driver/template segment —
+holds the `0x8B72` key LIFO and the `0x55A2` LCG state), or an absolute
+hex segment (`A000` = VRAM).
+
+The op semantics live in `smoke::input`: `key` waits for the
+`[0x9CCB]` latch to free first (bounded at 5000 internal steps),
+`pokew` mirrors `drv:` writes into `Host::img` at `0x292B0 + ofs`. The
+oracle is a pinned hash — which is exactly the right tool for CI.
 
 ## Gating
 
@@ -101,8 +125,9 @@ with the commands in its doc header.
 1. `supremacy-smoke … --expect …` fails on `video`: the framebuffer
    differs. Write `--frame out.ppm` and eyeball it — often the bug is
    obvious (a missing hotspot, a half-drawn panel).
-2. `state` differs: the `ds` cells do. Compare a `difftest` `D01` dump
-   at the same tick, or bisect `--ticks` to find the divergence frame.
+2. `state` differs: the `ds` cells do. Bisect `--ticks` to find the
+   divergence frame, then diff the `ds` image against the same run on
+   the last-good commit.
 3. `audio` differs but `video`/`state` don't: the PCM path — check
    `front::audio::Bus` and the driver's tick cadence.
 4. `rng` differs alone: the LCG consumed a different number of draws —
@@ -116,7 +141,12 @@ with the commands in its doc header.
 | `mod.rs` | module docs, re-exports |
 | `digest.rs` | `Digest` — the five fields + `expect` matching |
 | `hash.rs` | the FNV-1a helpers the channels share |
-| `drive.rs` | the step loop — `Game::step` × N over `difftest::input` ops |
+| `drive.rs` | the step loop — `Game::step` × N over the script ops |
+| `op.rs` | `Op`/`Rec` — the `.scr` op vocabulary |
+| `script.rs` | the `.scr` text parser → `Rec` list |
+| `seg.rs` | `ds`/`drv`/absolute segment selectors |
+| `input.rs` | `key`/`mouse`/`pokew`/`waitcell` application |
+| `snap.rs` | `ds_image` — the reassembled 64 KiB `ds` snapshot |
 
 ## Reading a real digest line
 

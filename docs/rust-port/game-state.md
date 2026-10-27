@@ -24,8 +24,8 @@ below are just *offset constants* — `rec::F_POP` is `0x2A`, not a field.
 That design is why a savegame is literally a memory dump: the `0x1F8B`
 bytes the save routine writes *are* the game state. It also means every
 game variable is inspectable by offset — `st.word(0x91B8)` reads the
-same cell the asm's `mov ax,[0x91B8]` did, and a difftest `D01` dump
-offsets directly against this page's tables.
+same cell the asm's `mov ax,[0x91B8]` did, so this page's tables index
+a memory dump directly.
 
 ## `State` (`state.rs`, `consts.rs`)
 
@@ -184,9 +184,8 @@ An LCG (linear congruential generator) is the simplest PRNG: multiply
 the state by a constant, add a constant, take the low bits. The asm
 builds `13·s` out of shifts and adds because a 16-bit `mul` is what it
 has — `13·s = (s<<3) + (s<<2) + s`-shape recombination the routine's
-two-word adds implement. `Rng::set_state`/`state` expose the raw dword
-so `difftest` can transplant the DOS side's seed ([difftest.md](difftest.md)
-§ "the RNG problem").
+two-word adds implement. `Rng::state` exposes the raw dword — the
+smoke digest reports it as the `rng` channel.
 
 - `range(b)` → `hi16((b+1)·r)` (the asm does `inc bx` then `mul`,
   keeping `dx`) — result ∈ `0..=b`. Not `r % (b+1)`: the asm takes the

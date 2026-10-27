@@ -161,8 +161,8 @@ fn map_draw_marks_records_and_grid_paints_stars() {
 /// `Present(dx)` — the `0x2ED30` composite: regs `1..=31` from row
 /// `dx` of `ds:0x4394`, regs `0x21..=0xFF` from `ds:0x4095` colours
 /// `33..`, every nonzero component through the `ds:[0x9CA1]` shade.
-/// Expected values cross-checked against the DOS-side DAC dump
-/// `difftest/out/P05.BIN` (a `Present(0xD)` attract frame).
+/// The `>> 2` spot checks below pin the 6-bit DAC values captured
+/// from a `Present(0xD)` attract frame of the original.
 #[test]
 fn present_stages_the_screen_palette() {
     let mut h = host();
@@ -176,7 +176,7 @@ fn present_stages_the_screen_palette() {
     for n in 0x21..=0xFF_usize {
         assert_eq!(h.pal.rgb(n), scaled(&i, WORK_OFS + n * 3));
     }
-    // `P05.BIN` spot checks (the dump is raw 6-bit).
+    // Raw 6-bit DAC spot checks (the dump's encoding).
     assert_eq!(h.pal.rgb(1).map(|v| v >> 2), [4, 0, 0]);
     assert_eq!(h.pal.rgb(33).map(|v| v >> 2), [60, 60, 60]);
     assert_eq!(h.pal.rgb(255).map(|v| v >> 2), [63, 63, 0]);

@@ -4,7 +4,3 @@
 *.DLL
 target/
 .DS_Store
-
-# difftest run artefacts (generated)
-difftest/SCRIPT.BIN
-difftest/out/

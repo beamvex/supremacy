@@ -136,8 +136,8 @@ fn palette(img: &[u8], v: supremacy::args::Video) -> Palette {
     }
 }
 
-/// The unpacked image — `--exe` reads an alternate file (difftest
-/// debugging), otherwise the committed `data/*.bin` blobs (GAM-55).
+/// The unpacked image — `--exe` reads an alternate file, otherwise
+/// the committed `data/*.bin` blobs (GAM-55).
 fn load_img(exe: Option<PathBuf>) -> std::io::Result<Vec<u8>> {
     exe.map_or_else(|| Ok(supremacy::img::image()), std::fs::read)
 }

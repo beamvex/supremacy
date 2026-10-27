@@ -25,8 +25,8 @@ The segment registers are named `cs` (code), `ds` (data), `es` (extra),
 `ss` (stack). Assembly operands like `mov ax,[0x1258]` mean "read a word
 at `ds * 16 + 0x1258`".
 
-A concrete example. Suppose `ds = 0x1A23` (a real value observed under
-DOSBox — it changes per DOS load, which is why nothing can be hardcoded).
+A concrete example. Suppose `ds = 0x1A23` (a real observed value — it
+changes per DOS load, which is why nothing can be hardcoded).
 Then `mov ax,[0x1258]` reads physical address
 `0x1A23 * 16 + 0x1258 = 0x1B488`. The `* 16` is a left shift by 4 — the
 segment value counts in units of 16 bytes.
@@ -353,7 +353,7 @@ Quick reference for terms the docs use without re-explaining:
 | **provenance** | which asm routine a Rust item ports; cited as file/`cs:`/`ds:` offsets (§10) |
 | **`rep movsb`/`stosb`/`lodsb`/`scasb`** | block-copy / store / load / scan string instructions — `rep` repeats `cx` times |
 | **`std`/`cld`** | set/clear direction flag — `std` makes string ops walk *backwards* (EXEPACK relies on it, §5) |
-| **TSR** | terminate-and-stay-resident — a program that hooks vectors and stays loaded (the difftest probe is one) |
+| **TSR** | terminate-and-stay-resident — a program that hooks interrupt vectors and stays loaded |
 
 ## 13. A two-minute asm cheat sheet
 

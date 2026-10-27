@@ -1,8 +1,7 @@
 //! Input-op application — the port-side semantics of `key`, `mouse`,
-//! `pokew` and `waitcell`, shared by the artefact-driving replay
-//! ([`drive::run`][super::run]) and the headless smoke digest
-//! ([`crate::smoke`]). `step` counts `Game::step`s, including the ones
-//! a latch wait or `waitcell` runs internally.
+//! `pokew` and `waitcell` for the headless smoke digest's drive loop
+//! ([`run`][super::run]). `step` counts `Game::step`s, including the
+//! ones a latch wait or `waitcell` runs internally.
 
 use crate::front::Game;
 use crate::game::{VmHost, KEY_PEND};
@@ -10,15 +9,15 @@ use crate::game::{VmHost, KEY_PEND};
 use super::op::Op;
 use super::seg::Seg;
 
-/// `drv:` base in the exe image — `snap.rs`'s constant, needed to
-/// mirror `POKEW` into `Host::img`.
+/// `drv:` base in the exe image — needed to mirror `pokew` into
+/// `Host::img` (the RNG state `drv:0x55A2` lives at `0x292B0 + 0x55A2`).
 const DRV_OFS: usize = 0x292B0;
-/// Max `step()`s a `WaitCell`/latch wait may take before the replay
+/// Max `step()`s a `waitcell`/latch wait may take before the replay
 /// gives up on it (keeps a stuck scenario from hanging forever).
 const WAIT_CAP: u16 = 5000;
 
 /// Apply an input op to `g` — `true` when `op` was one of
-/// `Key`/`Mouse`/`Poke`/`WaitCell` (the artefact ops return `false` so
+/// `key`/`mouse`/`pokew`/`waitcell` (the artefact ops return `false` so
 /// callers can dispatch on them).
 pub fn input(g: &mut Game, op: Op, step: &mut u16) -> bool {
     match op {
@@ -34,8 +33,8 @@ pub fn input(g: &mut Game, op: Op, step: &mut u16) -> bool {
     true
 }
 
-/// The probe's latch-write: hold until `[0x9CCB]` frees, then queue the
-/// code and mirror it into `ds:` (like the next `pump_input` does).
+/// The latch-write semantics: hold until `[0x9CCB]` frees, then queue
+/// the code and mirror it into `ds:` (like the next `pump_input` does).
 fn key(g: &mut Game, scan: u8, step: &mut u16) {
     for _ in 0..WAIT_CAP {
         if g.vm.r8(&g.st, u16::try_from(KEY_PEND).unwrap_or(0)) == 0 {

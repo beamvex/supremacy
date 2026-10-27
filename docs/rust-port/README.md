@@ -53,8 +53,7 @@ use in about ten minutes. Then pick your path:
 - **"I want to understand the host layer / run the game"** →
   [platform](platform.md) → [args](args.md) → [audio](audio.md) →
   [front](front.md).
-- **"I want to test or verify"** → [smoke](smoke.md) →
-  [difftest](difftest.md) → § Test suite.
+- **"I want to test or verify"** → [smoke](smoke.md) → § Test suite.
 - **"I want to fix a bug"** → find the misbehaving subsystem below
   (§ Module guide), read its page, then grep `rust/src/` for the `cs:`/
   `ds:` addresses cited there — every ported routine carries its asm
@@ -69,12 +68,11 @@ use in about ten minutes. Then pick your path:
   it relative to the `rust/` directory. The unpacked-exe bytes the port
   reads are embedded from `rust/data/*.bin` (GAM-55), so
   `../decompiled/GAME.unpacked.exe` is *not* needed; it only matters
-  for blob regeneration (`extract-img`) and the DOS-side difftest.
-- Optional: `minifb` build deps for `supremacy-run` (a window opens),
-  `nasm` + `dosbox-x` only for the differential harness.
+  for blob regeneration (`extract-img`).
+- Optional: `minifb` build deps for `supremacy-run` (a window opens).
 
-On macOS/Linux `cargo` alone covers everything except the two optional
-extras. `minifb` needs the usual X11/wayland dev packages on Linux; the
+On macOS/Linux `cargo` alone covers everything except the optional
+extra. `minifb` needs the usual X11/wayland dev packages on Linux; the
 `audio` feature needs `cpal`'s platform deps (ALSA headers on Linux).
 Neither is needed for `cargo test` or the `supremacy`/`supremacy-smoke`
 binaries.
@@ -101,7 +99,7 @@ cargo fmt
 Step 3 is worth a caveat: the integration tests read the *real* game
 files — `../GAME/MCG.GPH` etc. — while the image comes from the
 committed `rust/data/*.bin` blobs. The git-ignored exes (`GAME.EXE`,
-`GAME.unpacked.exe`, `SUPCHT.*`) only feed the `exepack`/`difftest`
+`GAME.unpacked.exe`, `SUPCHT.*`) only feed the `exepack`
 checks, which skip cleanly when they aren't on disk. If you cloned the
 repo without the game-data directory, library unit tests still compile
 but the integration tests fail at file-open time. That is expected; the
@@ -186,7 +184,6 @@ rust/
 │   ├── video/          # per-mode VRAM + draw-image-by-index
 │   └── bin/
 │       ├── supremacy.rs   # `supremacy` — renders one record → PPM
-│       ├── difftest.rs    # `difftest` — DOSBox-X differential driver
 │       ├── extract_img.rs # `extract-img` — regenerate data/ from GAME.EXE
 │       ├── run.rs         # `supremacy-run` — playable minifb shell
 │       └── smoke.rs       # `supremacy-smoke` — headless digest runner
@@ -217,7 +214,6 @@ repo root/
 │   ├── disasm/           #   GAME.linear.asm — the disassembly
 │   ├── tools/            #   Python reference impls (extract_png.py, lzss.py)
 │   └── fixtures/         #   captured dumps used by tests
-├── difftest/             # probe.asm (the in-emulator TSR) + run output
 └── docs/rust-port/       # these pages
 ```
 
@@ -267,7 +263,6 @@ deeply asm-flavoured.
 | [`platform`](platform.md) | `0x31D74`, `0x353D`+ | DOS services layer | ◐ |
 | [`video`](video.md) | `0x2EB8A`, `0x2FB36`, `0x30620`, `0x310CE` | VRAM + draw-by-index | ◐ |
 | [`front`](front.md) | GAM-9 frontend | `VmHost` impl, `minifb` window | ● |
-| [`difftest`](difftest.md) | GAM-25 | DOSBox-X side-by-side harness | ● |
 | [`smoke`](smoke.md) | GAM-24 | headless tick run → hash digest | ○ |
 | [`game`](game-state.md) | `ds:0x7D39` block etc. | state, VM, tick, UI — see below | ● |
 
@@ -295,7 +290,7 @@ synthesises a PSP command tail (count byte, space, letters at
 `0x82`/`0x84`/`0x86`) so `args::parse` sees exactly what the asm sees
 (see [concepts.md](concepts.md) §4 and [args.md](args.md)). Everywhere
 `--exe PATH` appears it swaps the embedded image for an alternate
-unpacked exe (difftest debugging); without it the `rust/data/*.bin`
+unpacked exe; without it the `rust/data/*.bin`
 blobs make the binaries self-contained from any cwd.
 
 - `supremacy <GAME-dir> [V] [K] [S] [--set STEM] [--idx N] [--exe PATH]
@@ -315,8 +310,6 @@ blobs make the binaries self-contained from any cwd.
   game deterministically with no display or audio device and prints a
   `key=hex` digest of the VRAM, palette, PCM and `ds` state; `--expect`
   gates it (exit 3 on mismatch). See [smoke](smoke.md).
-- `difftest <script.scr> [--root DIR] [--port-only] …` — the DOSBox-X
-  differential driver (`bin/difftest.rs`); see [difftest](difftest.md).
 - `extract-img [GAME.EXE] [--out DIR] [--check]` — regenerates
   `rust/data/*.bin` by running `exepack::unpack` on the packed
   `GAME.EXE` and slicing each `img::Region` range; `--check` verifies
