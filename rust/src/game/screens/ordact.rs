@@ -47,9 +47,9 @@ pub fn order_mode(c: &mut Ctx, mode: u8) {
 /// `cs:0x71C4` — re-run the `[0x91CB]` mode inner (file
 /// `0x371C4`–`0x371E2`).
 pub fn mode_redraw(c: &mut Ctx) {
-    match c.vm.r8(c.st, a!(ORD_MODE)) {
-        m @ 0..=2 => mode_inner(c, m),
-        _ => {}
+    let m = c.vm.r8(c.st, a!(ORD_MODE));
+    if m <= 2 {
+        mode_inner(c, m);
     }
 }
 
@@ -131,12 +131,14 @@ fn bump(bx: &mut u16, dx: &mut u16) -> bool {
     true
 }
 
-/// `0x33404` — fill the unused slots (`6 − bp`) with the `0x68B1`
-/// blank + icon `0x163` (file `0x33404`–`0x33436`).
+/// `0x33404` — fill the unused slots with the `0x68B1` blank + icon
+/// `0x163`: `cx = 5 − bp` do-while, so `6 − bp` rows and always one
+/// when `bp ≥ 6` (file `0x33404`–`0x33436`).
 fn pad(c: &mut Ctx, bp: u16, mut bx: u16, mut dx: u16) {
-    for _ in 0..(5u16.wrapping_sub(bp)).wrapping_add(1) & 0xFF {
+    for _ in 0..6u16.saturating_sub(bp).max(1) {
         text::print_str(c, S_BLANK, bx, dx);
         c.host.svc(Call::Image(0x163));
+        bx = bx.wrapping_add(1);
         bump(&mut bx, &mut dx);
     }
 }
@@ -218,7 +220,7 @@ fn collect(c: &mut Ctx) {
     let di = faction_rec(c);
     let n = c.vm.r16(c.st, a!(REC_COUNT));
     let base = c.vm.r16(c.st, a!(REC_BASE));
-    for i in 0..n.wrapping_sub(1) {
+    for i in 0..n {
         let si = base.wrapping_add(i.wrapping_mul(a!(REC_STRIDE)));
         if c.vm.r16(c.st, si.wrapping_add(f!(F_KIND))) != 0xA {
             continue;
@@ -265,8 +267,8 @@ fn count_kinds(c: &mut Ctx) -> (u16, u16) {
 /// blip on refuse), prints `0x7513`, stages `+0xE` at `0x838E`, runs
 /// the `0xE652` inline edit bracketed in `[0x9CC5]`; Enter
 /// (`[0x4FCF] == 0`) arms the name repaint + `0x6F53`, Esc restores
-/// + `0x6B24` + `0x6F2D`; the `0x38C2` tail (file `0x337EA`–
-/// `0x338C1`).
+/// the name + `0x6B24` + `0x6F2D`; the `0x38C2` tail (file
+/// `0x337EA`–`0x338C1`).
 pub fn order_rename(c: &mut Ctx) {
     let rec = c.vm.r16(c.st, a!(SEL_REC));
     if rec == 0 || kind_of(c, rec) != 0xA {

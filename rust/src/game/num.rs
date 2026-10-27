@@ -74,21 +74,26 @@ pub fn num2(c: &mut Ctx, v: u16, mut bx: u16, dx: u16) -> u16 {
 }
 
 /// `cs:0x6886` — the ≤3-digit padded field (`file 0x36886`–
-/// `0x368D5`): `0x20` pad under 100, then the `0x6893` pair.
+/// `0x368D5`): `0x20` pad under 100, then the `0x6893` pair. Past 99
+/// the `0x68AE` entry skips the `0x6893` pad test and falls through
+/// the forced tens/units divisors — no space for `v % 100 < 10`.
 pub fn num3(c: &mut Ctx, v: u16, mut bx: u16, dx: u16) -> u16 {
     if v >= 100 {
         bx = decade(c, v, 100, bx, dx);
-        return num2(c, v % 100, bx, dx);
+        bx = decade(c, v % 100, 10, bx, dx);
+        return decade(c, v % 10, 1, bx, dx);
     }
     put(c, 0x20, bx, dx);
     num2(c, v, bx.wrapping_add(1), dx)
 }
 
-/// `0x68BD` — the count-subtract digit: `0x2F + v/d` (no mod clamp —
-/// over-range quotients print punctuation), leaving `v mod d` to the
-/// caller (file `0x368BD`–`0x368D5`). Returns `bx` advanced.
+/// `0x68BD` — the count-subtract digit: `0x30 + v/d` (the `0x2F`
+/// count cell increments once per subtract attempt, failing pass
+/// included; no mod clamp — over-range quotients print punctuation),
+/// leaving `v mod d` to the caller (file `0x368BD`–`0x368D5`).
+/// Returns `bx` advanced.
 fn decade(c: &mut Ctx, v: u16, d: u16, bx: u16, dx: u16) -> u16 {
-    let q = 0x2Fu16.wrapping_add(v / d) & 0xFF;
+    let q = 0x30u16.wrapping_add(v / d) & 0xFF;
     put(c, u8::try_from(q).unwrap_or(0), bx, dx);
     bx.wrapping_add(1)
 }
