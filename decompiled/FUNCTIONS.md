@@ -938,7 +938,9 @@ and `VmHost::cs_word`; tests in
 
 Hotspot records store their action as a **far** `0x286B:` pointer at
 `+0xC`/`+0xE` (the shipped templates live inside the save-block image,
-file `0x1A3E2`–`0x1B784`; the live lists are runtime-built copies).
+file `0x1A3E2`–`0x1B784` — `file = ds + 0x10CA0`, e.g. the shell
+template `ds:0x9AAC` sits at file `0x1A74C`; the live lists are
+runtime-built copies).
 Two code windows reference the same routines: record value `V` ⇄
 game-window `cs` `V − 0x6D50` ⇄ file `V + 0x292B0`. Screen entries
 share the `pop ax` idiom (the `jmp [si+0xC]` abandons the caller's
