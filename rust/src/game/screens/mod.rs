@@ -23,7 +23,10 @@ mod launch;
 mod machd;
 mod misc;
 mod open;
+mod ordact;
+mod ordbar;
 mod orders;
+mod ordlist;
 mod spy;
 mod status;
 mod surface;
@@ -105,6 +108,13 @@ fn nav(c: &mut Ctx, t: u16) {
         0x3F41 | 0xAC91 => order_open(c),
         0x3F91 | 0xACE1 => mach_open(c),
         0x4BA1 | 0xB8F1 => order_build(c),
+        0x36BD | 0xA40D => ordact::order_page(c, 0xFF),
+        0x36C4 | 0xA414 => ordact::order_page(c, 0),
+        0x374B | 0xA49B => ordact::order_collect(c),
+        0x37EA | 0xA53A => ordact::order_rename(c),
+        0x32DB | 0xA02B => ordact::order_mode(c, 0),
+        0x32FB | 0xA04B => ordact::order_mode(c, 1),
+        0x331B | 0xA06B => ordact::order_mode(c, 2),
         _ => drop(c.host.svc(Call::Native(t))),
     }
 }
@@ -128,7 +138,7 @@ fn install(c: &mut Ctx, sel: u16, list: u16, n: u16, mode: u8) {
 
 /// The shared sound-select block — `Chan(0x8A5B)`, `Chan(0x8A3B,al)`,
 /// `Sound(cl)`, suppressed on `[0x91D3] == 0xFF` (the `0x2CC5` idiom).
-fn snd(c: &mut Ctx, al: u8, cl: u8) {
+pub(super) fn snd(c: &mut Ctx, al: u8, cl: u8) {
     if c.vm.r8(c.st, a!(SND_ON)) == 0xFF {
         return;
     }

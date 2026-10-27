@@ -46,8 +46,9 @@ pub(super) fn overlay(c: &mut Ctx, s: u16, bx: u16) {
 /// `cs:0x6F2D` — `0x2C` iterations of the `0x6F39` frame step:
 /// `0x2CA9` vsync, the `0x66F3` `[0x91DB]`/`uimode-5` overlay slot,
 /// `uimode == 6` → `0xEA2E`, `inc [0x91D4]`, `0xA369` input, `0x5C1E`
-/// sequencer (file `0x36F39`–`0x36F52`).
-fn wait(c: &mut Ctx) {
+/// sequencer (file `0x36F39`–`0x36F52`). Shared by the orders-screen
+/// `order_collect`/`order_rename`/refuse waits.
+pub(super) fn wait(c: &mut Ctx) {
     for _ in 0..WAIT_N {
         vsync(c);
         if c.vm.r8(c.st, a!(PANEL_ON)) != 0 && uimode(c) == 5 {
