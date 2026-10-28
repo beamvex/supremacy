@@ -39,6 +39,37 @@ impl Host {
         }
     }
 
+    /// `[0x1276]` meter-bar edge — MCG `0x2F09B`: 7 px of `cl` at
+    /// `(ax·8, 0x9F − 2·di)` with the two rows above it blacked, so the
+    /// `0x2759` sweep walks a growing column; `bp` clamps `di`, and
+    /// `di = 0` blacks the under-baseline row alone. The EGA/CGA/TGA
+    /// twins (`0x301FE`/`0x30DFF`/`0x3190B`) aren't ported.
+    pub(super) fn bar(&mut self, ax: u16, cl: u16, di: u16, bp: u16) {
+        if self.scr.mode != Video::Mcga {
+            self.dropped += 1;
+            return;
+        }
+        let x = usize::from(ax) * 8;
+        if di == 0 {
+            return self.bar_row(x, 0x9D, 0);
+        }
+        let y = 0x9Fusize.saturating_sub(usize::from(di.min(bp)) * 2);
+        self.bar_row(x, y, cl);
+        self.bar_row(x, y.saturating_sub(2), 0);
+    }
+
+    /// One 7-px run of the bar column — the mode-13h `stosb` tail,
+    /// bounds-checked.
+    fn bar_row(&mut self, x: usize, y: usize, v: u16) {
+        if y >= 200 {
+            return;
+        }
+        let v = u8::try_from(v).unwrap_or(0);
+        for px in x..(x + 7).min(320) {
+            self.scr.put_pixel(px, y, v);
+        }
+    }
+
     /// `int 33` — `ax = 4` sets the position, `ax = 8` the y range,
     /// `ax = 0x14` swaps the event-handler mask (`0xA3BC`/`0xA36A` —
     /// `cx` = `0x1E` buttons-only vs `0x1F` full; `dx` is the handler

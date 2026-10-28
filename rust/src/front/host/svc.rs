@@ -70,6 +70,7 @@ impl VmHost for Host {
             Call::Image(i) => self.scr.draw_image(&self.set, usize::from(i)),
             Call::Glyph(ch, bx, dx) => font::draw(&mut self.scr, &self.img, ch, bx, dx),
             Call::Rect(a, b, x, d) => self.rect(a, b, x, d),
+            Call::Bar(a, x, d, p) => self.bar(a, x, d, p),
             Call::Mouse(ax, cx, dx) => self.int33(ax, cx, dx),
             Call::KeyPop => return u16::from(self.pump.pop_key().unwrap_or(0)),
             Call::Slot(0x1270, _) => self.msg_scroll(),

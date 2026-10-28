@@ -14,7 +14,10 @@
 //! port's `Phase::Galaxy`, keyed off `uimode == 5` by the runner.
 
 mod build;
+mod dbars;
 mod detail;
+mod dfield;
+mod dmach;
 mod fleet;
 mod galaxy;
 mod galbuild;

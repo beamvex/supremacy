@@ -9,7 +9,7 @@ use super::super::consts::{
 use super::super::vhost::Call;
 use super::super::vops::{kind_of, vsync, Ctx};
 use super::super::{menu, selrec, shell, text, tick_step};
-use super::{bump, install, leave, snd};
+use super::{bump, dbars, dfield, dmach, install, leave, snd};
 
 /// `u16` casts for the `ds:` slot constants.
 macro_rules! a {
@@ -18,7 +18,8 @@ macro_rules! a {
     };
 }
 
-/// `ds:` slot of the detail-screen animation flag (`[0x91DD]`).
+/// `ds:` slot of the detail-screen animation flag (`[0x91DD]`) —
+/// nonzero while a docked machine is selected (armed by `0x29D9`).
 pub(super) const ANIM: u16 = 0x91DD;
 /// The `0x7402` "not colonised" refusal message.
 pub(super) const S_REFUSE: u16 = 0x7402;
@@ -67,14 +68,20 @@ fn body(c: &mut Ctx) {
     c.host.svc_st(Call::Present(2), c.vm, c.st);
     snd(c, 0xA, 8);
     c.vm.w16(c.st, a!(SEQ_PTR), 0);
-    c.vm.w16(c.st, 0x91C4, 0);
+    c.vm.w16(c.st, dfield::SWEEP, 0);
     install(c, 0x9EDC, 0x9EDE, 8, 2);
     c.vm.w16(c.st, a!(SEL_REC), c.vm.r16(c.st, a!(REC_CUR)));
-    c.host.svc(Call::Native(0x4C8B));
-    c.host.svc(Call::Native(0x5994));
+    dfield::name(c);
+    dfield::bays(c);
     c.host.svc(Call::Slot(0x128C, 0x78));
-    for f in [0x55F2, 0x2684, 0x26C1, 0x2741, 0x26FE] {
-        c.host.svc(Call::Native(f));
+    dmach::auto_sel(c);
+    for f in [
+        dfield::col_food,
+        dfield::col_min,
+        dfield::col_nrg,
+        dfield::col_fuel,
+    ] {
+        f(c);
     }
     frame_loop(c);
 }
@@ -88,7 +95,7 @@ pub(super) fn frame_loop(c: &mut Ctx) {
         vsync(c);
         anim(c);
         dirty(c);
-        c.host.svc(Call::Native(0x2759));
+        dbars::meters(c);
         let _ = tick_step(c);
         c.host.svc(Call::Native(0xA369));
         menu::service(c);
@@ -121,23 +128,23 @@ fn dirty(c: &mut Ctx) {
     c.vm.w16(c.st, a!(SNAP0), d0);
     c.vm.w16(c.st, a!(SNAP1), d1);
     if d0 & 0x800 != 0 {
-        serve(c, 0x25EB, DIRTY0, !0x800);
+        serve(c, dfield::kind, DIRTY0, !0x800);
     } else if d0 & 0x20 != 0 {
-        serve(c, 0x2604, DIRTY0, !0x20);
+        serve(c, dfield::pop, DIRTY0, !0x20);
     } else if d0 & 0x4000 != 0 {
-        serve(c, 0x2684, DIRTY0, !0x4000);
+        serve(c, dfield::col_food, DIRTY0, !0x4000);
     } else if d0 & 0x8000 != 0 {
-        serve(c, 0x26C1, DIRTY0, !0x8000);
+        serve(c, dfield::col_min, DIRTY0, !0x8000);
     } else if d1 & 1 != 0 {
-        serve(c, 0x26FE, DIRTY1, !1);
+        serve(c, dfield::col_fuel, DIRTY1, !1);
     } else if d1 & 2 != 0 {
-        serve(c, 0x2741, DIRTY1, !2);
+        serve(c, dfield::col_nrg, DIRTY1, !2);
     }
 }
 
-/// One deferred arm: host call then `and` the bit off.
-fn serve(c: &mut Ctx, f: u16, cell: usize, mask: u16) {
-    c.host.svc(Call::Native(f));
+/// One deferred arm: the reprint then `and` the bit off.
+fn serve(c: &mut Ctx, f: fn(&mut Ctx), cell: usize, mask: u16) {
+    f(c);
     let a = u16::try_from(cell).unwrap_or(0);
     c.vm.w16(c.st, a, c.vm.r16(c.st, a) & mask);
 }

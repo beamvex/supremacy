@@ -48,6 +48,12 @@ pub enum Call {
     /// columns, `bx` = top row, `cx` = `width/16 − 1`, `dx` = height
     /// in rows — run before a popup/window paints.
     Rect(u16, u16, u16, u16),
+    /// `call word near [0x1276]` — the detail screen's meter-bar edge
+    /// (MCG `0x2F09B`): `ax` = column in 8-px units against the `0x9F`
+    /// baseline, `cl` = colour, `di` = height in 2-px units (`0`
+    /// blacks the under-baseline row alone), `bp` = the `[0x91C4]`
+    /// sweep cap `di` clamps to.
+    Bar(u16, u16, u16, u16),
     /// The int-21 asset loaders — `ax=0x4E00` find-first on the
     /// filename cell at `ds:arg` (the `ds:0x1208`+ `???.???` table the
     /// mode select patches with the set stem), then open/read/close
