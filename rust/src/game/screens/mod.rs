@@ -14,10 +14,13 @@
 //! port's `Phase::Galaxy`, keyed off `uimode == 5` by the runner.
 
 mod build;
+mod dact;
 mod dbars;
 mod detail;
 mod dfield;
 mod dmach;
+mod dscut;
+mod dxfer;
 mod fleet;
 mod galaxy;
 mod galbuild;
@@ -118,7 +121,7 @@ fn nav(c: &mut Ctx, t: u16) {
         0x32DB | 0xA02B => ordact::order_mode(c, 0),
         0x32FB | 0xA04B => ordact::order_mode(c, 1),
         0x331B | 0xA06B => ordact::order_mode(c, 2),
-        _ => drop(c.host.svc(Call::Native(t))),
+        _ => dact::dispatch(c, t),
     }
 }
 
