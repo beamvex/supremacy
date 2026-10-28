@@ -68,7 +68,7 @@ or pick one of 32 grid cells.
 - **Rust:** ported — `game/shell.rs`, `ppanel.rs`, `ticker.rs`,
   `hover.rs`, `selrec.rs`.
 
-### 5. Galaxy screen ![galaxy](screens/icons/galaxy.png) — uimode 5, `cs:0x395B` (sidebar list `ds:0xA81C`, 3 records)
+### 5. Galaxy screen <img src="screens/icons/galaxy.png" alt="galaxy" width="60" height="51" style="image-rendering:pixelated"> — uimode 5, `cs:0x395B` (sidebar list `ds:0xA81C`, 3 records)
 The strategic starmap: system ovals + route overlay repainted by
 `map_draw` (`[0x1278]`), with a blinking marker on the selected system.
 A bottom bar (`Image(0x56)`, `MCG/086`: BUY, STARBASE/COST/CAPACITY/DATA)
@@ -81,13 +81,13 @@ selected type.
 - **Reached by:** the galaxy button on the shell and the cross-screen
   rows of every other screen (`0x3906`/`0x3909`); right-button exits
   back to the shell.
-- **Icon:** ![galaxy](screens/icons/galaxy.png) — blue planet over
+- **Icon:** <img src="screens/icons/galaxy.png" alt="galaxy" width="60" height="51" style="image-rendering:pixelated"> — blue planet over
   stars, top row of the shell toolbar.
 - **Rust:** ported — `game/frame.rs` (`Phase::Galaxy`),
   `screens/{galaxy,galbuild,galmsg}.rs`, `front/map.rs` **MCG only** —
   the EGA/CGA/TGA map painters are not ported (calls drop).
 
-### 6. Planet detail screen ![detail](screens/icons/detail.png) — uimode 2, `cs:0x2426`/`0x2429`/`0x247F`
+### 6. Planet detail screen <img src="screens/icons/detail.png" alt="detail" width="60" height="51" style="image-rendering:pixelated"> — uimode 2, `cs:0x2426`/`0x2429`/`0x247F`
 (list `ds:0x9EDE`, 23 records)
 Per-planet logistics (backdrop `MCG/041`): the selected ship's sheet
 (CIVILIANS, TO CREW, CAPACITY, MAX FUEL, PAYLOAD, BAY) and the planet's
@@ -99,14 +99,14 @@ slider, "transfer all" / "unload all", and **scuttle** the ship
 (`kind 0xA`) open it — others get a ticker refusal.
 - **Reached by:** detail button on the shell/cross-screen rows;
   `0x247F` is the windowed variant.
-- **Icon:** ![detail](screens/icons/detail.png) — domed capitol
+- **Icon:** <img src="screens/icons/detail.png" alt="detail" width="60" height="51" style="image-rendering:pixelated"> — domed capitol
   building, bottom row of the shell toolbar.
 - **Machine detail** (`0x243D`, `screens/machd.rs`) is the same screen
   opened on a unit's host planet — "examine this machine".
 - **Rust:** ported — `screens/detail.rs`, `screens/machd.rs`; several
   field-print routines still `Call::Native` stubs.
 
-### 7. Status / docking-bay screen ![status](screens/icons/status.png) — uimode 6, `cs:0x5867`/`0x587A`
+### 7. Status / docking-bay screen <img src="screens/icons/status.png" alt="status" width="60" height="51" style="image-rendering:pixelated"> — uimode 6, `cs:0x5867`/`0x587A`
 (list `ds:0x9D60`, 19 records)
 The planet's bays over a surface backdrop (`MCG/002`): docking-bay
 rows plus six ship cells each with an ON/OFF toggle. Player can pick a
@@ -115,11 +115,11 @@ toggle ships' selected flag (`cell_sel`) — the working set other
 screens launch/deploy from.
 - **Reached by:** status button on shell/cross-screen rows; guarded —
   non-colonised records or unowned bays refuse with a ticker message.
-- **Icon:** ![status](screens/icons/status.png) — dark planet ringed
+- **Icon:** <img src="screens/icons/status.png" alt="status" width="60" height="51" style="image-rendering:pixelated"> — dark planet ringed
   by an orbit band, bottom row of the shell toolbar.
 - **Rust:** ported — `screens/status.rs`.
 
-### 8. Orders screen ![orders](screens/icons/orders.png) — uimode 3, `cs:0x31F2`/`0x31F5`
+### 8. Orders screen <img src="screens/icons/orders.png" alt="orders" width="60" height="51" style="image-rendering:pixelated"> — uimode 3, `cs:0x31F2`/`0x31F5`
 (list `ds:0xA85A`, 42 records)
 The colony ledger (backdrop `MCG/064`): a scrollable list of planets
 with NAME/DATE/STATUS, FOOD/MINERALS/FUELS/ENERGY stocks, POPULATION,
@@ -130,11 +130,11 @@ taxes from all colonies (`order_collect` — lumps every colony's credit
 income into the faction account), and switch between three display
 modes (`order_mode 0/1/2`).
 - **Reached by:** orders button on shell/cross-screen rows.
-- **Icon:** ![orders](screens/icons/orders.png) — bar/line chart on
+- **Icon:** <img src="screens/icons/orders.png" alt="orders" width="60" height="51" style="image-rendering:pixelated"> — bar/line chart on
   axes, top-left cell of the shell toolbar.
 - **Rust:** ported — `screens/orders.rs`, `screens/open.rs`.
 
-### 9. Build screen ![build](screens/icons/build.png) — uimode 4, `cs:0x4BA7`/`0x4BAA`
+### 9. Build screen <img src="screens/icons/build.png" alt="build" width="60" height="51" style="image-rendering:pixelated"> — uimode 4, `cs:0x4BA7`/`0x4BAA`
 (list `ds:0xA482`, 46 records)
 Ship/machine outfitting at a planet (backdrop `MCG/042`): two side-by-side
 SHIP panels (SHIP/DATE/CLASS, CREW/FUEL/CLASS), RENAME, and a HEADING
@@ -146,11 +146,11 @@ destination pick on the starmap — deploy a landed unit onto the planet
 (`mach_open`).
 - **Reached by:** build button on shell/cross-screen rows, or
   `order_build` from the orders screen.
-- **Icon:** ![build](screens/icons/build.png) — rocket streaking
+- **Icon:** <img src="screens/icons/build.png" alt="build" width="60" height="51" style="image-rendering:pixelated"> — rocket streaking
   right over sparks, top row of the shell toolbar.
 - **Rust:** ported — `screens/build.rs`.
 
-### 10. Fleet screen ![fleet](screens/icons/fleet.png) — uimode 1, `cs:0x5F12`/`0x5F15`
+### 10. Fleet screen <img src="screens/icons/fleet.png" alt="fleet" width="60" height="51" style="image-rendering:pixelated"> — uimode 1, `cs:0x5F12`/`0x5F15`
 (list `ds:0xAEEE`, 11 records)
 The shipyard market (backdrop `MCG/039`): two scrollable listing
 columns with page/column buttons and field selectors (`fld8`/`fldA`
@@ -158,12 +158,12 @@ step the compared fields), funding/cost readouts on the right. Player
 can **buy** a vessel (price checked against faction credits) and
 **scrap** an owned unit for a refund.
 - **Reached by:** fleet button on shell/cross-screen rows.
-- **Icon:** ![fleet](screens/icons/fleet.png) — orange dock
+- **Icon:** <img src="screens/icons/fleet.png" alt="fleet" width="60" height="51" style="image-rendering:pixelated"> — orange dock
   crane/claw, top row of the shell toolbar.
 - **Rust:** ported — `screens/fleet.rs`; the HUD banner prints
   (`0x6075`/`0x60B6`/`0x60D4`) are still `Call::Native` stubs.
 
-### 11. Surface screen ![surface](screens/icons/surface.png) — uimode 7, `cs:0x4036`
+### 11. Surface screen <img src="screens/icons/surface.png" alt="surface" width="60" height="51" style="image-rendering:pixelated"> — uimode 7, `cs:0x4036`
 (list `ds:0xABA4`, 42 records)
 The planet-surface layout (backdrop `MCG/087`): a large grid of surface
 cells beside SHIP/docking-bay slots and an "AGGRESSION" panel. Player
@@ -174,7 +174,7 @@ a surface info panel (`surf_panel`). Guarded: refuses uncolonised /
 machine-less records with a ticker message.
 - **Reached by:** the surface button on the shell (`0x4036`), or
   `order_sel` opening a kind-`0xA` row from orders.
-- **Icon:** ![surface](screens/icons/surface.png) — skull &
+- **Icon:** <img src="screens/icons/surface.png" alt="surface" width="60" height="51" style="image-rendering:pixelated"> — skull &
   crossbones, bottom row of the shell toolbar. The screen also owns
   the three defence/aggression-level icons (`MCG/088`–`090`,
   redrawn by `surf_mode`).
@@ -182,14 +182,14 @@ machine-less records with a ticker message.
 
 ## Modal dialogs (swap the hotspot list)
 
-### 12. Save/load dialog ![save](screens/icons/save.png) — `cs:0x2E21` (list `ds:0xB05C`, 3 records)
+### 12. Save/load dialog <img src="screens/icons/save.png" alt="save" width="60" height="51" style="image-rendering:pixelated"> — `cs:0x2E21` (list `ds:0xB05C`, 3 records)
 Popup frame `MCG/299` with three buttons: **NEW GAME** (restart the
 scenario from the `0x8432` checkpoint snapshot, behind the confirm
 dialog), **LOAD** and **SAVE** — both run the filename line editor.
 A successful load restores the recorded `[0x91E5]` scenario banner
 (`Loaded::{A,B,C,D}` → "WOTOK"/"SMINE"/"KRART"/"RORN ").
 - **Reached by:** the disk icon on the shell. Right-button closes.
-- **Icon:** ![save](screens/icons/save.png) — floppy disk, last cell
+- **Icon:** <img src="screens/icons/save.png" alt="save" width="60" height="51" style="image-rendering:pixelated"> — floppy disk, last cell
   of the shell toolbar.
 - **Rust:** ported — `dialog.rs`, `dlg_io.rs`, `save.rs`.
 
@@ -216,14 +216,14 @@ script (e.g. troops slaughtered, goods teleported away).
 - **Icon:** none — raised by the event script, not a toolbar button.
 - **Rust:** ported — `vplan::levy`, `vimpl` `dialog` op, `vdir::disaster`.
 
-### 16. Spy-mission picker ![spy](screens/icons/spy.png) — `cs:0x8149` (list `ds:0xAFCC`, 5 records)
+### 16. Spy-mission picker <img src="screens/icons/spy.png" alt="spy" width="60" height="51" style="image-rendering:pixelated"> — `cs:0x8149` (list `ds:0xAFCC`, 5 records)
 Shell "spy" button on a selected planet: refuses own/dead/en-route
 targets with a message ("CANNOT SPY ON YOUR OWN STARS!", "NO SPYS ON
 THIS DEAD STAR!"), else a modal list of four mission types plus
 cancel (`[0x91DC]` = 1–5). Missions cost escalating credits
 ("SPY INFORMATION COSTS:", 1000–4720) and enqueue "SPY INFORMATION
 FOR:" reports staging the target's stocks/fuel to the ticker.
-- **Icon:** ![spy](screens/icons/spy.png) — satellite dish, bottom
+- **Icon:** <img src="screens/icons/spy.png" alt="spy" width="60" height="51" style="image-rendering:pixelated"> — satellite dish, bottom
   row of the shell toolbar (opens this picker).
 - **Rust:** ported — `screens/spy.rs`.
 
@@ -276,7 +276,7 @@ fires on a failed file open, e.g. before an ending set is present.
   planet's stats as ticker text, not a view of its own.
 - **Fleet launch** (`cs:0x71E3`) — a shell action, not a screen: scans
   `0x9491` for a free kind-4 fleet slot to send the selected ships.
-  Toolbar pictogram ![fleet-launch](screens/icons/fleet-launch.png) —
+  Toolbar pictogram <img src="screens/icons/fleet-launch.png" alt="fleet-launch" width="60" height="51" style="image-rendering:pixelated"> —
   launch pad, top row of the shell toolbar.
 - **Minimap** — a 32-cell planet grid painted inside the shell backdrop;
   `cell_pick`/`map_click` hotspots select records through it.
@@ -290,12 +290,13 @@ toolbar — hotspot records 5–14 of the shell list (a 2×5 block at
 screen (26,155)–(133,190)). The icon graphics are part of the backdrop
 art, not standalone image records: each cell's `0x14`-byte hotspot
 carries only its rect + action (`+8` image field is `0`). Extracted at
-native 20×17 to `screens/icons/`:
+native 20×17 to `screens/icons/` — embeds in this doc render them at 3×
+(60×51) so they're legible:
 
 | | | | | |
 |---|---|---|---|---|
-| ![orders](screens/icons/orders.png)<br>orders | ![galaxy](screens/icons/galaxy.png)<br>galaxy | ![build](screens/icons/build.png)<br>build | ![fleet-launch](screens/icons/fleet-launch.png)<br>fleet launch | ![fleet](screens/icons/fleet.png)<br>fleet |
-| ![detail](screens/icons/detail.png)<br>detail | ![status](screens/icons/status.png)<br>status | ![surface](screens/icons/surface.png)<br>surface | ![spy](screens/icons/spy.png)<br>spy | ![save](screens/icons/save.png)<br>save/load |
+| <img src="screens/icons/orders.png" alt="orders" width="60" height="51" style="image-rendering:pixelated"><br>orders | <img src="screens/icons/galaxy.png" alt="galaxy" width="60" height="51" style="image-rendering:pixelated"><br>galaxy | <img src="screens/icons/build.png" alt="build" width="60" height="51" style="image-rendering:pixelated"><br>build | <img src="screens/icons/fleet-launch.png" alt="fleet-launch" width="60" height="51" style="image-rendering:pixelated"><br>fleet launch | <img src="screens/icons/fleet.png" alt="fleet" width="60" height="51" style="image-rendering:pixelated"><br>fleet |
+| <img src="screens/icons/detail.png" alt="detail" width="60" height="51" style="image-rendering:pixelated"><br>detail | <img src="screens/icons/status.png" alt="status" width="60" height="51" style="image-rendering:pixelated"><br>status | <img src="screens/icons/surface.png" alt="surface" width="60" height="51" style="image-rendering:pixelated"><br>surface | <img src="screens/icons/spy.png" alt="spy" width="60" height="51" style="image-rendering:pixelated"><br>spy | <img src="screens/icons/save.png" alt="save" width="60" height="51" style="image-rendering:pixelated"><br>save/load |
 
 - Top row (left→right): **orders** (chart on axes), **galaxy**
   (blue planet over stars), **build** (rocket over sparks),
