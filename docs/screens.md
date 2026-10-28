@@ -103,8 +103,10 @@ slider, "transfer all" / "unload all", and **scuttle** the ship
   building, bottom row of the shell toolbar.
 - **Machine detail** (`0x243D`, `screens/machd.rs`) is the same screen
   opened on a unit's host planet — "examine this machine".
-- **Rust:** ported — `screens/detail.rs`, `screens/machd.rs`; several
-  field-print routines still `Call::Native` stubs.
+- **Rust:** ported — `screens/detail.rs`, `screens/machd.rs` plus the
+  field prints in `screens/dfield.rs`, the `0x29D9` machine header and
+  `0x55F2` auto-select in `screens/dmach.rs`, and the `0x2759` meter
+  sweep in `screens/dbars.rs`.
 
 ### 7. Status / docking-bay screen <img src="screens/icons/status.png" alt="status" width="60" height="51" style="image-rendering:pixelated"> — uimode 6, `cs:0x5867`/`0x587A`
 (list `ds:0x9D60`, 19 records)

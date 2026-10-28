@@ -1,7 +1,8 @@
 //! The decimal printers — `cs:0x686C` (`u16`, space-padded to 5),
-//! `cs:0x698F` (`u16`, no padding), `cs:0x68E0` (`bp:ax` `u32`, padded
-//! to 8). All emit `0x68D6` char puts at `(bx·4px, dx)`, `bx += 1` per
-//! char (files `0x3686C`–`0x36A7A`).
+//! `cs:0x6879` (`u16`, space-padded to 4), `cs:0x698F` (`u16`, no
+//! padding), `cs:0x68E0` (`bp:ax` `u32`, padded to 8). All emit
+//! `0x68D6` char puts at `(bx·4px, dx)`, `bx += 1` per char (files
+//! `0x3686C`–`0x36A7A`).
 //!
 //! Structure per printer: a pad zone of the leading decades (`0x20`
 //! spaces while the value is still below the decade — skipped entirely
@@ -23,6 +24,14 @@ const DEC32: [u32; 8] = [10_000_000, 1_000_000, 100_000, 10_000, 1_000, 100, 10,
 /// `0x368BA`). Returns `bx` advanced past the field.
 pub fn num_pad(c: &mut Ctx, v: u16, mut bx: u16, dx: u16) -> u16 {
     field(c, u32::from(v), &DEC16, true, 1, &mut bx, dx);
+    bx
+}
+
+/// `cs:0x6879` — `u16` padded to a 4-column field: the `0x686C`
+/// decade chain entered at the thousands position (file `0x36879`–
+/// `0x368BA`). Returns `bx` advanced past the field.
+pub fn num4(c: &mut Ctx, v: u16, mut bx: u16, dx: u16) -> u16 {
+    field(c, u32::from(v), &DEC16[1..], true, 1, &mut bx, dx);
     bx
 }
 

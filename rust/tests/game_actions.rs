@@ -217,7 +217,9 @@ fn detail_mach_enters_the_machine_screen() {
     r.w16(game::BUTTONS, 2);
     game::dispatch_action(&mut r.ctx(), 0x243D);
     assert!(r.host.0.contains(&Call::Present(3)));
-    assert!(r.host.0.contains(&Call::Native(0x29D9)));
+    assert!(r.host.0.contains(&Call::Rect(0x18, 0xC, 0, 0x92))); // 0x29D9 strip clear
+    assert_eq!(r.r8(0x91DD), 0xFF); // ANIM — machine rows armed
+    assert!(!r.host.0.contains(&Call::Native(0x29D9)));
     assert_eq!(r.r8(game::UIMODE), 0); // frame loop exited → shell
 }
 

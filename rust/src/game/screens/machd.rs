@@ -2,13 +2,12 @@
 //! `0x3243D`–`0x3247E`): the "examine this machine" head that shares
 //! the uimode-2 detail screen through the `0x8E10` variant body.
 
-use super::super::consts::{
-    HOT_COUNT, HOT_LIST, HOT_SEL, REC_BASE, REC_STRIDE, SEL_MACH, SEQ_AUX, SEQ_PTR,
-};
+use super::super::consts::{HOT_LIST, HOT_SEL, REC_BASE, REC_STRIDE, SEL_MACH, SEQ_AUX, SEQ_PTR};
 use super::super::vhost::Call;
 use super::super::vops::{kind_of, Ctx};
 use super::super::{selrec, shell, text, UIMODE};
-use super::detail::{enter_detail_sel, frame_loop, ANIM, S_REFUSE};
+use super::detail::{enter_detail_sel, frame_loop, S_REFUSE};
+use super::{dfield, dmach};
 
 /// `u16` casts for the `ds:` slot constants.
 macro_rules! a {
@@ -58,13 +57,11 @@ fn draw(c: &mut Ctx) {
     c.host.svc_st(Call::Present(3), c.vm, c.st);
 }
 
-/// The `0x29D9` machine header (file `0x329D9`–`0x32ADC`): list
-/// count `0x17`, `ANIM` armed, `si` = the machine record — the stat
-/// prints stay a host call until that block is ported.
+/// The `0x29D9` machine header (file `0x329D9`–`0x32ADC`) on the
+/// `[0x9180]` selection — see [`dmach::mach_head`].
 fn head(c: &mut Ctx) {
-    c.vm.w16(c.st, a!(HOT_COUNT), 0x17);
-    c.vm.w8(c.st, ANIM, 0xFF);
-    c.host.svc(Call::Native(0x29D9));
+    let m = c.vm.r16(c.st, a!(SEL_MACH));
+    dmach::mach_head(c, m);
 }
 
 /// The `0x8E10` variant body — sequencer cells cleared, the `0x9EDE`
@@ -78,7 +75,7 @@ fn body(c: &mut Ctx) {
     c.vm.w16(c.st, a!(HOT_SEL), s);
     c.vm.w16(c.st, a!(HOT_LIST), 0x9EDE);
     c.vm.w8(c.st, a!(UIMODE), 2);
-    c.host.svc(Call::Native(0x4C8B));
-    c.host.svc(Call::Native(0x5994));
+    dfield::name(c);
+    dfield::bays(c);
     frame_loop(c);
 }
