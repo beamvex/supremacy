@@ -68,7 +68,7 @@ or pick one of 32 grid cells.
 - **Rust:** ported — `game/shell.rs`, `ppanel.rs`, `ticker.rs`,
   `hover.rs`, `selrec.rs`.
 
-### 5. Galaxy screen — uimode 5, `cs:0x395B` (sidebar list `ds:0xA81C`, 3 records)
+### 5. Galaxy screen ![galaxy](screens/icons/galaxy.png) — uimode 5, `cs:0x395B` (sidebar list `ds:0xA81C`, 3 records)
 The strategic starmap: system ovals + route overlay repainted by
 `map_draw` (`[0x1278]`), with a blinking marker on the selected system.
 A bottom bar (`Image(0x56)`, `MCG/086`: BUY, STARBASE/COST/CAPACITY/DATA)
@@ -87,7 +87,7 @@ selected type.
   `screens/{galaxy,galbuild,galmsg}.rs`, `front/map.rs` **MCG only** —
   the EGA/CGA/TGA map painters are not ported (calls drop).
 
-### 6. Planet detail screen — uimode 2, `cs:0x2426`/`0x2429`/`0x247F`
+### 6. Planet detail screen ![detail](screens/icons/detail.png) — uimode 2, `cs:0x2426`/`0x2429`/`0x247F`
 (list `ds:0x9EDE`, 23 records)
 Per-planet logistics (backdrop `MCG/041`): the selected ship's sheet
 (CIVILIANS, TO CREW, CAPACITY, MAX FUEL, PAYLOAD, BAY) and the planet's
@@ -106,7 +106,7 @@ slider, "transfer all" / "unload all", and **scuttle** the ship
 - **Rust:** ported — `screens/detail.rs`, `screens/machd.rs`; several
   field-print routines still `Call::Native` stubs.
 
-### 7. Status / docking-bay screen — uimode 6, `cs:0x5867`/`0x587A`
+### 7. Status / docking-bay screen ![status](screens/icons/status.png) — uimode 6, `cs:0x5867`/`0x587A`
 (list `ds:0x9D60`, 19 records)
 The planet's bays over a surface backdrop (`MCG/002`): docking-bay
 rows plus six ship cells each with an ON/OFF toggle. Player can pick a
@@ -119,7 +119,7 @@ screens launch/deploy from.
   by an orbit band, bottom row of the shell toolbar.
 - **Rust:** ported — `screens/status.rs`.
 
-### 8. Orders screen — uimode 3, `cs:0x31F2`/`0x31F5`
+### 8. Orders screen ![orders](screens/icons/orders.png) — uimode 3, `cs:0x31F2`/`0x31F5`
 (list `ds:0xA85A`, 42 records)
 The colony ledger (backdrop `MCG/064`): a scrollable list of planets
 with NAME/DATE/STATUS, FOOD/MINERALS/FUELS/ENERGY stocks, POPULATION,
@@ -134,7 +134,7 @@ modes (`order_mode 0/1/2`).
   axes, top-left cell of the shell toolbar.
 - **Rust:** ported — `screens/orders.rs`, `screens/open.rs`.
 
-### 9. Build screen — uimode 4, `cs:0x4BA7`/`0x4BAA`
+### 9. Build screen ![build](screens/icons/build.png) — uimode 4, `cs:0x4BA7`/`0x4BAA`
 (list `ds:0xA482`, 46 records)
 Ship/machine outfitting at a planet (backdrop `MCG/042`): two side-by-side
 SHIP panels (SHIP/DATE/CLASS, CREW/FUEL/CLASS), RENAME, and a HEADING
@@ -150,7 +150,7 @@ destination pick on the starmap — deploy a landed unit onto the planet
   right over sparks, top row of the shell toolbar.
 - **Rust:** ported — `screens/build.rs`.
 
-### 10. Fleet screen — uimode 1, `cs:0x5F12`/`0x5F15`
+### 10. Fleet screen ![fleet](screens/icons/fleet.png) — uimode 1, `cs:0x5F12`/`0x5F15`
 (list `ds:0xAEEE`, 11 records)
 The shipyard market (backdrop `MCG/039`): two scrollable listing
 columns with page/column buttons and field selectors (`fld8`/`fldA`
@@ -163,7 +163,7 @@ can **buy** a vessel (price checked against faction credits) and
 - **Rust:** ported — `screens/fleet.rs`; the HUD banner prints
   (`0x6075`/`0x60B6`/`0x60D4`) are still `Call::Native` stubs.
 
-### 11. Surface screen — uimode 7, `cs:0x4036`
+### 11. Surface screen ![surface](screens/icons/surface.png) — uimode 7, `cs:0x4036`
 (list `ds:0xABA4`, 42 records)
 The planet-surface layout (backdrop `MCG/087`): a large grid of surface
 cells beside SHIP/docking-bay slots and an "AGGRESSION" panel. Player
@@ -182,7 +182,7 @@ machine-less records with a ticker message.
 
 ## Modal dialogs (swap the hotspot list)
 
-### 12. Save/load dialog — `cs:0x2E21` (list `ds:0xB05C`, 3 records)
+### 12. Save/load dialog ![save](screens/icons/save.png) — `cs:0x2E21` (list `ds:0xB05C`, 3 records)
 Popup frame `MCG/299` with three buttons: **NEW GAME** (restart the
 scenario from the `0x8432` checkpoint snapshot, behind the confirm
 dialog), **LOAD** and **SAVE** — both run the filename line editor.
@@ -216,7 +216,7 @@ script (e.g. troops slaughtered, goods teleported away).
 - **Icon:** none — raised by the event script, not a toolbar button.
 - **Rust:** ported — `vplan::levy`, `vimpl` `dialog` op, `vdir::disaster`.
 
-### 16. Spy-mission picker — `cs:0x8149` (list `ds:0xAFCC`, 5 records)
+### 16. Spy-mission picker ![spy](screens/icons/spy.png) — `cs:0x8149` (list `ds:0xAFCC`, 5 records)
 Shell "spy" button on a selected planet: refuses own/dead/en-route
 targets with a message ("CANNOT SPY ON YOUR OWN STARS!", "NO SPYS ON
 THIS DEAD STAR!"), else a modal list of four mission types plus
@@ -274,6 +274,10 @@ fires on a failed file open, e.g. before an ending set is present.
   all event narration (comets, treaties, spy reports, disasters).
 - **Status report** (`0x2D97`) — a shell action that dumps the selected
   planet's stats as ticker text, not a view of its own.
+- **Fleet launch** (`cs:0x71E3`) — a shell action, not a screen: scans
+  `0x9491` for a free kind-4 fleet slot to send the selected ships.
+  Toolbar pictogram ![fleet-launch](screens/icons/fleet-launch.png) —
+  launch pad, top row of the shell toolbar.
 - **Minimap** — a 32-cell planet grid painted inside the shell backdrop;
   `cell_pick`/`map_click` hotspots select records through it.
 - **Hover popup** (`map_gate` `cs:0x8DC6`) — the oval hover test on the
