@@ -87,6 +87,8 @@ fn detail_single_bay_autoselects_the_machine() {
     r.w8(usize::from(rec) + 0x1C, 0);
     r.w8(usize::from(rec) + 0x20, 0);
     r.w8(usize::from(m) + game::M_TYPE, 3);
+    let t = u16::try_from(game::TYPE_BASE + 2 * game::TYPE_STRIDE).unwrap_or(0);
+    field(&mut r, t, 4, 7); // type stat — 0x686C 5-column print
     field(&mut r, rec, 0x2A, 300); // population
     field(&mut r, m, 0x24, 42); // crew
     field(&mut r, m, 0xC, 5); // kind word
@@ -103,6 +105,8 @@ fn detail_single_bay_autoselects_the_machine() {
         (b'4', 0x13, 0x7A),
         (b'2', 0x14, 0x7A), // "  42" crew
         (b'5', 0x1A, 0x40), // "    5" kind word
+        (b' ', 0x16, 0x28),
+        (b'7', 0x1A, 0x28), // "    7" type +4 stat — 5 columns wide
         (b'1', 0x33, 0xBE),
         (b'0', 0x34, 0xBE), // "   10" machine food row
         (b'1', 0x18, 0x38),

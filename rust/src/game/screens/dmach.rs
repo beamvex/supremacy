@@ -63,10 +63,10 @@ pub(super) fn mach_head(c: &mut Ctx, m: u16) {
     c.vm.w8(c.st, ANIM, 0xFF);
     text::print_str(c, m, 0x12, 8);
     cap(c);
-    stat4(c, 4, 0x16, 0x28);
+    stat4(c, 4, 0x16, 0x28, num::num_pad);
     dfield::kind(c);
     dfield::pop(c);
-    stat4(c, 0x1E, 0x17, 0x18);
+    stat4(c, 0x1E, 0x17, 0x18, num::num4);
     stat_c(c);
     desc(c);
     c.host.svc(Call::Slot(0x128C, 0x78));
@@ -85,11 +85,11 @@ fn cap(c: &mut Ctx) {
     num::num3(c, c.vm.r16(c.st, t + 0xA), bx, 0x20);
 }
 
-/// The `0x5057` reload + `0x6879` word prints (`0x32A14`–`0x32A22`,
-/// `0x32A29`–`0x32A37`).
-fn stat4(c: &mut Ctx, f: u16, bx: u16, dx: u16) {
+/// The `0x5057` reload + word print — `0x32A14`–`0x32A22` runs
+/// `0x686C` for `+4`, `0x32A29`–`0x32A37` runs `0x6879` for `+0x1E`.
+fn stat4(c: &mut Ctx, f: u16, bx: u16, dx: u16, p: fn(&mut Ctx, u16, u16, u16) -> u16) {
     let t = type_rec(c);
-    num::num4(c, c.vm.r16(c.st, t + f), bx, dx);
+    p(c, c.vm.r16(c.st, t + f), bx, dx);
 }
 
 /// `0x32A38`–`0x32A4E` — the `+0xC` word `0x6879`-printed at
