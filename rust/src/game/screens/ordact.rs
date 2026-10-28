@@ -174,8 +174,9 @@ pub fn order_page(c: &mut Ctx, dir: u8) {
 
 /// `0x336D6`–`0x3370E` — the accelerator: consecutive-frame presses
 /// keep the `[0x91F6]` ramp; otherwise it reseeds `0xC`. A live
-/// `[0x91F7]` delay postpones the step (`false`).
-fn accel(c: &mut Ctx) -> bool {
+/// `[0x91F7]` delay postpones the step (`false`). The detail fuel
+/// slider's `0x34D28`–`0x34D63` is the same cell dance.
+pub(super) fn accel(c: &mut Ctx) -> bool {
     let last = c.vm.r8(c.st, a!(REP_AT)).wrapping_add(1);
     let now = c.vm.r8(c.st, a!(FRAME));
     c.vm.w8(c.st, a!(REP_AT), now);

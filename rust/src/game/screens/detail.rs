@@ -58,7 +58,7 @@ pub fn enter_detail_sel(c: &mut Ctx) {
 /// The `0x2493` shared body — screen draw, the `0x9EDE` 8-record list
 /// install, `uimode 2`, then the detail frame loop (file
 /// `0x32493`–`0x3251E`).
-fn body(c: &mut Ctx) {
+pub(super) fn body(c: &mut Ctx) {
     c.vm.w16(c.st, a!(SEL_MACH), 0);
     c.vm.w8(c.st, ANIM, 0);
     c.host.svc(Call::Slot(0x1260, 0));

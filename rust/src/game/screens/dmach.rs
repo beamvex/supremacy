@@ -46,7 +46,7 @@ pub(super) fn auto_sel(c: &mut Ctx) {
 
 /// `0x299C` — bay index → `[0x9180]`, the `al = 3` select sfx, then
 /// the `0x29D9` header (file `0x3299C`–`0x329D8`).
-fn sel_mach(c: &mut Ctx, bay: u8) {
+pub(super) fn sel_mach(c: &mut Ctx, bay: u8) {
     let m =
         a!(MACH_BASE).wrapping_add(u16::from(bay).wrapping_sub(1).wrapping_mul(a!(MACH_STRIDE)));
     c.vm.w16(c.st, a!(SEL_MACH), m);
