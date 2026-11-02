@@ -5,7 +5,7 @@ use super::super::consts::{BUTTONS, SEQ_DELAY, SEQ_PERIOD, SEQ_PHASE, SEQ_PTR};
 use super::super::vhost::Call;
 use super::super::vops::{vsync, Ctx};
 use super::super::{dialog, menu, seq, tick_step};
-use super::{bump, install, leave};
+use super::{bump, handed_off, install, leave};
 
 /// `u16` casts for the `ds:` slot constants.
 macro_rules! a {
@@ -58,6 +58,9 @@ fn frame_loop(c: &mut Ctx) {
         let _ = tick_step(c);
         c.host.svc(Call::Native(0xA369));
         menu::service(c);
+        if handed_off(c) {
+            return;
+        }
         if c.vm.r16(c.st, a!(BUTTONS)) & 2 != 0 {
             break;
         }

@@ -7,7 +7,7 @@ use super::super::rec::F_OWNER;
 use super::super::vhost::Call;
 use super::super::vops::{kind_of, vsync, Ctx};
 use super::super::{menu, selrec, shell, text, tick_step};
-use super::{bump, install, leave};
+use super::{bump, handed_off, install, leave};
 
 /// `u16` casts for the `ds:` slot constants.
 macro_rules! a {
@@ -89,6 +89,9 @@ fn frame_loop(c: &mut Ctx) {
         c.host.svc(Call::Native(0xA369));
         menu::service(c);
         bump(c);
+        if handed_off(c) {
+            return;
+        }
         if c.vm.r16(c.st, a!(BUTTONS)) & 2 != 0 {
             break;
         }
