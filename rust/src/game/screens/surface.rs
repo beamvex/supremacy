@@ -10,7 +10,7 @@ use super::super::vhost::Call;
 use super::super::vops::{kind_of, vsync, Ctx};
 use super::super::{menu, seq, shell, text, tick_step};
 use super::detail::S_REFUSE;
-use super::{bump, install, leave, snd};
+use super::{bump, handed_off, install, leave, snd};
 
 /// `u16` casts for the `ds:` slot constants.
 macro_rules! a {
@@ -162,6 +162,9 @@ fn frame_loop(c: &mut Ctx) {
         menu::service(c);
         let _ = tick_step(c);
         bump(c);
+        if handed_off(c) {
+            return;
+        }
         if c.vm.r16(c.st, a!(BUTTONS)) & 2 != 0 {
             break;
         }

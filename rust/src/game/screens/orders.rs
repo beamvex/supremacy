@@ -8,7 +8,7 @@ use super::super::consts::{
 use super::super::vhost::Call;
 use super::super::vops::{faction_rec, kind_of, set_bits, vsync, Ctx};
 use super::super::{dialog, menu, selrec, seq, status, tick_step};
-use super::{bump, install, leave};
+use super::{bump, handed_off, install, leave};
 use super::{ordact, ordbar, ordlist};
 
 /// `u16` casts for the `ds:` slot constants.
@@ -72,6 +72,9 @@ fn frame_loop(c: &mut Ctx) {
         let _ = tick_step(c);
         bump(c);
         ordbar::sidebar(c);
+        if handed_off(c) {
+            return;
+        }
         if c.vm.r16(c.st, a!(BUTTONS)) & 2 != 0 {
             break;
         }

@@ -80,7 +80,10 @@ faction and constructs one (with a rename prompt). Ambient sfx vary by
 selected type.
 - **Reached by:** the galaxy button on the shell and the cross-screen
   rows of every other screen (`0x3906`/`0x3909`); right-button exits
-  back to the shell.
+  back to the shell. `0x3906` is the only screen entry with no loop of
+  its own, so in the port a cross-screen hit on it unwinds the frame
+  loop it was dispatched from (`screens::handed_off`) and the runner
+  picks `Phase::Galaxy` up off `uimode 5`.
 - **Icon:** <img src="screens/icons/galaxy.png" alt="galaxy" width="60" height="51" style="image-rendering:pixelated"> — blue planet over
   stars, top row of the shell toolbar.
 - **Rust:** ported — `game/frame.rs` (`Phase::Galaxy`),

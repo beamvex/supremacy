@@ -11,7 +11,11 @@
 //! `jmp 0x2CC5`s — [`shell::shell_enter`] — back to the menu screen.
 //!
 //! The galaxy entry `cs:0x3906` is the exception: its loop is the
-//! port's `Phase::Galaxy`, keyed off `uimode == 5` by the runner.
+//! port's `Phase::Galaxy`, keyed off `uimode == 5` by the runner. A
+//! cross-screen row hit on it therefore has to leave the loop it was
+//! dispatched from before the runner can take over — each frame loop
+//! checks [`handed_off`] after its `menu::service` and unwinds, the
+//! one place the port has to model the `pop ax` abandon itself.
 
 mod build;
 mod dact;
@@ -130,6 +134,18 @@ macro_rules! a {
     ($k:expr) => {
         u16::try_from($k).unwrap_or(0)
     };
+}
+
+/// `true` once a hotspot action has handed the runner the galaxy loop
+/// (`uimode 5`). [`enter_galaxy`] is the one screen entry with no loop
+/// of its own — `cs:0x3906` falls through to `0x395B`, which the port
+/// runs as `Phase::Galaxy` — so a cross-screen row hit on it has to
+/// unwind the screen loop it was dispatched from, the asm's `pop ax`
+/// frame abandon. The entries that do run their loop inline model the
+/// abandon by having already returned to the shell, so only this one
+/// needs the check; the `leave` tail is skipped with the frame.
+fn handed_off(c: &Ctx) -> bool {
+    c.vm.r8(c.st, a!(UIMODE)) == 5
 }
 
 /// Shared hotspot-list install: `[0x9CC8]=[sel]`, `[0x9194]=list`,
