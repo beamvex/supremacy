@@ -11,9 +11,8 @@ use super::super::rec::{
     F_ENERGY, F_FOOD, F_FUEL, F_LINK_A, F_LINK_B, F_LINK_C, F_MINERALS, F_POP,
 };
 use super::super::text;
-use super::super::vhost::Call;
 use super::super::vops::Ctx;
-use super::{dfield, dmach, dscut, dxfer, galmsg, ordact};
+use super::{dfield, dmach, dscut, dxfer, galmsg, ordact, sact};
 
 /// `u16` casts for the `ds:` slot constants.
 macro_rules! a {
@@ -52,7 +51,7 @@ pub(super) fn dispatch(c: &mut Ctx, t: u16) {
         0x4DBB | 0xBB0B => xfer_all_sel(c),
         0x4E0A | 0xBB5A => dscut::unload_all(c),
         0x2B9B | 0x98EB => dscut::scuttle(c),
-        _ => drop(c.host.svc(Call::Native(t))),
+        _ => sact::dispatch(c, t),
     }
 }
 

@@ -241,13 +241,16 @@ fn surface_entry_installs_uimode7() {
     let rec = r.r16(game::REC_BASE);
     r.w16(game::REC_CUR, rec);
     r.w16(usize::from(rec) + 0xC, 0xA); // colonised
+    let u = u16::try_from(game::FLEET_BASE).unwrap_or(0);
+    r.w16(usize::from(u) + 2, rec); // a unit stationed on the planet
+    r.w8(usize::from(u) + 6, 0x2);
     r.w16(game::BUTTONS, 2);
     game::dispatch_action(&mut r.ctx(), 0x4036);
     assert_eq!(r.host.0.first(), Some(&Call::Slot(0x1274, 0)));
     assert!(r.host.0.contains(&Call::Image(0x57)));
     assert!(r.host.0.contains(&Call::Present(7)));
     assert!(r.host.0.contains(&Call::Rect(0x1C, 6, 3, 0x41)));
-    assert!(r.host.0.contains(&Call::Native(0x4190))); // table build
+    assert_eq!(r.r16(0x9AB1), u); // the 0x4190 surface-table build ran
     assert_eq!(r.r16(game::HOT_LIST), 0xA0AC); // leave → shell list
     assert_eq!(r.r8(game::UIMODE), 0); // frame loop exited → shell
 }
