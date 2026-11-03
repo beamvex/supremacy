@@ -10,7 +10,7 @@ use super::super::vhost::Call;
 use super::super::vops::{kind_of, vsync, Ctx};
 use super::super::{menu, seq, shell, text, tick_step};
 use super::detail::S_REFUSE;
-use super::{bump, handed_off, install, leave, snd};
+use super::{bump, dfield, handed_off, install, leave, snd};
 
 /// `u16` casts for the `ds:` slot constants.
 macro_rules! a {
@@ -130,7 +130,7 @@ fn banner(c: &mut Ctx) {
 /// `0x340E3`–`0x3411C`).
 fn table(c: &mut Ctx) {
     c.host.svc(Call::Native(0x49DE));
-    c.host.svc(Call::Native(0x5994));
+    dfield::bays(c);
     c.host.svc(Call::Native(0x4190));
     header(c);
     c.vm.w16(c.st, 0x9C9D, 0xFFFF);

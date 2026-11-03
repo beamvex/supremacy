@@ -7,7 +7,7 @@ use super::super::consts::{
 use super::super::vhost::Call;
 use super::super::vops::{vsync, Ctx};
 use super::super::{dialog, menu, selrec, seq, status, tick_step};
-use super::{bump, handed_off, install, leave};
+use super::{bump, dfield, handed_off, install, leave};
 
 /// `u16` casts for the `ds:` slot constants.
 macro_rules! a {
@@ -33,7 +33,7 @@ pub fn enter_build(c: &mut Ctx, win: bool) {
     c.host.svc(Call::Native(0x89C3));
     c.host.svc(Call::Image(0x2A));
     c.host.svc_st(Call::Present(4), c.vm, c.st);
-    c.host.svc(Call::Native(0x5994));
+    dfield::bays(c);
     c.host.svc(Call::Slot(0x128C, 0x33));
     cells(c);
     c.host.svc(Call::Native(0x4C8B));

@@ -35,11 +35,24 @@ pub(super) fn name(c: &mut Ctx) {
 /// `(5,0x3F)`: an empty bay prints `0x6B2E`, a docked one its machine
 /// record's name (file `0x35994`–`0x359EA`).
 pub(super) fn bays(c: &mut Ctx) {
+    bays_at(c, [0x29, 0x34, 0x3F]);
+}
+
+/// `cs:0x595C` — the status screen's variant of the bay walk: the
+/// same `[0x917C]` reads and `0x59CC` prints on the `(5,0x8F)`/
+/// `(5,0x9A)`/`(5,0xA5)` rows (file `0x3595C`–`0x35993`).
+pub(super) fn bays_status(c: &mut Ctx) {
+    bays_at(c, [0x8F, 0x9A, 0xA5]);
+}
+
+/// The shared `0x59CC` body — an empty bay prints `0x6B2E`, a docked
+/// one its machine record's name, at column 5 on `rows`.
+fn bays_at(c: &mut Ctx, rows: [u16; 3]) {
     let rec = c.vm.r16(c.st, a!(SEL_REC));
     for (f, row) in [
-        (a!(F_LINK_A), 0x29u16),
-        (a!(F_LINK_B), 0x34),
-        (a!(F_LINK_C), 0x3F),
+        (a!(F_LINK_A), rows[0]),
+        (a!(F_LINK_B), rows[1]),
+        (a!(F_LINK_C), rows[2]),
     ] {
         let b = c.vm.r8(c.st, rec.wrapping_add(f));
         let s = if b == 0 { 0x6B2E } else { mach_at(b) };
