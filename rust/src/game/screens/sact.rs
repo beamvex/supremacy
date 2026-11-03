@@ -4,8 +4,8 @@
 //! `0x4A8E`) and the shared table rebuilds: `0x57BC` fills the
 //! `ds:0x4FD0` cargo slots from the fleet records hosted by
 //! `[0x9180]`, `0x4190` fills the `ds:0x9AB1` surface cells from the
-//! records hosted by `[0x917C]` (files `0x34190`–`0x34308`, `0x34A8E`–
-//! `0x34AC7`, `0x357BC`–`0x35866`, `0x3604E`–`0x36074`).
+//! records hosted by `[0x917C]` (files `0x34190`–`0x34308`,
+//! `0x34A8E`–`0x34AC7`, `0x357BC`–`0x35866`).
 
 use super::super::consts::{
     FLEET_BASE, FLEET_STRIDE, MACH_BASE, MACH_STRIDE, REC_CUR, SEL_MACH, SEL_REC,
@@ -47,8 +47,7 @@ pub(super) fn dispatch(c: &mut Ctx, t: u16) {
 }
 
 /// `cs:0x424B`/`0x42F5`/`0x42FF` — `surf_slot 1/2/3`: the bay byte at
-/// `[sel]+f` names a docked machine; `+0x1E == 1` (a troop carrier)
-/// selects it and runs the `0x42A7` tail (files `0x3424B`–`0x34308`).
+/// `[sel]+f` names a machine; `+0x1E == 1` runs `0x42A7` (`0x3424B`+).
 fn slot(c: &mut Ctx, sel: u16, f: u16) {
     let rec = c.vm.r16(c.st, sel);
     let b = c.vm.r8(c.st, rec.wrapping_add(f));
@@ -65,9 +64,8 @@ fn slot(c: &mut Ctx, sel: u16, f: u16) {
 }
 
 /// `cs:0x4AA6`/`0x4A9E`/`0x4A96`/`0x4A8E` — `surf_assign 0..3`: the
-/// `ds:0x4FD0+4n` slot's unit lands on `[0x9184]` (`+0x2`) with the
-/// `+0x6` `0x4` aboard bit dropped; empty takes `0x4257` (file
-/// `0x34A8E`–`0x34AC7`).
+/// `ds:0x4FD0+4n` unit lands on `[0x9184]` (`+0x2`), `+0x6` `0x4`
+/// dropped; empty takes `0x4257` (file `0x34A8E`–`0x34AC7`).
 fn assign(c: &mut Ctx, n: u16) {
     let u = c.vm.r16(c.st, CARGO.wrapping_add(n.wrapping_mul(4)));
     if u == 0 {
@@ -82,8 +80,7 @@ fn assign(c: &mut Ctx, n: u16) {
 }
 
 /// The `0x42A7`/`0x3FFF` select tail — the machine's `+0` name at
-/// `(0x14,0xE)`, `[0x91DD]` armed, the `0x42C3` type print and the
-/// `0x57BC`+`0x5994` rebuilds.
+/// `(0x14,0xE)`, `[0x91DD]` armed, `0x42C3` and `0x57BC`+`0x5994`.
 pub(super) fn select(c: &mut Ctx, m: u16) {
     text::print_str(c, m, 0x14, 0xE);
     c.vm.w8(c.st, 0x91DD, 0xFF);
@@ -100,10 +97,9 @@ pub(super) fn type_name(c: &mut Ctx) {
     text::print_str(c, 0x79A4u16.wrapping_add(t.wrapping_mul(0x16)), 6, 0x50);
 }
 
-/// `cs:0x57BC` — rebuild the `ds:0x4FD0` cargo table: the four slots
-/// take the fleet records hosted by `[0x9180]` (the `+0x6` `0x2`
-/// bit) down `(0x14,0x1F)`; leftovers blank (file `0x357BC`–
-/// `0x35866`).
+/// `cs:0x57BC` — rebuild the `ds:0x4FD0` cargo table: slots take the
+/// fleet records hosted by `[0x9180]` (the `+0x6` `0x2` bit) down
+/// `(0x14,0x1F)`; leftovers blank (file `0x357BC`–`0x35866`).
 pub(super) fn cargo(c: &mut Ctx) {
     let m = c.vm.r16(c.st, a!(SEL_MACH));
     let (mut bp, mut bx, mut dx, mut n) = (CARGO, 0x14u16, 0x1Fu16, 0u8);
@@ -114,18 +110,18 @@ pub(super) fn cargo(c: &mut Ctx) {
             continue;
         }
         c.vm.w16(c.st, bp, u);
-        row(c, i + 1, c.vm.r16(c.st, u), bx, dx);
+        let end = row(c, i + 1, c.vm.r16(c.st, u), bx, dx);
         bp = bp.wrapping_add(4);
-        (bx, dx) = advance(bx, dx, false);
+        (bx, dx) = advance(end, dx, false);
         n = n.wrapping_add(1);
     }
     erase(c, 4u8.wrapping_sub(n), bx, dx, false);
 }
 
-/// `cs:0x4190` — rebuild the `ds:0x9AB1` surface table: the cells
-/// take the fleet records hosted by `[0x917C]` (a `+0x6` `0x8` bit
-/// skips) column-major from `(3,0x74)`; leftovers blank (file
-/// `0x34190`–`0x3424A`).
+/// `cs:0x4190` — rebuild the `ds:0x9AB1` surface table: cells take
+/// the fleet records hosted by `[0x917C]` (a `+0x6` `0x8` bit skips)
+/// column-major from `(3,0x74)`; leftovers blank (file `0x34190`–
+/// `0x3424A`).
 pub(super) fn planet(c: &mut Ctx) {
     let rec = c.vm.r16(c.st, a!(SEL_REC));
     let (mut bp, mut bx, mut dx, mut n) = (SURF, 3u16, 0x74u16, 0u8);
@@ -136,9 +132,9 @@ pub(super) fn planet(c: &mut Ctx) {
             continue;
         }
         c.vm.w16(c.st, bp, u);
-        row(c, i + 1, c.vm.r16(c.st, u), bx, dx);
+        let end = row(c, i + 1, c.vm.r16(c.st, u), bx, dx);
         bp = bp.wrapping_add(4);
-        (bx, dx) = advance(bx, dx, true);
+        (bx, dx) = advance(end, dx, true);
         n = n.wrapping_add(1);
     }
     erase(c, 0x18u8.wrapping_sub(n), bx, dx, true);
@@ -153,16 +149,16 @@ fn clear(c: &mut Ctx, base: u16, n: u16) {
 }
 
 /// The `0x57EC`/`0x41BA` row print — `num2(idx)`, the `0x604E`
-/// ordinal, a pad column, `num3(v)` inside the 8-char field.
-fn row(c: &mut Ctx, idx: u16, v: u16, bx: u16, dx: u16) {
+/// ordinal, a pad, `num3(v)`; returns `bx` past the 8-char field.
+fn row(c: &mut Ctx, idx: u16, v: u16, bx: u16, dx: u16) -> u16 {
     let bx = num::num2(c, idx, bx, dx);
     let bx = suffix(c, idx, bx, dx);
-    num::num3(c, v, bx.wrapping_add(1), dx);
+    num::num3(c, v, bx.wrapping_add(1), dx)
 }
 
 /// `cs:0x604E` — the index's ordinal suffix: `1`/`0x15` → `0x68A2`
-/// "ST", `2`/`0x16` → `0x68A5` "ND", `3`/`0x17` → `0x68A8` "RD",
-/// else `0x68AB` "TH" (file `0x3604E`–`0x36074`).
+/// "ST", `2`/`0x16` → `0x68A5` "ND", `3`/`0x17` → `0x68A8` "RD", else
+/// `0x68AB` "TH" (file `0x3604E`–`0x36074`).
 fn suffix(c: &mut Ctx, idx: u16, bx: u16, dx: u16) -> u16 {
     let s = match idx {
         1 | 0x15 => 0x68A2,
@@ -177,19 +173,23 @@ fn suffix(c: &mut Ctx, idx: u16, bx: u16, dx: u16) -> u16 {
 fn erase(c: &mut Ctx, mut n: u8, mut bx: u16, mut dx: u16, grid: bool) {
     while n != 0 {
         let end = text::print_str(c, 0x68B6, bx, dx);
-        text::print_str(c, 0x68B7, end.wrapping_add(1), dx);
-        (bx, dx) = advance(bx, dx, grid);
+        let end = text::print_str(c, 0x68B7, end.wrapping_add(1), dx);
+        (bx, dx) = advance(end, dx, grid);
         n = n.wrapping_sub(1);
     }
 }
 
-/// The `bl − 8`/`dl + 0xA` step — `grid` wraps `0xC4` → `0x74`, `bl + 0xA`.
+/// The `−8`/`+0xA` step on the post-print `bx` — `0x57BC` word ops,
+/// `0x4190` `bl`/`dl` byte ops (`dl == 0xC4` → `dx = 0x74`, `bl + 0xA`).
 fn advance(bx: u16, dx: u16, grid: bool) -> (u16, u16) {
-    let (bx, dx) = (bx.wrapping_sub(8), dx.wrapping_add(0xA));
-    if grid && dx == 0xC4 {
-        return (bx.wrapping_add(0xA), 0x74);
+    if !grid {
+        return (bx.wrapping_sub(8), dx.wrapping_add(0xA));
     }
-    (bx, dx)
+    let (bl, dl) = (bx.wrapping_sub(8) & 0xFF, dx.wrapping_add(0xA) & 0xFF);
+    if dl == 0xC4 {
+        return (bl.wrapping_add(0xA) & 0xFF, 0x74);
+    }
+    (bl, dl)
 }
 
 /// `0x4257`/`0x425D` — refuse `si` at `(bx,0x59)`, wait, `0x68BB` erase.

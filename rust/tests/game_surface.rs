@@ -6,10 +6,11 @@
 mod common;
 
 use common::game_dir;
+use common::rig::Rig;
 use supremacy::args::{Sound, Video};
 use supremacy::assets::{heap_segment, load_set};
 use supremacy::front::Game;
-use supremacy::game::{self, FLEET_BASE, FLEET_STRIDE, MACH_BASE, REC_BASE, REC_CUR};
+use supremacy::game::{self, Call, FLEET_BASE, FLEET_STRIDE, MACH_BASE, REC_BASE, REC_CUR};
 use supremacy::palette::{from_dac, DAC_OFS};
 
 /// The four `ds:0x4FD0` cargo slots `0x57BC` fills.
@@ -131,4 +132,51 @@ fn surface_assign_empty_row_refuses() {
     assert_eq!(g.st.word(usize::from(u) + 2), m);
     assert_eq!(g.st.byte(usize::from(u) + 6) & 0x6, 0x6);
     assert_eq!(g.st.word(game::SEL_MACH), 0);
+}
+
+/// Nine surface units force the `0x4190` grid's second column — the
+/// asm's `sub bl,8`/`add dl,0xA` byte ops run on the post-print `bx`
+/// (num2+ordinal+num3 = 8 columns), so every row reseats to its
+/// column start (`3`, then `0xD` past the `dl == 0xC4` wrap) and all
+/// the glyphs stay inside the modelled VRAM span.
+#[test]
+fn surface_grid_rows_keep_column_x() {
+    let mut r = Rig::new();
+    r.vm = game::Vm::from_image(&supremacy::img::image());
+    let rec = r.r16(game::REC_BASE);
+    r.w16(game::REC_CUR, rec);
+    r.w16(usize::from(rec) + 0xC, 0xA);
+    for i in 0..0x18usize {
+        r.w16(FLEET_BASE + i * FLEET_STRIDE + 2, 0);
+        r.w8(FLEET_BASE + i * FLEET_STRIDE + 6, 0);
+    }
+    for i in 0..9usize {
+        r.w16(
+            FLEET_BASE + i * FLEET_STRIDE,
+            u16::try_from(0x40 + i).unwrap_or(0),
+        );
+        r.w16(FLEET_BASE + i * FLEET_STRIDE + 2, rec);
+    }
+    r.w16(game::BUTTONS, 2);
+    game::dispatch_action(&mut r.ctx(), 0xAD86);
+    // Rows 1–8 print at `bx = 3` (`dx` stepping `0xA`); row 9 opens
+    // column 2 at `bx = 0xD`, `dx = 0x74`.
+    for (ch, bx, dx) in [
+        (b'1', 4u16, 0x74u16),
+        (b'2', 4, 0x7E),
+        (b'9', 0xE, 0x74),
+        (b'H', 0x10, 0x74),
+        (b'7', 0x13, 0x74),
+    ] {
+        assert!(
+            r.host.0.contains(&Call::Glyph(ch, bx, dx)),
+            "{ch} @{bx},{dx}"
+        );
+    }
+    // No grid glyph lands off the modelled VRAM span.
+    assert!(!r
+        .host
+        .0
+        .iter()
+        .any(|c| matches!(c, Call::Glyph(_, x, d) if *x > 0xFF && (0x74..0xC4).contains(d))));
 }
