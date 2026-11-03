@@ -14,7 +14,7 @@ use super::super::vops::{faction_rec, kind_of, Ctx};
 use super::super::{selrec, shell, text};
 use super::detail::S_REFUSE;
 use super::machd::mach_host;
-use super::{build::enter_build, surface};
+use super::{build::enter_build, dfield, surface};
 
 /// `u16` casts for the `ds:` slot constants.
 macro_rules! a {
@@ -108,15 +108,17 @@ pub fn mach_open(c: &mut Ctx) {
 }
 
 /// `0x3FFF` — the DAC variant: the surface draw head, the machine's
-/// name at `(0x14,0xE)`, `[0x91DD] = 0xFF`, the `0x42C3`/`0x57BC`/
-/// `0x5994` natives, then `jmp 0x40B7` (file `0x33FFF`–`0x34035`).
+/// name at `(0x14,0xE)`, `[0x91DD] = 0xFF`, the `0x42C3`/`0x57BC`
+/// natives, the `0x5994` bays, then `jmp 0x40B7` (file
+/// `0x33FFF`–`0x34035`).
 fn dac(c: &mut Ctx, m: u16) {
     surface::draw(c);
     text::print_str(c, m, 0x14, 0xE);
     c.vm.w8(c.st, 0x91DD, 0xFF);
-    for f in [0x42C3u16, 0x57BC, 0x5994] {
+    for f in [0x42C3u16, 0x57BC] {
         c.host.svc(Call::Native(f));
     }
+    dfield::bays(c);
     surface::resume_entry(c);
 }
 
