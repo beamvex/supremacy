@@ -228,10 +228,10 @@ fn status_cells_icons_carry_positions() {
     r.w16(usize::from(rec) + 0xC, 0xA);
     let serial = r.r8(usize::from(rec) + 0x28);
     for (i, ty) in [(0usize, 2u8), (1, 5)] {
-        let m = usize::from(game::MACH_BASE) + i * usize::from(game::MACH_STRIDE);
-        r.w8(m + usize::from(game::M_TYPE), ty);
-        r.w8(m + usize::from(game::M_FLAGS), 0x10);
-        r.w8(m + usize::from(game::M_HOST), serial);
+        let m = game::MACH_BASE + i * game::MACH_STRIDE;
+        r.w8(m + game::M_TYPE, ty);
+        r.w8(m + game::M_FLAGS, 0x10);
+        r.w8(m + game::M_HOST, serial);
         for (k, &ch) in b"UNITX...".iter().enumerate() {
             r.w8(m + k, ch);
         }
