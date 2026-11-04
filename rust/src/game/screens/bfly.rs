@@ -111,9 +111,12 @@ fn step(c: &mut Ctx) {
 }
 
 /// `0x354BA`/`0x35511` — `{0xA369, 0xA10F}` while the left button is
-/// held.
+/// held. The asm spins on interrupt-fed cells, so the port needs a
+/// `0x2CA9` in the loop for `pump_input` to deliver the release edge
+/// — without it the wait never sees `[0x9CDA]` clear (GAM-82).
 pub(super) fn release(c: &mut Ctx) {
     loop {
+        vsync(c);
         c.host.svc(Call::Native(0xA369));
         menu::service(c);
         if c.vm.r16(c.st, a!(BUTTONS)) & 1 == 0 {
