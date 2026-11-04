@@ -265,6 +265,7 @@ deeply asm-flavoured.
 | [`front`](front.md) | GAM-9 frontend | `VmHost` impl, `minifb` window | ● |
 | [`smoke`](smoke.md) | GAM-24 | headless tick run → hash digest | ○ |
 | [`game`](game-state.md) | `ds:0x7D39` block etc. | state, VM, tick, UI — see below | ● |
+| [interpreters](interpreters.md) | `cs:0x773D`, `0x5C1E`, `0x6709`, `0xF3D`, `0xF672` | all five bytecode engines: what's scripted vs native | ◐ |
 
 The `game` module is large enough to split across six pages:
 
