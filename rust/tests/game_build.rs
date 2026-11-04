@@ -6,11 +6,12 @@
 
 mod common;
 
-use common::rig::Rig;
+use common::{game_dir, rig::Rig};
+use supremacy::assets::{heap_segment, load_set};
+use supremacy::front::Game;
 use supremacy::game::{self, Call};
+use supremacy::palette::{from_dac, DAC_OFS};
 
-/// `ds:` slot of the `+0x21` host-index field.
-const M_HOST: usize = 0x21;
 /// `ds:` slot of a planet record's serial index.
 const F_SERIAL: usize = 0x28;
 
@@ -33,7 +34,7 @@ fn rig() -> Rig {
     r.w8(usize::from(m) + 8, 0xFF);
     r.w8(usize::from(m) + game::M_TYPE, 6);
     let serial = r.r8(usize::from(rec) + F_SERIAL);
-    r.w8(usize::from(m) + M_HOST, serial);
+    r.w8(usize::from(m) + game::M_HOST, serial);
     r.w8(usize::from(rec) + 0x18, 1);
     r.w8(usize::from(rec) + 0x1C, 0);
     r.w8(usize::from(rec) + 0x20, 0);
@@ -110,4 +111,93 @@ fn build_fly_cancel_restores_selection() {
     assert_eq!(r.r16(game::SEL_REC), rec, "selection restored");
     assert_eq!(r.r8(game::LAUNCH_F), 0, "pick disarmed");
     assert_eq!(r.r8(game::UIMODE), 0, "abandoned to the shell");
+}
+
+/// GAM-82 — `build_fly`'s `{0xA369, 0xA10F}` release-wait spins on the
+/// interrupt-fed `[0x9CDA]` in the asm; the port feeds that cell from
+/// `pump_input`, reachable only through a `0x2CA9`. Without a vsync in
+/// the loop a still-held left button wedges the modal forever — the
+/// reported press-HEADING crash. `BUTTONS = 2` exits on spin one; the
+/// `Ui` must precede the `0xA369` poll in the call stream.
+#[test]
+fn build_fly_release_pumps_input() {
+    let mut r = rig();
+    let m = u16::try_from(game::MACH_BASE).unwrap_or(0);
+    r.w16(game::SEL_MACH, m);
+    r.w8(usize::from(m) + game::M_FLAGS, 4); // in orbit
+    game::dispatch_action(&mut r.ctx(), 0xC15C);
+    let ui = r.host.0.iter().position(|&c| c == Call::Ui(0x2CA9));
+    let poll = r.host.0.iter().position(|&c| c == Call::Native(0xA369));
+    assert!(
+        ui.is_some() && ui < poll,
+        "release must vsync before polling"
+    );
+}
+
+/// A real `Game` on the shipped image (MCG set, preset 3) — the
+/// `pump_input`/`vsync` plumbing the `Rig` host stubs out.
+fn real_game() -> Game {
+    let img = supremacy::img::image();
+    let set = load_set(&game_dir(), "MCG", heap_segment()).unwrap();
+    let pal = from_dac(&img[DAC_OFS..DAC_OFS + 768]);
+    Game::new(
+        img,
+        set,
+        pal,
+        supremacy::args::Video::Mcga,
+        supremacy::args::Sound::PcSpeaker,
+        false,
+        3,
+        0x42,
+        Box::new(supremacy::platform::MemFs::new()),
+    )
+}
+
+/// Scripted `(frame, x, y, left, right)` press edges through the live
+/// vsync hook — the feed `window::install_vsync` supplies.
+fn feed(g: &mut Game, script: &'static [(usize, u16, u16, bool, bool)]) {
+    let mut n = 0usize;
+    g.host.set_vsync(Some(Box::new(move |h| {
+        n += 1;
+        if let Some(&(_, x, y, l, r)) = script.iter().find(|(f, ..)| *f == n) {
+            h.pump.move_to(x, y);
+            h.pump.set_buttons(l, r);
+        }
+    })));
+}
+
+/// GAM-82 end-to-end — the reported repro: on the build screen, select
+/// an orbiting unit, press+release HEADING (the held button is what
+/// wedged `release`), then click the STARBASE cell — the pick must
+/// commit the launch; a right-click exits the screen.
+#[test]
+fn heading_pick_commits_launch() {
+    let mut g = real_game();
+    let m = game::MACH_BASE;
+    g.st.set_byte(m + game::M_TYPE, 6);
+    g.st.set_byte(m + game::M_FLAGS, 4); // in orbit at record 0
+    g.st.set_byte(m + game::M_HOST, 0);
+    g.st.set_word(m + game::M_DEPOSIT, 0x2000); // fuel for the jump
+    for (i, &ch) in b"MINER...\xff".iter().enumerate() {
+        g.st.set_byte(m + i, ch);
+    }
+    let dest = g.st.word(game::REC_BASE).wrapping_add(7 * 0x3A); // STARBASE
+    feed(
+        &mut g,
+        &[
+            (3, 0x2F, 0x87, true, false), // machine-grid cell 0
+            (5, 0x2F, 0x87, false, false),
+            (8, 157, 16, true, false), // HEADING
+            (10, 157, 16, false, false),
+            (14, 0x2F, 0xBB, true, false), // planet row 7 (STARBASE)
+            (16, 0x2F, 0xBB, false, false),
+            (24, 0, 0, false, true), // leave the screen
+            (26, 0, 0, false, false),
+        ],
+    );
+    game::dispatch_action(&mut g.ctx(), 0x4BA7);
+    assert_ne!(g.st.byte(m + game::M_FLAGS) & 8, 0, "in transit");
+    assert_eq!(g.st.word(m + game::M_LINK), dest, "destination link");
+    assert_eq!(g.st.word(m + game::M_OPS), 7, "eta = serial delta");
+    assert_eq!(g.st.byte(game::UIMODE), 0, "right-click → shell");
 }
