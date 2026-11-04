@@ -116,7 +116,11 @@ impl Pump {
     }
 
     /// Mirror state into the `ds:` cells; drops at most one queued code
-    /// per frame into the `[0x9CCB]` latch, only when it's free.
+    /// per frame into the `[0x9CCB]` latch while no input code is
+    /// pending there (`== 1`). Any other value is a flag mark — the
+    /// `menu_text` stream end writes `0xFF` into the same cell — which
+    /// the int-9/int-33 ISRs overwrite unconditionally, so the port
+    /// overwrites it too rather than starving behind it.
     pub fn write(&mut self, vm: &mut Vm, st: &mut State) {
         if self.motion {
             vm.w16(st, u16::try_from(CUR_X).unwrap_or(0), self.x);
@@ -127,7 +131,7 @@ impl Pump {
             u16::try_from(K_MODE).unwrap_or(0),
             u8::from(self.k_mode),
         );
-        if vm.r8(st, u16::try_from(KEY_PEND).unwrap_or(0)) == 0 {
+        if vm.r8(st, u16::try_from(KEY_PEND).unwrap_or(0)) != 1 {
             if let Some(c) = self.queue.pop_front() {
                 vm.w8(st, u16::try_from(KEY_CODE).unwrap_or(0), c);
                 vm.w8(st, u16::try_from(KEY_PEND).unwrap_or(0), 1);
