@@ -12,10 +12,9 @@ use super::super::consts::{
 };
 use super::super::mach::M_TYPE;
 use super::super::rec::{F_LINK_A, F_LINK_B, F_LINK_C};
-use super::super::vhost::Call;
 use super::super::vops::Ctx;
 use super::super::{num, text};
-use super::{dfield, galmsg};
+use super::{dfield, galmsg, stact};
 
 /// `u16` casts for the `ds:` slot constants.
 macro_rules! a {
@@ -42,7 +41,7 @@ pub(super) fn dispatch(c: &mut Ctx, t: u16) {
         0x4A9E | 0xB7EE => assign(c, 1),
         0x4A96 | 0xB7E6 => assign(c, 2),
         0x4A8E | 0xB7DE => assign(c, 3),
-        _ => drop(c.host.svc(Call::Native(t))),
+        _ => stact::dispatch(c, t),
     }
 }
 
