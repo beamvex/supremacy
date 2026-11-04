@@ -110,13 +110,14 @@ fn shown(c: &mut Ctx, m: u16, serial: u8, mode: u8) -> bool {
 }
 
 /// `0x333BD` — one listed machine: the `si` name print at `(bx,dx)`
-/// then the `+0x1E − 1`-indexed `[0x128C]` icon (`0x15C`-based; the
-/// descriptor patch is folded into the `Call::Image`).
+/// then the `+0x1E − 1`-indexed `[0x128C]` icon (`0x15C`-based) at
+/// `si = dx − 0x1D`, `ah = bl/2 − 4` on the post-print `bl`.
 fn machine_row(c: &mut Ctx, m: u16, bx: &mut u16, dx: u16) {
-    text::print_str(c, m, *bx, dx);
+    let end = text::print_str(c, m, *bx, dx);
     let ty = c.vm.r8(c.st, m.wrapping_add(f!(M_TYPE)));
     let icon = 0x15Cu16.wrapping_add(u16::from(ty).wrapping_sub(1));
-    c.host.svc(Call::Image(icon));
+    c.host
+        .svc(Call::Icon(icon, icon_x(end), dx.wrapping_sub(0x1D)));
     *bx = bx.wrapping_add(1);
 }
 
@@ -136,11 +137,18 @@ fn bump(bx: &mut u16, dx: &mut u16) -> bool {
 /// when `bp ≥ 6` (file `0x33404`–`0x33436`).
 fn pad(c: &mut Ctx, bp: u16, mut bx: u16, mut dx: u16) {
     for _ in 0..6u16.saturating_sub(bp).max(1) {
-        text::print_str(c, S_BLANK, bx, dx);
-        c.host.svc(Call::Image(0x163));
+        let end = text::print_str(c, S_BLANK, bx, dx);
+        c.host
+            .svc(Call::Icon(0x163, icon_x(end), dx.wrapping_sub(0x1D)));
         bx = bx.wrapping_add(1);
         bump(&mut bx, &mut dx);
     }
+}
+
+/// The `[0x128C]` `ah` arg — the post-print `bl` halved less 4, the
+/// asm's `mov ah,bl`/`shr ah,1`/`sub ah,4` byte ops.
+fn icon_x(end: u16) -> u16 {
+    u16::from((u8::try_from(end & 0xFF).unwrap_or(0) >> 1).wrapping_sub(4))
 }
 
 /// `cs:0x36BD`/`0x36C4` — the tax-rate arrows: `[0x91F8] = dir`

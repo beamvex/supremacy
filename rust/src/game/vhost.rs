@@ -39,6 +39,11 @@ pub enum Call {
     /// carries the glyph/attr byte (`0x6A8E` prints `0x2F`, `0x6AD2`
     /// prints `0x3E`, the `0x6B8F` ticker prints its stream).
     Glyph(u8, u16, u16),
+    /// `call word near [0x128C]` — the positioned icon put (MCG
+    /// `0x2F498`): writes `ah·8`/`si` into the `0x15C`–`0x163` icon
+    /// records' `x`/`y` then `[0x125A]`-draws `cx` — carried here as
+    /// `(img, ah, si)`.
+    Icon(u16, u16, u16),
     /// A near call the port doesn't model yet (`cs:` target).
     Native(u16),
     /// `call 0x2CA9` — UI housekeeping used by several op blocks.

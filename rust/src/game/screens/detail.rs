@@ -73,7 +73,7 @@ pub(super) fn body(c: &mut Ctx) {
     c.vm.w16(c.st, a!(SEL_REC), c.vm.r16(c.st, a!(REC_CUR)));
     dfield::name(c);
     dfield::bays(c);
-    c.host.svc(Call::Slot(0x128C, 0x78));
+    c.host.svc(Call::Icon(0x163, 1, 0x78));
     dmach::auto_sel(c);
     for f in [
         dfield::col_food,

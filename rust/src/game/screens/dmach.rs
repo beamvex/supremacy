@@ -69,7 +69,9 @@ pub(super) fn mach_head(c: &mut Ctx, m: u16) {
     stat4(c, 0x1E, 0x17, 0x18, num::num4);
     stat_c(c);
     desc(c);
-    c.host.svc(Call::Slot(0x128C, 0x78));
+    let ty = c.vm.r8(c.st, m + a!(M_TYPE));
+    let icon = 0x15Cu16.wrapping_add(u16::from(ty).wrapping_sub(1));
+    c.host.svc(Call::Icon(icon, 1, 0x78));
     cols(c);
 }
 

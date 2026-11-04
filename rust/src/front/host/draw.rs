@@ -70,6 +70,21 @@ impl Host {
         }
     }
 
+    /// `call word [0x128C]` (MCG `0x2F498`) — the positioned icon put:
+    /// writes `ax8·8`/`y` into the eight `0x15C`–`0x163` icon records'
+    /// `x`/`y`, then runs `img` through `[0x125A]`. The records ship
+    /// `(0,0)` origins, so without the patch every icon piles onto the
+    /// top-left corner.
+    pub(super) fn icon(&mut self, img: u16, ax8: u16, y: u16) {
+        if let Some(rs) = self.set.records.get_mut(0x15C..=0x163) {
+            for r in rs.iter_mut() {
+                r.x = ax8.wrapping_mul(8);
+                r.y = y;
+            }
+        }
+        self.scr.draw_image(&self.set, usize::from(img));
+    }
+
     /// `int 33` — `ax = 4` sets the position, `ax = 8` the y range,
     /// `ax = 0x14` swaps the event-handler mask (`0xA3BC`/`0xA36A` —
     /// `cx` = `0x1E` buttons-only vs `0x1F` full; `dx` is the handler

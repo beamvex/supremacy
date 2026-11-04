@@ -69,6 +69,7 @@ impl VmHost for Host {
         match call {
             Call::Image(i) => self.scr.draw_image(&self.set, usize::from(i)),
             Call::Glyph(ch, bx, dx) => font::draw(&mut self.scr, &self.img, ch, bx, dx),
+            Call::Icon(img, ax, y) => self.icon(img, ax, y),
             Call::Rect(a, b, x, d) => self.rect(a, b, x, d),
             Call::Bar(a, x, d, p) => self.bar(a, x, d, p),
             Call::Mouse(ax, cx, dx) => self.int33(ax, cx, dx),

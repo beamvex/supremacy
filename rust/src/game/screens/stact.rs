@@ -153,13 +153,16 @@ fn held(c: &mut Ctx, m: u16, serial: u8) -> bool {
 }
 
 /// `0x35A2C` — one cell: `si` name, the `+0x1E − 1`-indexed
-/// `0x15C`-base icon, then the `0x20`-flag ON/blank a row down at
+/// `0x15C`-base icon (the `[0x128C]` positioned put at `si = 0x78`,
+/// `ah = bl/2 − 5`), then the `0x20`-flag ON/blank a row down at
 /// `bx − 9`; `bx` resumes past it (file `0x35A2C`–`0x35A7B`).
 fn cell_row(c: &mut Ctx, m: u16, bx: &mut u16, dx: u16) {
     let end = text::print_str(c, m, *bx, dx);
     let ty = c.vm.r8(c.st, m + a!(M_TYPE));
-    c.host.svc(Call::Image(
+    c.host.svc(Call::Icon(
         0x15Cu16.wrapping_add(u16::from(ty).wrapping_sub(1)),
+        icon_x(end),
+        0x78,
     ));
     let s = if c.vm.r8(c.st, m + a!(M_FLAGS)) & 0x20 != 0 {
         S_RUN
@@ -174,10 +177,16 @@ fn cell_row(c: &mut Ctx, m: u16, bx: &mut u16, dx: u16) {
 fn pad(c: &mut Ctx, bp: u16, mut bx: u16, dx: u16) {
     for _ in bp..6 {
         let end = text::print_str(c, S_BLANK, bx, dx);
-        c.host.svc(Call::Image(0x163));
+        c.host.svc(Call::Icon(0x163, icon_x(end), 0x78));
         let end = text::print_str(c, S_BLANK, end.wrapping_sub(9), dx + 8);
         bx = end.wrapping_add(1);
     }
+}
+
+/// The `[0x128C]` `ah` arg — the post-print `bl` halved less 5, the
+/// asm's `mov ah,bl`/`shr ah,1`/`sub ah,5` byte ops.
+fn icon_x(end: u16) -> u16 {
+    u16::from((u8::try_from(end & 0xFF).unwrap_or(0) >> 1).wrapping_sub(5))
 }
 
 /// `0x5B3C` — the shared message tail: the `0x4FE0` header erase at

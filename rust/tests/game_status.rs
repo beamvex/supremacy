@@ -213,3 +213,44 @@ fn status_bay_pick_empty_refuses() {
     assert_eq!(g.st.byte(usize::from(m) + game::M_FLAGS) & 0x10, 0);
     assert_eq!(g.vm.r16(&g.st, CELLS), 0);
 }
+
+/// The held cells' `[0x128C]` icon puts carry the patched draw
+/// position — `si = 0x78`, `ah = bl/2 − 5` off the post-name `bl` —
+/// so the `0x15C`-based slot icons land beside their rows instead of
+/// piling onto the records' shipped `(0,0)` origins (GAM-78).
+#[test]
+fn status_cells_icons_carry_positions() {
+    let mut r = Rig::new();
+    r.vm = game::Vm::from_image(&supremacy::img::image());
+    let rec = r.r16(game::REC_BASE);
+    r.w16(game::REC_CUR, rec);
+    r.w16(game::SEL_REC, rec);
+    r.w16(usize::from(rec) + 0xC, 0xA);
+    let serial = r.r8(usize::from(rec) + 0x28);
+    for (i, ty) in [(0usize, 2u8), (1, 5)] {
+        let m = usize::from(game::MACH_BASE) + i * usize::from(game::MACH_STRIDE);
+        r.w8(m + usize::from(game::M_TYPE), ty);
+        r.w8(m + usize::from(game::M_FLAGS), 0x10);
+        r.w8(m + usize::from(game::M_HOST), serial);
+        for (k, &ch) in b"UNITX...".iter().enumerate() {
+            r.w8(m + k, ch);
+        }
+    }
+    r.w16(game::BUTTONS, 2);
+    game::dispatch_action(&mut r.ctx(), 0xC5B7);
+    let icons: Vec<Call> = r
+        .host
+        .0
+        .iter()
+        .copied()
+        .filter(|c| matches!(c, Call::Icon(..)))
+        .collect();
+    assert_eq!(icons.len(), 6, "two held cells + four pads");
+    assert!(icons.iter().all(|c| matches!(c, Call::Icon(_, _, 0x78))));
+    // "UNITX..." prints 8 cols → `bl = 0x1B`, `ah = 0x1B/2 − 5 = 8`.
+    assert!(icons.contains(&Call::Icon(0x15D, 8, 0x78)));
+    // Cell 1 resumes at `bx = 0x1C` (the 9-col blank tail), so
+    // `bl = 0x24`, `ah = 0x24/2 − 5 = 0xD`.
+    assert!(icons.contains(&Call::Icon(0x160, 0xD, 0x78)));
+    assert!(icons.iter().any(|c| matches!(c, Call::Icon(0x163, _, _))));
+}
