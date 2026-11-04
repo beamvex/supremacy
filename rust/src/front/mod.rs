@@ -25,6 +25,8 @@ mod load;
 mod map;
 mod pump;
 mod runner;
+#[cfg(feature = "minifb")]
+mod scan;
 mod stars;
 mod text;
 #[cfg(feature = "minifb")]
