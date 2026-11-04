@@ -33,11 +33,13 @@ pub fn input(g: &mut Game, op: Op, step: &mut u16) -> bool {
     true
 }
 
-/// The latch-write semantics: hold until `[0x9CCB]` frees, then queue
-/// the code and mirror it into `ds:` (like the next `pump_input` does).
+/// The latch-write semantics: hold until `[0x9CCB]` stops holding a
+/// live pending code, then queue the code and mirror it into `ds:`
+/// (like the next `pump_input` does). `!= 1` matches `Pump::write` —
+/// the `0xFF` stream-end mark must not stall the wait.
 fn key(g: &mut Game, scan: u8, step: &mut u16) {
     for _ in 0..WAIT_CAP {
-        if g.vm.r8(&g.st, u16::try_from(KEY_PEND).unwrap_or(0)) == 0 {
+        if g.vm.r8(&g.st, u16::try_from(KEY_PEND).unwrap_or(0)) != 1 {
             break;
         }
         g.step();
