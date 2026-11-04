@@ -69,13 +69,12 @@ Key addresses: `JT_BASE = 0x50E3` (op jump table — 40 far pointers
 `KEYMAP = 0x7CBD` (`KEYMAP_N = 0x3E` pairs).
 
 - `from_image(img)` — loads `ds:0..0x9CC4` from file `ds_ofs + DS_BASE`
-  (`0x106A0`), seeds `stage` from the shipped save block, then
-  `jtab::fix` rewrites each op-table `ofs` (`file − 0x292B0` near
-  offset) into the port's `cs:` label space (`file − 0x30000`,
-  `−0x6D50`). The shipped image already holds the real op table, event
-  slots, scripts and keymap at their runtime `ds:` offsets — a live
-  `ds` dump of the original confirms byte-identical content. See
-  [front.md](front.md) § "The two `cs:` spaces" for why two constants.
+  (`0x106A0`) and seeds `stage` from the shipped save block. The
+  shipped image still holds the real event slots, scripts and keymap
+  at their runtime `ds:` offsets — a live `ds` dump of the original
+  confirms byte-identical content. (GAM-80: `jtab::fix` is gone — the
+  `ds:0x50E3` op table is data the transpiler consumed at build time;
+  scripts no longer run through it.)
 - `r8`/`r16`/`w8`/`w16` — byte/word access across the three regions
   (routed by offset; unaligned-safe LE).
 - `stage_save`/`stage_load` — the `0x8432`/`0x844B` block copies
@@ -87,24 +86,25 @@ Key addresses: `JT_BASE = 0x50E3` (op jump table — 40 far pointers
   word immediates and wider `{value, tag}` slots — the `0x77B4`-style
   wide ops read the 4-byte form.
 
-## Dispatch (`vops.rs`)
+## Dispatch (`script/` + `vops.rs`)
 
 Tick codes `0x38+2N .. 0x56+2N` index the `ds:0x5183` event table; word
-0 is the script `si`. Each opcode word indexes `JT_BASE` for a handler
-address (the shipped image stores `{ofs, 0x286B}` far pointers —
-`jtab::fix` normalises `ofs` to `cs:` labels at load; op words step by
-4). `Flow`: `Cont` = `jmp 0x7758` (fetch next), `Ret` =
-`ret` (suspend).
+0 is the script `si`. GAM-80: the `cs:0x7758` fetch loop is compiled
+away — `script::run` matches `si` directly to a generated `evNN::run`
+fn (the `ds:0x51FB` scripts transpiled by `src/bin/xgen`). Each op is a
+direct call into `vimpl`/`vplan`/`vmac`/`vdir`; the `ds:0x50E3` jump
+table and `jtab` label rewrite are gone. `Flow` still models the asm
+contract: `Cont` = `jmp 0x7758` (next op), `Ret` = `ret` (suspend).
 
-So a VM step is: *read event's `si` → loop { fetch op word, look up
-handler, run it } → stop on the first `Ret`*. A script is a chain of
-guards — each returns `Cont` if it can proceed, `Ret` if the event
-should wait. One event runs to its first unmet guard per tick.
+So a VM step is: *read event's `si` → run the compiled script → stop
+on the first `Ret`*. A script is a chain of guards — each returns
+`Cont` if it can proceed, `Ret` if the event should wait. One event
+runs to its first unmet guard per tick.
 
-`run(c, idx)` = the `cs:0x773D` entry + `cs:0x7758` fetch loop: `si` from
-the event table, loop `{w = r16(si); t = r16(JT_BASE+w); si += 2}` until
-a handler returns `Ret`; returns the op count — the `Tick` enum's
-payload for the Script arm (see [game-tick.md](game-tick.md)).
+`run(c, idx)` = the `cs:0x773D` entry: `si` from the event table,
+dispatched on the compiled script's address; returns the op count —
+the `Tick` enum's payload for the Script arm (see
+[game-tick.md](game-tick.md)).
 
 `Ctx<'a>` — the five borrow contexts every op takes: `vm`, `st`, `rng`,
 `host: &mut dyn VmHost`, `files: &mut dyn DosFiles`. `vsync(c)` = one
@@ -296,7 +296,8 @@ Everything richer (fonts, starfields, audio routing) lives behind
 | file | item |
 |---|---|
 | `vm.rs` | `Vm` — low/State/hi split, `from_image`, `r8`/`w8`/…, `stage_*` |
-| `vops.rs` | `run`/`Ctx`/`Flow`, the fetch-dispatch loop |
+| `script/` | `ev00..ev29` + `run` — the compiled `ds:0x51FB` scripts (`xgen`) |
+| `vops.rs` | `Ctx`/`Flow`, the op-handler helpers |
 | `vimpl.rs` | the simple ops (`wait_b`/`wait_eq_*`/`ld_ind`/`cp`/`add_imm`/`st_imm`/`delay`/`menu`/`dialog`/`native`) |
 | `vdir.rs` | `disaster`/`jingle`/`msg_op`/`redraw`/`clear_msg` |
 | `vev.rs` | `tribute`/`pirate` + the `0x7D5A` victim pick |
@@ -307,21 +308,22 @@ Everything richer (fonts, starfields, audio routing) lives behind
 | `vend/` | `endgame`, `end_step`, `tail` + `seq/` subroutines |
 | `vhud.rs` | the `0xA7`/`0xAA`/`0xFC`/`0xFD` HUD arms |
 | `vhost.rs` | `Call` enum + `VmHost` trait + `NullHost` |
-| `jtab.rs` | `JT_BASE`/`fix` — the op-table label rewrite |
+| `seqtab/`, `texttab/` | compiled sequencer records + control-code strings (`xgen`) |
 
 ## Worked example — one event's tick
 
-Suppose event slot 7's script `si` points at a `delay`-then-`print`
-sequence. One `vops::run(c, 7)`:
+Suppose event slot 7's script `si` is `ds:0x5327` (`ev07` — a
+`delay`-then-`print` sequence). One `script::run(c, 7)`:
 
-1. `si = r16(TAB_BASE + 7*4)` — the event's script cursor.
-2. `w = r16(si)` — the first opcode word; `t = r16(JT_BASE + w)` —
-   the handler's `cs:` label (label-space after `jtab::fix`).
-3. Handler runs. If it's `delay` on a nonzero countdown cell:
-   decrement, return `Ret` — the run stops; op count = 1.
+1. `si = r16(TAB_BASE + 7*4)` — the event's script address; the `match`
+   on `si` calls `ev07::run`.
+2. Each guard is a direct call — e.g. `wait_b(c, 0x8210, false)`; a
+   `Ret` stops the run at that op index.
+3. On the `delay 0x8212` op with a nonzero countdown cell: decrement,
+   return `Ret` — the run stops; op count = the ops run so far.
 4. Next tick the same `si` is re-fetched from the table (not saved) —
    the script re-runs from the top; when the delay cell finally hits
-   0, `delay` returns `Cont` and the *next* opcode executes this tick.
+   0, `delay` returns `Cont` and the *next* op executes this tick.
 
 The whole "wait 30 ticks then print" is `delay` re-running 30 times —
 there's no suspended frame, just a cell that isn't 0 yet.

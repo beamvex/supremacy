@@ -5,7 +5,7 @@ const SFX_TAB: u16 = 0x4EA;
 /// `cs:0x93E` — song records `{tempo, list0..3}` (9 bytes each).
 const SONG_TAB: u16 = 0x93E;
 /// `cs:0x85F` — the `esel → ecur` table the loader seeds ch2 from.
-const ENV_TAB: u16 = 0x85F;
+pub(super) const ENV_TAB: u16 = 0x85F;
 
 impl<P: Ports> Tandy<P> {
     /// The `int 0x80` entry (file `0x1950`): `ah < 0x20` jumps through

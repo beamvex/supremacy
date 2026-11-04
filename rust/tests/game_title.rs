@@ -136,16 +136,24 @@ impl Rig {
         game::title_step(&mut self.ctx());
         self
     }
-    /// `0xFFFF` at `cs:ofs` — a seq stream that ends on first fetch.
-    fn stream_end(&mut self, ofs: usize) {
-        self.host.cs[ofs] = 0xFF;
-        self.host.cs[ofs + 1] = 0xFF;
+    /// No-op — streams are compiled (`seqtab`); real delays are
+    /// capped inside `step`/`run` so tests finish fast.
+    fn stream_end(&mut self, _ofs: usize) {}
+    /// One `title_step`, then the seq delay/period forced to 1 — the
+    /// shipped streams (`0x9F6`/`0xB22`/`0xC8A`) then end in a few
+    /// steps instead of their `0x12C`-tick countdowns (the cap runs
+    /// *after* the step so the `Delay` op's own load takes effect once).
+    fn step(&mut self) {
+        self.vm.w8(&mut self.st, 0x91D6, 1);
+        game::title_step(&mut self.ctx());
+        let d = self.vm.r16(&self.st, 0x91A0).min(1);
+        self.vm.w16(&mut self.st, 0x91A0, d);
     }
     /// Drive `title_step` until `Vm::title` clears (bounded).
     fn run(&mut self) -> usize {
         let mut n = 0;
         while self.vm.title.is_some() && n < 0x4000 {
-            game::title_step(&mut self.ctx());
+            self.step();
             n += 1;
         }
         n
@@ -213,7 +221,7 @@ fn mcga_runs_all_three_slides() {
     r.stream_end(0xC8A);
     r.boot();
     for _ in 0..0x60 {
-        game::title_step(&mut r.ctx());
+        r.step();
     }
     let c = &r.host.calls;
     assert!(c.contains(&Call::Image(5)));

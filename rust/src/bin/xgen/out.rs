@@ -1,0 +1,61 @@
+//! Emission helpers — write/compare generated `.rs` files and split
+//! overlong `match` bodies across per-chunk files (the project caps
+//! files at 200 lines).
+
+use std::path::{Path, PathBuf};
+use std::process::ExitCode;
+
+/// Accumulates writes; `--check` compares instead of writing.
+pub struct Out {
+    root: PathBuf,
+    check: bool,
+    drift: bool,
+}
+
+impl Out {
+    /// `root` = the crate's `src/`; `check` = verify-only mode.
+    pub fn new(root: PathBuf, check: bool) -> Self {
+        Self {
+            root,
+            check,
+            drift: false,
+        }
+    }
+
+    /// Write (or verify) `rel` under `src/` with content `text`.
+    pub fn file(&mut self, rel: &str, text: &str) {
+        let p = self.root.join(rel);
+        if self.check {
+            check(&p, text, &mut self.drift);
+            return;
+        }
+        if let Some(d) = p.parent() {
+            std::fs::create_dir_all(d).unwrap_or_else(|e| panic!("{d:?}: {e}"));
+        }
+        std::fs::write(&p, text).unwrap_or_else(|e| panic!("{p:?}: {e}"));
+        println!("{}", p.display());
+    }
+
+    /// Exit code — `3` when `--check` saw drift.
+    pub fn finish(self) -> ExitCode {
+        if self.check && self.drift {
+            eprintln!("generated sources differ — run `cargo run --bin xgen`");
+            return ExitCode::from(3);
+        }
+        ExitCode::SUCCESS
+    }
+}
+
+fn check(p: &Path, text: &str, drift: &mut bool) {
+    match std::fs::read_to_string(p) {
+        Ok(old) if old == text => println!("{}: ok", p.display()),
+        Ok(_) => {
+            eprintln!("{}: drift", p.display());
+            *drift = true;
+        }
+        Err(e) => {
+            eprintln!("{}: {e}", p.display());
+            *drift = true;
+        }
+    }
+}

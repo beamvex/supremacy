@@ -1,14 +1,37 @@
 # Interpreters — does the game run code in a VM?
 
-**Yes — in fact, several.** `GAME.EXE` is native 8086 code, but it embeds
-five bytecode interpreters that drive large parts of its behaviour. The
-simulation core (planet economy, battles, ships, rendering, input) is
-plain machine code; everything *scripted* — timed events, text layout,
-machine animation, music, menu pages — is decoded from byte/word
-streams at runtime.
+**The original did — the port does not (GAM-80).** `GAME.EXE` is native
+8086 code, but it embeds five bytecode interpreters that drive large
+parts of its behaviour. The Rust port no longer mirrors them: `xgen`
+(`src/bin/xgen`) decodes every shipped stream once, at build time, and
+emits it as checked-in Rust — generated `match` tables, typed event
+enums, and one native function per event script. At runtime the port
+indexes the compiled tables; no `GAME.EXE` bytecode is fetched,
+decoded, or dispatched through a jump-table loop.
 
-This page catalogues all five; [game-vm.md](game-vm.md) covers the
-flagship event VM in depth.
+| interpreter | asm | now compiled into |
+|---|---|---|
+| Event VM (`cs:0x773D`/`0x7758`) | 30 scripts at `ds:0x51FB+`, op table `ds:0x50E3` | `game/script/ev00..ev29` — one Rust fn per script; `script::run` dispatches on the slot `si` |
+| Draw sequencer (`cs:0x5C1E`) | `cs:` `{op,pad}` records | `game/seqtab` — `at(cursor) → (SeqOp, next)` |
+| Print interpreter (`cs:0x6709`) | `ds:` strings with `0x01..0x04` control bytes | `game/texttab` — resolved `Draw` lists (plain strings keep a live scan) |
+| Music decoder (`cs:0xF3D`/`0x1C02`, AdLib queue) | PC/Tandy byte streams; AdLib queue records | `audio/pctab`/`audio/ttab` `(Ev, next)` tables; AdLib `qpages` decoded at `select` |
+| Menu text (`cs:0xF672`) | `ss:` line-record stream | `front/text/stream` — typed `Blk`/`Line` tables |
+
+What remains "interpreting" is only *data* lookup: typed tables the
+codegen emitted, plus non-executable runtime data (LZSS assets, save
+files, sound registers, the `ds:` cells the game logic owns).
+
+The original five interpreters, for reference, were:
+
+## The five original interpreters
+
+| interpreter | asm | bytecode lives in | drives | port |
+|---|---|---|---|---|
+| Event VM | `cs:0x773D` entry, `cs:0x7758` fetch loop (file `0x3773D`–`0x37C61`) | `ds:0x51FB`+ scripts; `ds:0x50E3` jump table (40 far pointers); `ds:0x5183` event slots | timed events, ambushes, tributes, uprisings, endgame checks, modal dialogs, HUD reprints | `game/script/`, `game/{vm,vops,vimpl,vdir,vev,vup,vplan,vmac,vord,vend,vhud,vhost}.rs` |
+| Draw sequencer | `cs:0x5C1E` (file `0x35C1E`–`0x35C96`) | `cs:` stream of 4-byte `{op, pad}` records | per-machine-type animation: image index, delay, link, end | `game/{seq,seqtab}.rs` |
+| Print interpreter | `cs:0x6709` (file `0x36709`, `print_str`) | `ds:` strings, `0xFF`-terminated, with embedded control bytes `0x01`–`0x04` | ticker/status text: glyph draws, cursor moves, run-length repeats | `game/{text,texttab}.rs` |
+| Music stream decoder | PC-speaker module file `0xC00`; per-channel step `cs:0xF3D` (Tandy `0x1C02`, AdLib `ar_*`) | `cs:` byte streams per channel; bytes `≥0x80` index an opcode jump table (`cs:0x32`), `<0x80` index the note table | tracker music + SFX on speaker, Tandy SN76489, AdLib OPL2 | `audio/{pc_step,pc_ops,tandy_step,tandy_ops,pctab,ttab,ar_*}.rs` |
+| Menu text | `ss:` stream at `cs:0xF672`, glyph loop `0x2F640` | byte stream: `0x20` tile clear, `0xF0` newline, `0x00` end, `0xFF` save+suspend, else letter → tile blit | menu pages, the victory credits scroll | `front/text/{walk,stream}.rs`, `game/vend/seq/scroll.rs` |
 
 ## The five interpreters
 

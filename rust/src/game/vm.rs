@@ -9,24 +9,18 @@
 //! rest (`ds:0x9CC4..=0xFFFF`, menu records and scratch).
 //!
 //! Dispatch: tick codes `0x38+2N .. 0x56+2N` index the 4-byte event
-//! table at `ds:0x5183`; word 0 is the script `si`. Each opcode word is
-//! an offset into the op table at `ds:0x50E3` — the image ships it as
-//! `{ofs, 0x286B}` far pointers, and [`jtab::fix`] rewrites `ofs` into
-//! the port's `cs:` label space at load; the table yields a `cs:`
-//! handler address. Handlers either `jmp 0x7758` (continue) or `ret`
-//! (suspend). **`si` is never written back** — a suspended event simply
-//! re-runs from its entry next tick, so scripts are guard+action rules
-//! whose state lives in `ds` flag cells, not in the instruction pointer.
+//! table at `ds:0x5183`; word 0 is the script `si`. GAM-80: the scripts
+//! are compiled (`script::evNN`), so `si` selects a Rust fn rather than
+//! a bytecode cursor — **`si` is still never written back**: a
+//! suspended event re-runs from its entry next tick, so scripts are
+//! guard+action rules whose state lives in `ds` flag cells.
 
 use super::consts::{DS_BASE, REC_BASE, REC_STRIDE, STATE_LEN, STATE_OFS};
+use super::keymap;
 use super::state::State;
 use super::title::Title;
 use super::vend::End;
-use super::{jtab, keymap};
 
-/// `ds:0x50E3` — op jump table base (dispatch at file `0x37760`; the
-/// table itself ships at file `0x15783`).
-pub const JT_BASE: u16 = 0x50E3;
 /// `ds:0x5183` — event table, 4-byte `{cur, base}` entries (dispatch
 /// reads it at file `0x37750`; it ships at file `0x15823`).
 pub const TAB_BASE: u16 = 0x5183;
@@ -120,7 +114,6 @@ impl Vm {
         vm.hi[..n].copy_from_slice(&img[src..src + n]);
         let lo = STATE_OFS + DS_BASE;
         vm.stage.copy_from_slice(&img[lo..lo + STATE_LEN]);
-        jtab::fix(&mut vm.low, usize::from(JT_BASE));
         vm
     }
 

@@ -1,17 +1,15 @@
-//! Event-VM op dispatch — the routines at `cs:0x7768..0x7C61` the
-//! `ds:0x50E3` op table jumps to. Each returns [`Flow::Cont`]
-//! (`jmp 0x7758`) or [`Flow::Ret`] (`ret`, suspend).
-//!
-//! Operand encoding in scripts: a bare `u16` immediate (`si += 2`) or a
-//! 4-byte slot `{ptr, tag}` (`si += 4`; the shipped tag is `0x0FAA`).
+//! Event-VM op bodies — the routines at `cs:0x7768..0x7C61`, now
+//! called directly by the compiled `script::evNN` functions (GAM-80:
+//! the `cs:0x7758` fetch-dispatch loop is transpiled away). Each
+//! returns [`Flow::Cont`] (`jmp 0x7758`) or [`Flow::Ret`] (`ret`,
+//! suspend).
 
 use super::consts::{FLEET_BASE, FLEET_COUNT, FLEET_STRIDE, REC_COUNT, UIMODE};
 use super::rec::F_KIND;
 use super::rng::Rng;
 use super::state::State;
 use super::vhost::{Call, VmHost};
-use super::vm::{Flow, Vm};
-use super::{vdir, vimpl, vmac, vplan};
+use super::vm::Vm;
 use crate::platform::DosFiles;
 
 /// The VM's `ds` scratch registers (inside the save block).
@@ -48,84 +46,6 @@ pub struct Ctx<'a> {
 pub fn vsync(c: &mut Ctx) {
     c.host.svc(Call::Ui(0x2CA9));
     c.host.pump_input(c.vm, c.st);
-}
-
-/// Run event `idx` until a handler suspends — the `cs:0x773D` entry
-/// (`si` from the `ds:0x5183` table) plus the `cs:0x7758` fetch loop.
-/// Returns the op count executed.
-pub fn run(c: &mut Ctx, idx: u16) -> u16 {
-    let mut si = c.vm.r16(c.st, super::vm::TAB_BASE + (idx & 0xFF) * 4);
-    let mut ran = 0u16;
-    loop {
-        let w = c.vm.r16(c.st, si);
-        let target = c.vm.r16(c.st, super::vm::JT_BASE.wrapping_add(w));
-        si = si.wrapping_add(2);
-        ran = ran.wrapping_add(1);
-        if op(c, target, &mut si) == Flow::Ret {
-            return ran;
-        }
-    }
-}
-
-/// `jmp word [ds:0x50E3+w]` — dispatch on the `cs:` handler target.
-pub fn op(c: &mut Ctx, t: u16, si: &mut u16) -> Flow {
-    match t {
-        0x7768 | 0x7AF0 => Flow::Ret,
-        0x7769 => vimpl::wait_b(c, si, false),
-        0x7774 => vimpl::print(c, si),
-        0x7782 => vimpl::set_flag(c, si, 0xFF),
-        0x778C => vimpl::set_flag(c, si, 0),
-        0x7796 => vimpl::wait_eq_b(c, si),
-        0x77A5 => vimpl::wait_eq_w(c, si, false),
-        0x77B4 => vimpl::wait_eq_w(c, si, true),
-        0x77C3 => vimpl::print_at(c, planet_rec(c) + 0xE),
-        0x77E1 => vimpl::print_at(c, c.vm.r16(c.st, R_SEL) + 0xE),
-        0x77F0 => vimpl::rand_planet(c),
-        0x7811 => vimpl::ld_ind(c, si, R_A, 1),
-        0x7825 => vimpl::ld_ind(c, si, R_B, 2),
-        0x7839 => vimpl::ld_ind(c, si, R_C, 4),
-        0x7853 => vimpl::cp(c, si, 1),
-        0x7866 => vimpl::cp(c, si, 2),
-        0x7879 => vimpl::cp(c, si, 4),
-        _ => op2(c, t, si),
-    }
-}
-
-fn op2(c: &mut Ctx, t: u16, si: &mut u16) -> Flow {
-    match t {
-        0x7893 => vimpl::add_imm(c, si, 1),
-        0x78A2 => vimpl::add_imm(c, si, 2),
-        0x78B1 => vimpl::add_imm(c, si, 4),
-        0x78C7 => vimpl::wait_b(c, si, true),
-        0x78D5 => vimpl::st_imm(c, si, 1),
-        0x78E4 => vimpl::st_imm(c, si, 2),
-        0x78F3 => vimpl::st_imm(c, si, 4),
-        0x7908 => vimpl::native(c, si),
-        0x790A => vplan::kill_sel(c),
-        0x7980 => vplan::wait_kind(c, 0xA),
-        0x798E => vplan::wait_kind(c, 7),
-        _ => op3(c, t, si),
-    }
-}
-
-fn op3(c: &mut Ctx, t: u16, si: &mut u16) -> Flow {
-    match t {
-        0x799C => vplan::wait_kind(c, 4),
-        0x79AA => vimpl::delay(c, si),
-        0x79BB => vimpl::menu(c),
-        0x79C3 => vimpl::dialog(c),
-        0x7A11 => vplan::levy(c),
-        0x7A45 => vdir::disaster(c),
-        0x7ADD => vmac::unhide(c),
-        0x7AF1 => vmac::raze(c),
-        0x7BAB => vmac::wait_derelict(c),
-        0x7BE8 => vimpl::print_at(c, c.vm.r16(c.st, R_MACH)),
-        0x7BF4 => vplan::depopulate(c),
-        0x7C05 => vplan::charge(c),
-        0x7C16 => vmac::reset_timers(c),
-        0x7C30 => vmac::wait_ripe(c),
-        _ => Flow::Ret,
-    }
 }
 
 /// `ds:` offset of the current planet's record (`[0x81F6]` × `0x3A` +

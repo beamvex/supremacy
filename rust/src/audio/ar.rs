@@ -12,6 +12,21 @@ use super::ar_chan::AChan;
 use super::Ports;
 
 /// The `AdLib`/Roland driver state — see module docs.
+/// One decoded queue event cell — `class 0` empty, `1` `{kind,param}`,
+/// `2` `{note,prog}`, `3` the full 7-byte record.
+#[derive(Clone, Copy, Default)]
+pub(super) struct ArCell {
+    /// `+0x04` — the four note bytes.
+    pub notes: [u8; 4],
+    /// `+0x04` program byte.
+    pub prog: u8,
+    /// `+0x05` kind byte.
+    pub kind: u8,
+    /// `+0x06` param byte.
+    pub param: u8,
+}
+
+/// The AdLib/Roland MPU driver state.
 pub struct Ar<P> {
     /// Module bytes — `cs:` reads `map` to file `0x2900 + ofs`; the
     /// slice runs to `0x4970` where the embedded song records begin.
@@ -37,6 +52,10 @@ pub struct Ar<P> {
     pub(super) idx: u8,
     /// `[0x1FD2]` — highest nonzero `map` index + 1 (`nmap`).
     pub(super) nmap: u16,
+    /// GAM-80 — the `map`-page queue records decoded at `select`:
+    /// `qpages[idx][bar]` → per-channel event cells, so `fetch` is an
+    /// index, not a variable-length record walk.
+    pub(super) qpages: Vec<Vec<[ArCell; 8]>>,
     /// `[0x19FB]` — the event-queue cursor (record-relative offset).
     pub(super) cur: u16,
     /// `[0x1C81]` — the queue region's record-relative paragraph —
@@ -127,6 +146,7 @@ impl<P: Ports> Ar<P> {
             pass: 0,
             idx: 0,
             nmap: 0,
+            qpages: Vec::new(),
             cur: 0x118,
             qbase: 0,
             qend: 0,

@@ -34,7 +34,7 @@ One game tick, called once per frame. `[0x91B0]` nonzero → cleared
 | `0x20..0x38` | `Ship` | `ship_tick` (`bx = bl − 0x20`, `cs:0x60EE`) |
 | `0x38..0x38+N` | `Planet` | `sim_planet` (`b−0x38`) |
 | `+N..+2N` | `Defence` | `defence_tick` (`b−0x38−n`) |
-| `+2N..0x56+2N` | `Script` | `vops::run` event VM (op count payload) |
+| `+2N..0x56+2N` | `Script` | `script::run` compiled event (op count payload) |
 | `0xA7` | `HudSel` | selected-object reprint `cs:0x60A8` |
 | `0xAA` | `Sprites` | mark-all-sprites `cs:0x3738` |
 | `0xA8` | `Jingle` | `vdir::jingle` `cs:0x7E36` |
@@ -213,7 +213,7 @@ The msg cursor walks the message one byte per step:
   advance.
 
 So a ticker message is a `ds:` string with inline `0xFC`/`0xFB`/`0xFD`
-control bytes, walked one byte per `ticker_step` — the same bytecode
+control bytes, walked one byte per `ticker_step` — the same byte
 trick `print_str` uses, at scroll speed instead of whole-string.
 
 ## Pitfalls

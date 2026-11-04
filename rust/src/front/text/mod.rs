@@ -38,6 +38,7 @@ mod ega;
 mod lay;
 mod mcg;
 mod scroll;
+mod stream;
 mod tga;
 mod walk;
 
