@@ -112,16 +112,89 @@ fn surface_assign_deploys_bay_unit() {
     assert_eq!(g.st.word(usize::from(SURF)), u);
 }
 
-/// Clicking a cargo row with no bay selected takes the `0x4257`
-/// "THAT'S EMPTY!" refuse — no unit fields move and the loop still
-/// exits on the right button.
+/// The `0x4AFD` entry auto-select: a `+0x1E == 1` bay machine arms
+/// `[0x9180]` and fills the `0x57BC` cargo table before any click —
+/// `[0x91DD]` latches like the `0x42AB` tail.
+#[test]
+fn surface_entry_autoselects_carrier() {
+    let mut g = game();
+    let (_rec, m, u) = setup(&mut g);
+    run(&mut g, |n, p| match n {
+        9 => p.set_buttons(false, true),
+        13 => p.set_buttons(false, false),
+        _ => {}
+    });
+    assert_eq!(g.st.word(game::SEL_MACH), m);
+    assert_eq!(g.st.byte(0x91DD), 0xFF);
+    assert_eq!(g.vm.r16(&g.st, CARGO), u);
+    assert_eq!(g.vm.r16(&g.st, CARGO + 4), 0);
+}
+
+/// The `0x50A9` grid click: a surface cell's ship moves into the
+/// selected machine — `+0x2` = the machine, the `0x4` aboard bit set,
+/// the second `0x4FD0` slot filled, the `0x9AB1` cell cleared.
+#[test]
+fn surface_grid_loads_ship_into_carrier() {
+    let mut g = game();
+    let (_rec, m, u) = setup(&mut g);
+    let rec = _rec;
+    let u2 = u16::try_from(FLEET_BASE).unwrap_or(0) + u16::try_from(FLEET_STRIDE).unwrap_or(0);
+    g.st.set_word(usize::from(u2), 0x41);
+    g.st.set_word(usize::from(u2) + 2, rec);
+    g.st.set_byte(usize::from(u2) + 6, 0x2);
+    run(&mut g, |n, p| match n {
+        5 => {
+            p.move_to(0x10, 0x74);
+            p.set_buttons(true, false);
+        }
+        9 => p.set_buttons(false, false),
+        21 => p.set_buttons(false, true),
+        25 => p.set_buttons(false, false),
+        _ => {}
+    });
+    assert_eq!(g.st.word(usize::from(u2) + 2), m);
+    assert_eq!(g.st.byte(usize::from(u2) + 6) & 0x6, 0x6);
+    assert_eq!(g.vm.r16(&g.st, CARGO), u);
+    assert_eq!(g.vm.r16(&g.st, CARGO + 4), u2);
+    assert_eq!(g.st.word(usize::from(SURF)), 0);
+}
+
+/// The `0x50A9` refuse half: no `[0x9180]` selection takes the
+/// `0x69DE` path — the cell's ship stays on the record untouched.
+#[test]
+fn surface_grid_click_without_carrier_refuses() {
+    let mut g = game();
+    let (rec, m, _u) = setup(&mut g);
+    g.st.set_byte(usize::from(m) + game::M_TYPE, 2);
+    let u2 = u16::try_from(FLEET_BASE).unwrap_or(0) + u16::try_from(FLEET_STRIDE).unwrap_or(0);
+    g.st.set_word(usize::from(u2), 0x41);
+    g.st.set_word(usize::from(u2) + 2, rec);
+    g.st.set_byte(usize::from(u2) + 6, 0x2);
+    run(&mut g, |n, p| match n {
+        5 => {
+            p.move_to(0x10, 0x74);
+            p.set_buttons(true, false);
+        }
+        9 => p.set_buttons(false, false),
+        21 => p.set_buttons(false, true),
+        25 => p.set_buttons(false, false),
+        _ => {}
+    });
+    assert_eq!(g.st.word(game::SEL_MACH), 0);
+    assert_eq!(g.st.word(usize::from(u2) + 2), rec);
+    assert_eq!(g.st.byte(usize::from(u2) + 6), 0x2);
+    assert_eq!(g.st.word(usize::from(SURF)), u2);
+}
+
+/// Clicking an empty cargo row after the `0x4AFD` auto-select still
+/// takes the `0x4257` "THAT'S EMPTY!" refuse — the aboard unit stays.
 #[test]
 fn surface_assign_empty_row_refuses() {
     let mut g = game();
     let (_rec, m, u) = setup(&mut g);
     run(&mut g, |n, p| match n {
         5 => {
-            p.move_to(0x5E, 0x20);
+            p.move_to(0x5E, 0x2C);
             p.set_buttons(true, false);
         }
         9 => p.set_buttons(false, false),
@@ -131,7 +204,7 @@ fn surface_assign_empty_row_refuses() {
     });
     assert_eq!(g.st.word(usize::from(u) + 2), m);
     assert_eq!(g.st.byte(usize::from(u) + 6) & 0x6, 0x6);
-    assert_eq!(g.st.word(game::SEL_MACH), 0);
+    assert_eq!(g.st.word(game::SEL_MACH), m);
 }
 
 /// Nine surface units force the `0x4190` grid's second column — the
