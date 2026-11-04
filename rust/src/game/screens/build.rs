@@ -34,7 +34,7 @@ pub fn enter_build(c: &mut Ctx, win: bool) {
     c.host.svc(Call::Image(0x2A));
     c.host.svc_st(Call::Present(4), c.vm, c.st);
     dfield::bays(c);
-    c.host.svc(Call::Slot(0x128C, 0x33));
+    c.host.svc(Call::Icon(0x163, 0x21, 0x33));
     cells(c);
     c.host.svc(Call::Native(0x4C8B));
     c.host.svc(Call::Native(0x6FBF));
