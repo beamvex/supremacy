@@ -115,7 +115,7 @@ fn boot(
     if galaxy {
         g.enter_galaxy();
     }
-    match window::run(&mut g) {
+    match window::run(&mut g, probe()) {
         Ok(()) => ExitCode::SUCCESS,
         Err(e) => fail("minifb", &std::io::Error::other(e)),
     }
@@ -145,6 +145,26 @@ fn load_img(exe: Option<PathBuf>) -> std::io::Result<Vec<u8>> {
 fn fail(what: &str, e: &std::io::Error) -> ExitCode {
     eprintln!("{what}: {e}");
     ExitCode::FAILURE
+}
+
+/// macOS: raw `CGEventSourceButtonState` (HID level, no permissions) —
+/// or-ed over minifb's event-fed state by `window::input`.
+#[cfg(target_os = "macos")]
+fn probe() -> Option<window::ButtonProbe> {
+    #[link(name = "CoreGraphics", kind = "framework")]
+    unsafe extern "C" {
+        #[link_name = "CGEventSourceButtonState"]
+        fn src_btn_state(state_id: i32, button: u32) -> bool;
+    }
+    Some(Box::new(|| unsafe {
+        (src_btn_state(1, 0), src_btn_state(1, 1))
+    }))
+}
+
+/// Other platforms: no native probe wired yet.
+#[cfg(not(target_os = "macos"))]
+fn probe() -> Option<window::ButtonProbe> {
+    None
 }
 
 /// Build a PSP-style command tail — see `supremacy.rs::tail_bytes`.

@@ -27,86 +27,18 @@ const H: usize = 200;
 /// per `step`).
 const FPS: u32 = 30;
 
-/// `minifb` key → DOS set-1 scancode — every code the game's
-/// `ds:0x7CBD` keymap and the K-mode nav path consume (arrows, Enter,
-/// Esc, the line editor's alnum/punct/keypad set).
-const SCAN: &[(Key, u8)] = &[
-    (Key::Escape, 0x01),
-    (Key::Key1, 0x02),
-    (Key::Key2, 0x03),
-    (Key::Key3, 0x04),
-    (Key::Key4, 0x05),
-    (Key::Key5, 0x06),
-    (Key::Key6, 0x07),
-    (Key::Key7, 0x08),
-    (Key::Key8, 0x09),
-    (Key::Key9, 0x0A),
-    (Key::Key0, 0x0B),
-    (Key::Minus, 0x0C),
-    (Key::Equal, 0x0D),
-    (Key::Backspace, 0x0E),
-    (Key::Q, 0x10),
-    (Key::W, 0x11),
-    (Key::E, 0x12),
-    (Key::R, 0x13),
-    (Key::T, 0x14),
-    (Key::Y, 0x15),
-    (Key::U, 0x16),
-    (Key::I, 0x17),
-    (Key::O, 0x18),
-    (Key::P, 0x19),
-    (Key::Enter, 0x1C),
-    (Key::NumPadEnter, 0x1C),
-    (Key::A, 0x1E),
-    (Key::S, 0x1F),
-    (Key::D, 0x20),
-    (Key::F, 0x21),
-    (Key::G, 0x22),
-    (Key::H, 0x23),
-    (Key::J, 0x24),
-    (Key::K, 0x25),
-    (Key::L, 0x26),
-    (Key::Semicolon, 0x27),
-    (Key::Backslash, 0x2B),
-    (Key::Z, 0x2C),
-    (Key::X, 0x2D),
-    (Key::C, 0x2E),
-    (Key::V, 0x2F),
-    (Key::B, 0x30),
-    (Key::N, 0x31),
-    (Key::M, 0x32),
-    (Key::Comma, 0x33),
-    (Key::Period, 0x34),
-    (Key::Slash, 0x35),
-    (Key::Space, 0x39),
-    (Key::Up, 0x48),
-    (Key::Down, 0x50),
-    (Key::Left, 0x4B),
-    (Key::Right, 0x4D),
-    (Key::Home, 0x47),
-    (Key::NumPad7, 0x47),
-    (Key::NumPad8, 0x48),
-    (Key::PageUp, 0x49),
-    (Key::NumPad9, 0x49),
-    (Key::NumPad4, 0x4B),
-    (Key::NumPad5, 0x4C),
-    (Key::NumPad6, 0x4D),
-    (Key::End, 0x4F),
-    (Key::NumPad1, 0x4F),
-    (Key::NumPad2, 0x50),
-    (Key::PageDown, 0x51),
-    (Key::NumPad3, 0x51),
-    (Key::Insert, 0x52),
-    (Key::NumPad0, 0x52),
-    (Key::Delete, 0x53),
-    (Key::NumPadDot, 0x53),
-];
+use super::scan::SCAN;
 
-/// Run `g` until the window closes.
+/// Raw hardware-level button source `(left, right)` — the frontend
+/// or-s it over minifb's event-fed `get_mouse_down` (see [`buttons`]).
+pub type ButtonProbe = Box<dyn FnMut() -> (bool, bool)>;
+
+/// Run `g` until the window closes. `probe` supplies a raw button
+/// level [`buttons`] or-s over the event-fed state.
 ///
 /// # Errors
 /// Propagates `minifb` window-creation/update failures.
-pub fn run(g: &mut Game) -> Result<(), minifb::Error> {
+pub fn run(g: &mut Game, probe: Option<ButtonProbe>) -> Result<(), minifb::Error> {
     let mut win = Window::new(
         "Supremacy",
         W,
@@ -124,7 +56,7 @@ pub fn run(g: &mut Game) -> Result<(), minifb::Error> {
         g.host.snd.set_rate(o.rate);
     }
     let win = Rc::new(RefCell::new(win));
-    install_vsync(g, Rc::clone(&win));
+    install_vsync(g, Rc::clone(&win), probe);
     #[cfg(feature = "audio")]
     let mut pcm: Vec<f32> = Vec::new();
     while win.borrow().is_open() {
@@ -148,7 +80,8 @@ pub fn run(g: &mut Game) -> Result<(), minifb::Error> {
 /// rate-limits in one call; the input read that follows sees the
 /// just-pumped state. A closed window exits the process — the nested
 /// game loops never return here to check `is_open` themselves.
-fn install_vsync(g: &mut Game, win: Rc<RefCell<Window>>) {
+fn install_vsync(g: &mut Game, win: Rc<RefCell<Window>>, probe: Option<ButtonProbe>) {
+    let mut probe = probe;
     let mut prev: Vec<Key> = Vec::new();
     let mut buf = vec![0u32; W * H];
     g.host.set_vsync(Some(Box::new(move |host| {
@@ -157,22 +90,44 @@ fn install_vsync(g: &mut Game, win: Rc<RefCell<Window>>) {
         if w.update_with_buffer(&buf, W, H).is_err() || !w.is_open() {
             std::process::exit(0);
         }
-        input(&mut host.pump, &w, &mut prev);
+        input(&mut host.pump, &w, &mut prev, &mut probe);
     })));
 }
 
 /// Poll minifb → pump — cursor (already buffer-space), button edges,
 /// make/break scancodes.
 #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-fn input(pump: &mut super::Pump, win: &Window, prev: &mut Vec<Key>) {
+fn input(
+    pump: &mut super::Pump,
+    win: &Window,
+    prev: &mut Vec<Key>,
+    probe: &mut Option<ButtonProbe>,
+) {
     let (mx, my) = win.get_mouse_pos(MouseMode::Clamp).unwrap_or_default();
-    let (l, r) = (
-        win.get_mouse_down(MouseButton::Left),
-        win.get_mouse_down(MouseButton::Right),
-    );
+    let (l, r) = buttons(win, probe);
     pump.move_to(mx.max(0.) as u16, my.max(0.) as u16);
     pump.set_buttons(l, r);
     keys(pump, win, prev);
+}
+
+/// Button level — minifb's event-fed state or-ed with the raw
+/// [`ButtonProbe`] level while the cursor is inside the window.
+/// `mouseDown:` never reaches the view when AppKit swallows the click
+/// (a press on a non-key window dispatches nothing), and the int-33h
+/// driver modelled here reads the buttons unconditionally — the
+/// hardware level is the faithful source. Outside the window the
+/// probe is ignored so presses on other windows can't leak in.
+fn buttons(win: &Window, probe: &mut Option<ButtonProbe>) -> (bool, bool) {
+    let ev = (
+        win.get_mouse_down(MouseButton::Left),
+        win.get_mouse_down(MouseButton::Right),
+    );
+    match probe.as_mut().map(|p| p()) {
+        Some((cl, cr)) if win.get_mouse_pos(MouseMode::Discard).is_some() => {
+            (ev.0 || cl, ev.1 || cr)
+        }
+        _ => ev,
+    }
 }
 
 /// Make/break scancodes for the mapped keys that changed since last
