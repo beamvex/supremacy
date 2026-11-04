@@ -42,10 +42,6 @@ mod stream;
 mod tga;
 mod walk;
 
-/// `ss:` stream base in the unpacked image — `ss = 0x1F6F`, file
-/// `0x1F6F0 + 0xC00`.
-const STREAM: usize = 0x202F0;
-
 /// The `menu_text` crawl — the `cs:0xF672` cursor plus the scroll
 /// state `[0x1290]`/`[0x1292]`/`0x8983` stand in for.
 pub struct Crawl {

@@ -33,15 +33,24 @@ The original five interpreters, for reference, were:
 | Music stream decoder | PC-speaker module file `0xC00`; per-channel step `cs:0xF3D` (Tandy `0x1C02`, AdLib `ar_*`) | `cs:` byte streams per channel; bytes `≥0x80` index an opcode jump table (`cs:0x32`), `<0x80` index the note table | tracker music + SFX on speaker, Tandy SN76489, AdLib OPL2 | `audio/{pc_step,pc_ops,tandy_step,tandy_ops,pctab,ttab,ar_*}.rs` |
 | Menu text | `ss:` stream at `cs:0xF672`, glyph loop `0x2F640` | byte stream: `0x20` tile clear, `0xF0` newline, `0x00` end, `0xFF` save+suspend, else letter → tile blit | menu pages, the victory credits scroll | `front/text/{walk,stream}.rs`, `game/vend/seq/scroll.rs` |
 
-## The five interpreters
+## Regenerating the compiled tables
 
-| interpreter | asm | bytecode lives in | drives | port |
-|---|---|---|---|---|
-| Event VM | `cs:0x773D` entry, `cs:0x7758` fetch loop (file `0x3773D`–`0x37C61`) | `ds:0x51FB`+ scripts; `ds:0x50E3` jump table (40 far pointers); `ds:0x5183` event slots | timed events, ambushes, tributes, uprisings, endgame checks, modal dialogs, HUD reprints | `game/{vm,vops,vimpl,vdir,vev,vup,vplan,vmac,vord,vend,vhud,vhost,jtab}.rs` |
-| Draw sequencer | `cs:0x5C1E` (file `0x35C1E`–`0x35C96`) | `cs:` stream of 4-byte `{op, pad}` records | per-machine-type animation: image index, delay, link, end | `game/seq.rs` |
-| Print interpreter | `cs:0x6709` (file `0x36709`, `print_str`) | `ds:` strings, `0xFF`-terminated, with embedded control bytes `0x01`–`0x04` | ticker/status text: glyph draws, cursor moves, run-length repeats | `game/text.rs` |
-| Music stream decoder | PC-speaker module file `0xC00`; per-channel step `cs:0xF3D` (Tandy `0x1C02`, AdLib `ar_*`) | `cs:` byte streams per channel; bytes `≥0x80` index an opcode jump table (`cs:0x32`), `<0x80` index the note table | tracker music + SFX on speaker, Tandy SN76489, AdLib OPL2 | `audio/{pc_step,pc_ops,tandy_step,tandy_ops,ar_*}.rs` |
-| Menu text | `ss:` stream at `cs:0xF672`, glyph loop `0x2F640` | byte stream: `0x20` tile clear, `0xF0` newline, `0x00` end, `0xFF` save+suspend, else letter → tile blit | menu pages, the victory credits scroll | `game/vend/seq/scroll.rs`, `game/title/credits.rs` |
+The checked-in `@generated` sources are produced by `xgen` and must be
+reproducible from it — never hand-edit them:
+
+```sh
+cd rust
+cargo run --bin xgen          # rewrite src/{game/script,game/seqtab,game/texttab,audio/{pc,t}tab,front/text/stream}
+cargo run --bin xgen -- --check   # verify the tree is current (exit 3 on drift)
+```
+
+`xgen` reads the committed `data/{low,dgroup,cs}.bin` blobs, prepends
+the shared `#![allow(...)]` lint header, and normalises every emitted
+file through `rustfmt` (edition 2021 — it must be on `PATH`), so the
+files it writes are byte-identical to what `--check` compares against;
+no `cargo fmt` pass is needed afterwards. Regenerate after changing a
+blob or an emitter template, and keep the regeneration in the same
+commit as the template change that produced it.
 
 ## The event VM in one paragraph
 
@@ -98,11 +107,16 @@ convention.
   sequencer — cs:0x5C1E", `print_str` at file `0x36709`, § "PC speaker
   driver" (opcode jump table `cs:0x32`), the `menu_text` row in the
   routine tables.
-- Rust port: `vops::run` (`rust/src/game/vops.rs`) is the
-  `cs:0x773D`+`cs:0x7758` pair; `op`/`op2`/`op3` are the jump-table
-  dispatch; `tick.rs` routes `Tick::Script` through it. `seq.rs`,
-  `text.rs`, `audio/pc_step.rs`, `vend/seq/scroll.rs` port the other
-  four interpreters.
+- Rust port: `game/script/run.rs` maps each event slot's `si` to a
+  compiled `evNN::run` (one native fn per shipped script — the
+  `cs:0x773D`/`0x7758` pair transpiled); `tick.rs` routes
+  `Tick::Script` through it. `game/seqtab::at`, `game/texttab::at`,
+  `audio/{pctab,ttab}::at`, and `front/text/stream::at` are the other
+  four streams as typed tables consumed by `seq.rs`, `text.rs`,
+  `pc_step.rs`/`tandy_step.rs`, and `front/text/walk.rs`.
+- Codegen: `rust/src/bin/xgen/` — `scripts.rs` (event VM), `seqs.rs`
+  (sequencer), `texts.rs` (print strings), `songs.rs` (PC/Tandy),
+  `menus.rs` (menu text), `out.rs` (header + `rustfmt` + write/check).
 - Tests: `rust/tests/{game_vm,game_seq,game_tick}.rs`,
   `rust/tests/audio_{pc,tandy,ar}.rs`.
 
@@ -111,7 +125,8 @@ convention.
 The game does not run *all* its code in a VM — the bulk is compiled
 8086. But the original authors did ship a real opcode-dispatch
 interpreter for scripted events, plus smaller bytecode engines for
-text, animation, music and menu pages. In the Rust port those same
-interpreters run the shipped bytecode out of the original image; the
-port is a reimplementation of the interpreters and the native routines
-alike, not an emulator and not a script translator.
+text, animation, music and menu pages. In the Rust port those streams
+are transpiled to native Rust at build time by `xgen`; the runtime
+executes the compiled tables and functions directly, so the port is a
+reimplementation of the game logic — not an emulator and not a
+bytecode interpreter.

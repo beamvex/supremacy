@@ -2,8 +2,12 @@
 //! overlong `match` bodies across per-chunk files (the project caps
 //! files at 200 lines).
 
+use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::ExitCode;
+use std::process::{Command, ExitCode, Stdio};
+
+/// The lint header every generated file carries.
+const HEADER: &str = "#![allow(\n    clippy::too_many_lines,\n    clippy::cast_sign_loss,\n    clippy::match_same_arms,\n    clippy::unreachable,\n    missing_docs\n)]\n";
 
 /// Accumulates writes; `--check` compares instead of writing.
 pub struct Out {
@@ -22,11 +26,14 @@ impl Out {
         }
     }
 
-    /// Write (or verify) `rel` under `src/` with content `text`.
+    /// Write (or verify) `rel` under `src/` with content `text`; the
+    /// lint header is prepended and the result `rustfmt`-normalised so
+    /// `--check` compares committed form, not emitter form.
     pub fn file(&mut self, rel: &str, text: &str) {
+        let text = fmt(&format!("{HEADER}{text}"));
         let p = self.root.join(rel);
         if self.check {
-            check(&p, text, &mut self.drift);
+            check(&p, &text, &mut self.drift);
             return;
         }
         if let Some(d) = p.parent() {
@@ -58,4 +65,27 @@ fn check(p: &Path, text: &str, drift: &mut bool) {
             *drift = true;
         }
     }
+}
+
+/// `rustfmt` (edition 2021) `text` → committed form.
+fn fmt(text: &str) -> String {
+    let mut c = Command::new("rustfmt")
+        .args(["--edition", "2021"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("xgen needs `rustfmt` on PATH");
+    c.stdin
+        .take()
+        .expect("stdin")
+        .write_all(text.as_bytes())
+        .expect("rustfmt stdin");
+    let o = c.wait_with_output().expect("rustfmt");
+    assert!(
+        o.status.success(),
+        "rustfmt: {}",
+        String::from_utf8_lossy(&o.stderr)
+    );
+    String::from_utf8(o.stdout).expect("rustfmt emitted non-utf8")
 }

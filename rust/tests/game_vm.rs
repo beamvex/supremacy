@@ -199,4 +199,3 @@ fn tick_dispatches_script_events() {
     assert!(matches!(tick, game::Tick::Script(_)));
     assert_eq!(NullHost.svc(Call::Menu), 0); // sink drops host calls
 }
-

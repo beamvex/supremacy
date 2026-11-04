@@ -136,11 +136,7 @@ impl<P: Ports> Ar<P> {
         let mut dx = self.s16(para, *si);
         *si += 2;
         let mut cells = [super::ar::ArCell::default(); 8];
-        for (c, cell) in cells
-            .iter_mut()
-            .enumerate()
-            .take(usize::from(self.nchans()))
-        {
+        for cell in cells.iter_mut().take(usize::from(self.nchans())) {
             match (dx >> 14) & 3 {
                 1 => {
                     cell.kind = self.s8(para, *si);
