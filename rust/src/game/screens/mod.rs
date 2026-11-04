@@ -17,6 +17,13 @@
 //! checks [`handed_off`] after its `menu::service` and unwinds, the
 //! one place the port has to model the `pop ax` abandon itself.
 
+mod bact;
+mod bcommit;
+mod bfield;
+mod bfly;
+mod borb;
+mod bpaint;
+mod bren;
 mod build;
 mod dact;
 mod dbars;

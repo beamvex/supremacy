@@ -11,7 +11,7 @@ use super::super::rec::{F_LINK_A, F_LINK_B, F_LINK_C, F_SERIAL};
 use super::super::text;
 use super::super::vhost::Call;
 use super::super::vops::Ctx;
-use super::{dfield, galmsg};
+use super::{bact, dfield, galmsg};
 
 /// `u16` casts for the `ds:`/record constants.
 macro_rules! a {
@@ -32,7 +32,7 @@ const S_RUN: u16 = 0x69A7;
 const M_CREW: u16 = 0x14;
 
 /// The `0x9D60` records' `+0xC` words — both windows' forms.
-/// Anything else drops to the `Call::Native` sink.
+/// Anything else falls through to the build screen's [`bact`].
 pub(super) fn dispatch(c: &mut Ctx, t: u16) {
     match t {
         0x5B16 | 0xC866 => bay_pick(c, a!(F_LINK_A)),
@@ -50,7 +50,7 @@ pub(super) fn dispatch(c: &mut Ctx, t: u16) {
         0x5AD3 | 0xC823 => cell_sel(c, 3),
         0x5ADB | 0xC82B => cell_sel(c, 4),
         0x5AE3 | 0xC833 => cell_sel(c, 5),
-        _ => drop(c.host.svc(Call::Native(t))),
+        _ => bact::dispatch(c, t),
     }
 }
 

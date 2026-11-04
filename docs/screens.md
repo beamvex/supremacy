@@ -155,7 +155,13 @@ destination pick on the starmap — deploy a landed unit onto the planet
   `order_build` from the orders screen.
 - **Icon:** <img src="screens/icons/build.png" alt="build" width="60" height="51" style="image-rendering:pixelated"> — rocket streaking
   right over sparks, top row of the shell toolbar.
-- **Rust:** ported — `screens/build.rs`.
+- **Rust:** ported — `screens/build.rs` plus the `0xA482` list
+  actions in `screens/bact.rs`/`borb.rs`/`bren.rs` (`bmach_sel`,
+  `build_xfer`, `build_orbit`, `build_deploy`, `build_rename`, the
+  `0x7119` machine click), the `0x540C` launch/destination pick in
+  `screens/bfly.rs`/`bcommit.rs`, and the `0x4EB6` redraw +
+  `0x6FB8`/`0x6FBF`/`0x6FD2` grid paints in `screens/bfield.rs`/
+  `bpaint.rs` (`tests/game_build.rs`).
 
 ### 10. Fleet screen <img src="screens/icons/fleet.png" alt="fleet" width="60" height="51" style="image-rendering:pixelated"> — uimode 1, `cs:0x5F12`/`0x5F15`
 (list `ds:0xAEEE`, 11 records)

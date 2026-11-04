@@ -7,7 +7,7 @@ use super::super::consts::{
 use super::super::vhost::Call;
 use super::super::vops::{vsync, Ctx};
 use super::super::{dialog, menu, selrec, seq, status, tick_step};
-use super::{bump, dfield, handed_off, install, leave};
+use super::{bfield, bpaint, bren, bump, dfield, handed_off, install, leave, ordlist};
 
 /// `u16` casts for the `ds:` slot constants.
 macro_rules! a {
@@ -36,8 +36,8 @@ pub fn enter_build(c: &mut Ctx, win: bool) {
     dfield::bays(c);
     c.host.svc(Call::Icon(0x163, 0x21, 0x33));
     cells(c);
-    c.host.svc(Call::Native(0x4C8B));
-    c.host.svc(Call::Native(0x6FBF));
+    dfield::name(c);
+    bpaint::mach_mode(c);
     status::tick_day(c);
     c.vm.w16(c.st, a!(SEQ_PTR), 0x424);
     c.vm.w16(c.st, a!(SEQ_DELAY), 0);
@@ -63,13 +63,12 @@ fn cells(c: &mut Ctx) {
 /// input, menu — exits via `0x5EE6` + stash + `jmp 0x2CC5`.
 fn frame_loop(c: &mut Ctx) {
     loop {
-        c.host.svc(Call::Native(0x4EB6));
-        let f = if c.vm.r8(c.st, 0x91E2) == 0 {
-            0x701D
+        bfield::redraw(c);
+        if c.vm.r8(c.st, bpaint::PICK) == 0 {
+            ordlist::list_click(c);
         } else {
-            0x7119
-        };
-        c.host.svc(Call::Native(f));
+            bren::mach_click(c);
+        }
         vsync(c);
         seq::seq_step(c);
         let _ = tick_step(c);
