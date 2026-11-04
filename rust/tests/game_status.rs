@@ -62,3 +62,154 @@ fn status_empty_bays_print_marker() {
     }
     assert!(!r.host.0.contains(&Call::Native(0x595C)));
 }
+
+// ---------------------------------------------------------------------------
+// The `0x9D60` list's bay/cell actions (GAM-76, round 3) — the
+// "DOCKING BAY TO PLANET SURFACE TRANSFERENCE SYSTEM" rows: `bay_pick`
+// moves a docked unit into the held cells, `cell_load` docks it back,
+// `cell_sel` marks it RUNNING — all through the real `Game` + `Pump`
+// input path.
+
+use common::game_dir;
+use supremacy::args::{Sound, Video};
+use supremacy::assets::{heap_segment, load_set};
+use supremacy::front::{Game, Pump};
+use supremacy::palette::{from_dac, DAC_OFS};
+
+/// `ds:` base of the six held-unit cells `0x59EB` fills.
+const CELLS: u16 = 0x5017;
+
+fn game() -> Game {
+    let img = supremacy::img::image();
+    Game::new(
+        img.clone(),
+        load_set(&game_dir(), "MCG", heap_segment()).unwrap(),
+        from_dac(&img[DAC_OFS..DAC_OFS + 768]),
+        Video::Mcga,
+        Sound::PcSpeaker,
+        false,
+        3,
+        0x42,
+        Box::new(supremacy::platform::MemFs::new()),
+    )
+}
+
+/// Colonised record, `SEL_REC`/`REC_CUR` on it, bay A docked with
+/// machine 0 hosted on the record's serial — returns `(rec, m)`.
+fn docked(g: &mut Game) -> (u16, u16) {
+    let rec = g.st.word(game::REC_BASE);
+    g.st.set_word(usize::from(rec) + 0xC, 0xA);
+    g.st.set_byte(usize::from(rec) + 0x18, 1);
+    g.st.set_byte(usize::from(rec) + 0x1C, 0);
+    g.st.set_byte(usize::from(rec) + 0x20, 0);
+    g.st.set_word(game::REC_CUR, rec);
+    g.st.set_word(game::SEL_REC, rec);
+    let m = u16::try_from(game::MACH_BASE).unwrap_or(0);
+    for (i, &ch) in b"MINER...".iter().enumerate() {
+        g.st.set_byte(usize::from(m) + i, ch);
+    }
+    g.st.set_byte(usize::from(m) + 8, 0xFF);
+    g.st.set_byte(usize::from(m) + game::M_TYPE, 6);
+    g.st.set_byte(usize::from(m) + game::M_FLAGS, 0);
+    g.st.set_byte(
+        usize::from(m) + game::M_HOST,
+        g.st.byte(usize::from(rec) + game::F_SERIAL),
+    );
+    (rec, m)
+}
+
+/// The `cs:0x5867` entry with `steps` scripted through the vsync
+/// hook — same `Pump` contract `game_surface` drives.
+fn run(g: &mut Game, steps: impl FnMut(u16, &mut Pump) + 'static) {
+    let mut n = 0u16;
+    let mut steps = steps;
+    g.host.set_vsync(Some(Box::new(move |h| {
+        n += 1;
+        steps(n, &mut h.pump);
+    })));
+    game::dispatch_action(&mut g.ctx(), 0xC5B7);
+    g.host.set_vsync(None);
+}
+
+/// Click `rect` at `n`, release two beats later, right-exit at the
+/// tail — the debounced `menu::service` press/release shape.
+fn click(p: &mut Pump, x: u16, y: u16) {
+    p.move_to(x, y);
+    p.set_buttons(true, false);
+}
+
+/// Bay A's `(5,140)`–`(55,150)` row → the unit leaves the bay into
+/// held cell 0: `+0x1F | 0x10`, `ds:0x5017` filled, `0x91DD` armed.
+#[test]
+fn status_bay_pick_moves_unit_to_cells() {
+    let mut g = game();
+    let (rec, m) = docked(&mut g);
+    run(&mut g, |n, p| match n {
+        5 => click(p, 0x20, 0x92),
+        9 => p.set_buttons(false, false),
+        13 => p.set_buttons(false, true),
+        17 => p.set_buttons(false, false),
+        _ => {}
+    });
+    assert_eq!(g.st.byte(usize::from(rec) + 0x18), 0, "bay A cleared");
+    assert_eq!(g.st.byte(usize::from(m) + game::M_FLAGS) & 0x10, 0x10);
+    assert_eq!(g.st.byte(0x91DD), 0xFF, "the redraw latch arms");
+    assert_eq!(g.vm.r16(&g.st, CELLS), m, "held cell 0");
+}
+
+/// A held unit at entry packs into cell 0; the `(73,117)`–`(110,150)`
+/// `cell_load` row re-docks it into the first free bay.
+#[test]
+fn status_cell_load_redocks_held_unit() {
+    let mut g = game();
+    let (rec, m) = docked(&mut g);
+    g.st.set_byte(usize::from(rec) + 0x18, 0);
+    g.st.set_byte(usize::from(m) + game::M_FLAGS, 0x10);
+    run(&mut g, |n, p| match n {
+        5 => click(p, 0x5A, 0x85),
+        9 => p.set_buttons(false, false),
+        13 => p.set_buttons(false, true),
+        17 => p.set_buttons(false, false),
+        _ => {}
+    });
+    assert_eq!(g.st.byte(usize::from(rec) + 0x18), 1, "bay A re-docked");
+    assert_eq!(g.st.byte(usize::from(m) + game::M_FLAGS) & 0x30, 0);
+    assert_eq!(g.vm.r16(&g.st, CELLS), 0, "held cell emptied");
+}
+
+/// The `(75,106)`–`(110,114)` `cell_sel` row toggles `+0x1F` `0x20`
+/// — the RUNNING mark — on a crewed kind-`6` unit.
+#[test]
+fn status_cell_sel_marks_running() {
+    let mut g = game();
+    let (rec, m) = docked(&mut g);
+    g.st.set_byte(usize::from(rec) + 0x18, 0);
+    g.st.set_byte(usize::from(m) + game::M_FLAGS, 0x10);
+    g.st.set_word(usize::from(m) + 0x14, 5);
+    run(&mut g, |n, p| match n {
+        5 => click(p, 0x5A, 0x6E),
+        9 => p.set_buttons(false, false),
+        13 => p.set_buttons(false, true),
+        17 => p.set_buttons(false, false),
+        _ => {}
+    });
+    assert_eq!(g.st.byte(usize::from(m) + game::M_FLAGS) & 0x20, 0x20);
+    assert_eq!(g.vm.r16(&g.st, CELLS), m, "still held");
+}
+
+/// Empty bay B's pick takes the `0x5B3C` refuse — no flags, no cell.
+#[test]
+fn status_bay_pick_empty_refuses() {
+    let mut g = game();
+    let (rec, m) = docked(&mut g);
+    run(&mut g, |n, p| match n {
+        5 => click(p, 0x20, 0xA0),
+        9 => p.set_buttons(false, false),
+        13 => p.set_buttons(false, true),
+        17 => p.set_buttons(false, false),
+        _ => {}
+    });
+    assert_eq!(g.st.byte(usize::from(rec) + 0x18), 1, "bay A untouched");
+    assert_eq!(g.st.byte(usize::from(m) + game::M_FLAGS) & 0x10, 0);
+    assert_eq!(g.vm.r16(&g.st, CELLS), 0);
+}

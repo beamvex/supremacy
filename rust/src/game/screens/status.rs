@@ -7,7 +7,7 @@ use super::super::rec::F_OWNER;
 use super::super::vhost::Call;
 use super::super::vops::{kind_of, vsync, Ctx};
 use super::super::{menu, selrec, shell, text, tick_step};
-use super::{bump, dfield, handed_off, install, leave};
+use super::{bump, dfield, handed_off, install, leave, stact};
 
 /// `u16` casts for the `ds:` slot constants.
 macro_rules! a {
@@ -72,7 +72,7 @@ fn body(c: &mut Ctx) {
     text::print_str(c, name, 3, 0x76);
     dfield::bays_status(c);
     text::print_str(c, 0x7BB8, 4, 0xB4);
-    c.host.svc(Call::Native(0x59EB));
+    stact::cells(c);
     c.host.svc(Call::Native(0xEA12));
     frame_loop(c);
 }
