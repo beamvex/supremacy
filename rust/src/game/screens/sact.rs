@@ -193,7 +193,7 @@ fn advance(bx: u16, dx: u16, grid: bool) -> (u16, u16) {
 }
 
 /// `0x4257`/`0x425D` — refuse `si` at `(bx,0x59)`, wait, `0x68BB` erase.
-fn refuse(c: &mut Ctx, s: u16, bx: u16) {
+pub(super) fn refuse(c: &mut Ctx, s: u16, bx: u16) {
     text::print_str(c, s, bx, 0x59);
     galmsg::wait(c);
     text::print_str(c, 0x68BB, 7, 0x59);

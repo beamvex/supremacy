@@ -10,7 +10,7 @@ use super::super::vhost::Call;
 use super::super::vops::{kind_of, vsync, Ctx};
 use super::super::{menu, seq, shell, text, tick_step};
 use super::detail::S_REFUSE;
-use super::{bump, dfield, handed_off, install, leave, sact, snd};
+use super::{bump, dfield, handed_off, install, leave, sact, sgrid, snd};
 
 /// `u16` casts for the `ds:` slot constants.
 macro_rules! a {
@@ -138,14 +138,14 @@ fn table(c: &mut Ctx) {
 }
 
 /// `0x40EC` — the record `+0xE` name at `(3,0xE)`, `0x4B71`, `0x736C`
-/// at `(0x34,0x4E)`, `0x442E`, `0x4AFD`.
+/// at `(0x34,0x4E)`, `0x442E`, `0x4AFD` (the bay auto-select).
 fn header(c: &mut Ctx) {
     let rec = c.vm.r16(c.st, a!(SEL_REC));
     text::print_str(c, rec + 0xE, 3, 0xE);
     c.host.svc(Call::Native(0x4B71));
     text::print_str(c, 0x736C, 0x34, 0x4E);
     c.host.svc(Call::Native(0x442E));
-    c.host.svc(Call::Native(0x4AFD));
+    sgrid::autoselect(c);
 }
 
 /// The `0x411D` frame loop — `{vsync, seq, 0x4974, 0x50A9, 0x5E83,
@@ -156,7 +156,9 @@ fn frame_loop(c: &mut Ctx) {
     loop {
         vsync(c);
         seq::seq_step(c);
-        for f in [0x4974, 0x50A9, 0x5E83, 0xA369] {
+        sgrid::dirty(c);
+        sgrid::grid(c);
+        for f in [0x5E83, 0xA369] {
             c.host.svc(Call::Native(f));
         }
         menu::service(c);

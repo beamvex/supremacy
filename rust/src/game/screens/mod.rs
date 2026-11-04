@@ -38,6 +38,7 @@ mod ordbar;
 mod orders;
 mod ordlist;
 mod sact;
+mod sgrid;
 mod spy;
 mod status;
 mod surface;
