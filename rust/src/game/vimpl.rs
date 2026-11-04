@@ -1,5 +1,7 @@
-//! The simple event-VM ops — flag/flag-wait, print, register load,
+//! The simple event ops — flag/flag-wait, print, register load,
 //! copy/store/add immediates, countdown delay, menu/dialog host calls.
+//! GAM-80: operands are baked in by `xgen`; these are the shared bodies
+//! the compiled `script::evNN` functions call.
 
 use super::consts::REC_COUNT;
 use super::text;
@@ -9,8 +11,7 @@ use super::vops::Ctx;
 
 /// `0x7769`/`0x78C7` — suspend while `byte[p] != set` / while
 /// `byte[p] == 0`.
-pub fn wait_b(c: &mut Ctx, si: &mut u16, set: bool) -> Flow {
-    let p = c.vm.slot(c.st, si);
+pub fn wait_b(c: &mut Ctx, p: u16, set: bool) -> Flow {
     if (c.vm.r8(c.st, p) != 0) == set {
         Flow::Cont
     } else {
@@ -19,9 +20,7 @@ pub fn wait_b(c: &mut Ctx, si: &mut u16, set: bool) -> Flow {
 }
 
 /// `0x7796` — suspend until `byte[p] == imm8`.
-pub fn wait_eq_b(c: &mut Ctx, si: &mut u16) -> Flow {
-    let p = c.vm.slot(c.st, si);
-    let i = u8::try_from(c.vm.imm(c.st, si)).unwrap_or(0);
+pub fn wait_eq_b(c: &mut Ctx, p: u16, i: u8) -> Flow {
     if c.vm.r8(c.st, p) == i {
         Flow::Cont
     } else {
@@ -29,15 +28,8 @@ pub fn wait_eq_b(c: &mut Ctx, si: &mut u16) -> Flow {
     }
 }
 
-/// `0x77A5`/`0x77B4` — suspend until `word[p] == imm16` (the `0x77B4`
-/// variant reads its immediate as a full 4-byte slot).
-pub fn wait_eq_w(c: &mut Ctx, si: &mut u16, wide: bool) -> Flow {
-    let p = c.vm.slot(c.st, si);
-    let i = if wide {
-        c.vm.slot(c.st, si)
-    } else {
-        c.vm.imm(c.st, si)
-    };
+/// `0x77A5`/`0x77B4` — suspend until `word[p] == imm16`.
+pub fn wait_eq_w(c: &mut Ctx, p: u16, i: u16) -> Flow {
     if c.vm.r16(c.st, p) == i {
         Flow::Cont
     } else {
@@ -45,10 +37,24 @@ pub fn wait_eq_w(c: &mut Ctx, si: &mut u16, wide: bool) -> Flow {
     }
 }
 
-/// `0x7774` — print the message string at slot `p` (`call 0x6B06`).
-pub fn print(c: &mut Ctx, si: &mut u16) -> Flow {
-    let p = c.vm.slot(c.st, si);
+/// `0x7774` — enqueue the message string at `p` (`call 0x6B06`).
+pub fn print(c: &mut Ctx, p: u16) -> Flow {
     print_at(c, p)
+}
+
+/// `0x77C3` — print the current planet's name record.
+pub fn print_planet(c: &mut Ctx) -> Flow {
+    print_at(c, super::vops::planet_rec(c) + 0xE)
+}
+
+/// `0x77E1` — print the `[0x81EE]` selected record's name.
+pub fn print_sel(c: &mut Ctx) -> Flow {
+    print_at(c, c.vm.r16(c.st, super::vops::R_SEL) + 0xE)
+}
+
+/// `0x7BE8` — print at the `[0x81F2]` machine pointer.
+pub fn print_mach(c: &mut Ctx) -> Flow {
+    print_at(c, c.vm.r16(c.st, super::vops::R_MACH))
 }
 
 /// Print helper shared by the name-print ops.
@@ -58,8 +64,7 @@ pub fn print_at(c: &mut Ctx, addr: u16) -> Flow {
 }
 
 /// `0x7782`/`0x778C` — `byte[p] = 0xFF`/`0`.
-pub fn set_flag(c: &mut Ctx, si: &mut u16, v: u8) -> Flow {
-    let p = c.vm.slot(c.st, si);
+pub fn set_flag(c: &mut Ctx, p: u16, v: u8) -> Flow {
     c.vm.w8(c.st, p, v);
     Flow::Cont
 }
@@ -84,10 +89,9 @@ pub fn rand_planet(c: &mut Ctx) -> Flow {
 }
 
 /// `0x7811`/`0x7825`/`0x7839` — load `n` bytes through
-/// `word[slot] + imm` into the scratch registers.
-pub fn ld_ind(c: &mut Ctx, si: &mut u16, reg: u16, n: u16) -> Flow {
-    let base = c.vm.r16(c.st, c.vm.slot(c.st, si));
-    let a = base.wrapping_add(c.vm.imm(c.st, si));
+/// `word[p] + imm` into the scratch registers.
+pub fn ld_ind(c: &mut Ctx, p: u16, i: u16, reg: u16, n: u16) -> Flow {
+    let a = c.vm.r16(c.st, p).wrapping_add(i);
     for k in 0..n {
         let b = c.vm.r8(c.st, a.wrapping_add(k));
         c.vm.w8(c.st, reg.wrapping_add(k), b);
@@ -95,10 +99,8 @@ pub fn ld_ind(c: &mut Ctx, si: &mut u16, reg: u16, n: u16) -> Flow {
     Flow::Cont
 }
 
-/// `0x7853`/`0x7866`/`0x7879` — copy `n` bytes `slot → slot`.
-pub fn cp(c: &mut Ctx, si: &mut u16, n: u16) -> Flow {
-    let src = c.vm.slot(c.st, si);
-    let dst = c.vm.slot(c.st, si);
+/// `0x7853`/`0x7866`/`0x7879` — copy `n` bytes `src → dst`.
+pub fn cp(c: &mut Ctx, src: u16, dst: u16, n: u16) -> Flow {
     for k in 0..n {
         let b = c.vm.r8(c.st, src.wrapping_add(k));
         c.vm.w8(c.st, dst.wrapping_add(k), b);
@@ -107,10 +109,8 @@ pub fn cp(c: &mut Ctx, si: &mut u16, n: u16) -> Flow {
 }
 
 /// `0x7893`/`0x78A2`/`0x78B1` — add an immediate to `byte`/`word`/
-/// `dword` at slot `ptr` (the dword form `adc`s the carry).
-pub fn add_imm(c: &mut Ctx, si: &mut u16, n: u16) -> Flow {
-    let add = c.vm.imm(c.st, si);
-    let ptr = c.vm.slot(c.st, si);
+/// `dword` at `ptr` (the dword form `adc`s the carry).
+pub fn add_imm(c: &mut Ctx, ptr: u16, add: u16, n: u16) -> Flow {
     if n == 1 {
         let sum =
             c.vm.r8(c.st, ptr)
@@ -127,29 +127,28 @@ pub fn add_imm(c: &mut Ctx, si: &mut u16, n: u16) -> Flow {
     Flow::Cont
 }
 
-/// `0x78D5`/`0x78E4`/`0x78F3` — store immediate `byte`/`word`/`dword`
-/// at slot `p`.
-pub fn st_imm(c: &mut Ctx, si: &mut u16, n: u16) -> Flow {
-    let lo = c.vm.imm(c.st, si);
-    let hi = if n == 4 { c.vm.imm(c.st, si) } else { 0 };
-    let p = c.vm.slot(c.st, si);
+/// `0x78D5`/`0x78E4` — store immediate `byte`/`word` at `p`.
+pub fn st_imm(c: &mut Ctx, p: u16, lo: u16, _n: u16) -> Flow {
     c.vm.w16(c.st, p, lo);
-    if n == 4 {
-        c.vm.w16(c.st, p + 2, hi);
-    }
+    Flow::Cont
+}
+
+/// `0x78F3` — store an immediate `dword` at `p`.
+pub fn st_imm4(c: &mut Ctx, p: u16, lo: u16, hi: u16) -> Flow {
+    c.vm.w16(c.st, p, lo);
+    c.vm.w16(c.st, p + 2, hi);
     Flow::Cont
 }
 
 /// `0x7908` — `jmp word [si]`: a raw escape to a `cs:` routine. Nothing
 /// returns to the VM, so it suspends.
-pub fn native(c: &mut Ctx, si: &mut u16) -> Flow {
-    c.host.svc(Call::Native(c.vm.r16(c.st, *si)));
+pub fn native(c: &mut Ctx, cs: u16) -> Flow {
+    c.host.svc(Call::Native(cs));
     Flow::Ret
 }
 
 /// `0x79AA` — countdown cell: suspend decrementing while nonzero.
-pub fn delay(c: &mut Ctx, si: &mut u16) -> Flow {
-    let p = c.vm.slot(c.st, si);
+pub fn delay(c: &mut Ctx, p: u16) -> Flow {
     let v = c.vm.r16(c.st, p);
     if v == 0 {
         Flow::Cont

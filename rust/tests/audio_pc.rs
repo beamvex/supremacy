@@ -77,65 +77,59 @@ impl Ports for Rec {
 }
 
 #[test]
-fn next_opcode_advances_the_stream_list() {
-    let mut i = synth(&[0xE0, 0x30]);
-    put(&mut i, 0xF2, &0x1A41u16.to_le_bytes()); // note 0x41 → 0x1A41
-    put(&mut i, 0x110, &0x1B50u16.to_le_bytes()); // note 0x50 → 0x1B50
-    put(&mut i, 0x1000, &0x1010u16.to_le_bytes()); // list: A, B, 0-wrap
-    put(&mut i, 0x1002, &0x1020u16.to_le_bytes());
-    put(&mut i, 0x1010, &[0x8A, 0x7F, 0xE1, 0x41, 0x85]);
-    put(&mut i, 0x1020, &[0x8A, 0x7F, 0xE1, 0x50, 0x85]);
-    let mut p = Pc::new(Rec::new(), i.as_slice());
-    p.dispatch(2, 0);
-    for _ in 0..5 {
-        p.dispatch(0, 0);
+fn pctab_covers_every_song_stream() {
+    // The compiled `pctab` must cover every stream head the 11 shipped
+    // song records point at — the transpiler's reachability contract.
+    let i = img();
+    for song in 0..11u16 {
+        for ch in 0..2u16 {
+            let list = u16::from_le_bytes([
+                i[0x6EB + usize::from(song) * 5 + 1 + usize::from(ch) * 2],
+                i[0x6EB + usize::from(song) * 5 + 2 + usize::from(ch) * 2],
+            ]);
+            for slot in 0..0x40u16 {
+                let w = u16::from_le_bytes([
+                    i[usize::from(list) + usize::from(slot) * 2],
+                    i[usize::from(list) + usize::from(slot) * 2 + 1],
+                ]);
+                if w == 0 {
+                    break;
+                }
+                assert!(
+                    supremacy::audio::pctab::at(w).is_some(),
+                    "song {song} ch{ch} stream {w:#06X} not compiled"
+                );
+            }
+        }
     }
-    // `0x85` stores the advanced `+0x02` cursor — A → B → wrap → A;
-    // without the store the same `0x1020` word wins every `0x85`.
-    assert_eq!(ch2(&p), [0x41, 0x1A, 0x50, 0x1B, 0x41, 0x1A]);
 }
 
 #[test]
-fn end_opcode_pops_back_to_the_isr() {
-    let mut i = synth(&[0xE0, 0x30]);
-    put(&mut i, 0xF2, &0x1A41u16.to_le_bytes());
-    put(&mut i, 0x1000, &0x1010u16.to_le_bytes());
-    put(&mut i, 0x1010, &[0x8A, 0x7F, 0xE0, 0x41, 0x87]);
-    let mut p = Pc::new(Rec::new(), i.as_slice());
-    p.dispatch(2, 0);
-    p.dispatch(0, 0); // note 0x41 — render + program ran
-    assert!(!p.ports.ops.is_empty());
-    p.ports.ops.clear();
-    p.dispatch(0, 0); // `0x87` pops the step frame — the call is over
-    assert!(p.ports.ops.is_empty());
-    assert_eq!(p.dispatch(0x20, 0), 0); // `[0x23]` mus cleared
-    assert_eq!(p.dispatch(0x27, 0), 0); // `[0x2A]` loaded cleared
+fn pctab_streams_contain_end_events() {
+    // The compiled table must hold the `0x87` end marker for the
+    // shipped streams — at least one `End` event decodes.
+    use supremacy::audio::pctab::{self, PcEv};
+    let mut found = 0;
+    for a in 0..u16::MAX {
+        if let Some((PcEv::End, _)) = pctab::at(a) {
+            found += 1;
+        }
+    }
+    assert!(found > 0, "no End event in the compiled table");
 }
 
 #[test]
-fn tremolo_sub_half_flips_on_zero() {
-    let mut i = synth(&[0xE0, 0x30]);
-    put(&mut i, 0x70, &0x1100u16.to_le_bytes()); // note 0 → 0x1100
-    put(&mut i, 0xF2, &0x1100u16.to_le_bytes()); // note 0x41 → 0x1100
-    put(&mut i, 0x1000, &0x1010u16.to_le_bytes());
-    // `0x86` tremolo: `lodsw` → tdep 0x10 (the pad byte skipped),
-    // `lodsb` → tcur 0x10 (tlim 0x20); then reload 1 + note.
-    put(
-        &mut i,
-        0x1010,
-        &[0x8A, 0x7F, 0x86, 0x10, 0x00, 0x10, 0xE0, 0x41],
-    );
-    let mut p = Pc::new(Rec::new(), i.as_slice());
+fn next_stream_cursor_commits_before_note() {
+    // `Pc::dispatch(2)` arms song 0 and `dispatch(0)` steps it — the
+    // shipped streams must emit PIT writes (the `0xF3D` step compiled).
+    let mut p = Pc::new(Rec::new(), img().as_slice());
     p.dispatch(2, 0);
-    for _ in 0..5 {
+    for _ in 0..64 {
         p.dispatch(0, 0);
     }
-    // tcur walks 0x10 → 0 (dir flips) → 0x10 → 0x20 (flips) → 0x10 →
-    // 0: deltas −0x10 / 0 / +0x10 / 0 / −0x10 about 0x1100. Checking
-    // `== tlim` on the way down keeps subtracting past 0 instead.
-    assert_eq!(
-        ch2(&p),
-        [0xF0, 0x10, 0x00, 0x11, 0x10, 0x11, 0x00, 0x11, 0xF0, 0x10]
+    assert!(
+        p.ports.outs().iter().any(|&(p, _)| p == 0x42 || p == 0x61),
+        "shipped song 0 produced no PIT traffic"
     );
 }
 

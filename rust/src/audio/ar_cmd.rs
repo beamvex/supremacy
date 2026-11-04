@@ -40,6 +40,7 @@ impl<P: Ports> Ar<P> {
         }
         self.all_off();
         self.map_bound();
+        self.decode_q();
         self.mvol = self.dvol;
         self.mvol_apply();
         self.volc = [0; 16];
@@ -53,7 +54,7 @@ impl<P: Ports> Ar<P> {
             c.last_prog = 0xFF;
         }
         self.fade = 0;
-        self.cur = 0x118;
+        self.cur = 0;
         self.pass = 0;
         self.en = 0xFF;
     }

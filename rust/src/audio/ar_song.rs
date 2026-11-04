@@ -117,6 +117,52 @@ impl<P: Ports> Ar<P> {
         }
     }
 
+    /// GAM-80 — decode every `map` page's queue bars into
+    /// `qpages[idx]` — the variable-length records become typed
+    /// [`ArCell`] rows so `service`'s `fetch` is a lookup.
+    pub(super) fn decode_q(&mut self) {
+        self.qpages.clear();
+        for i in 0..self.nmap {
+            let para = self.t16(u16::from(self.map(u8::try_from(i).unwrap_or(0))));
+            let page = (0..0x40)
+                .scan(0x118u16, |si, _| Some(self.qbar(para, si)))
+                .collect();
+            self.qpages.push(page);
+        }
+    }
+
+    /// Decode one bar at `(para, si)`; advances `si` past its events.
+    fn qbar(&self, para: u16, si: &mut u16) -> [super::ar::ArCell; 8] {
+        let mut dx = self.s16(para, *si);
+        *si += 2;
+        let mut cells = [super::ar::ArCell::default(); 8];
+        for cell in cells.iter_mut().take(usize::from(self.nchans())) {
+            match (dx >> 14) & 3 {
+                1 => {
+                    cell.kind = self.s8(para, *si);
+                    cell.param = self.s8(para, *si + 1);
+                    *si += 2;
+                }
+                2 => {
+                    cell.notes[0] = self.s8(para, *si);
+                    cell.prog = self.s8(para, *si + 1);
+                    *si += 2;
+                }
+                3 => {
+                    let b = self.rec(usize::from(para) * 16 + usize::from(*si), 7);
+                    cell.notes.copy_from_slice(&b[..4]);
+                    cell.prog = b[4];
+                    cell.kind = b[5];
+                    cell.param = b[6];
+                    *si += 7;
+                }
+                _ => {}
+            }
+            dx <<= 2;
+        }
+        cells
+    }
+
     /// `0x22A4` — `nmap` (`[0x1FD2]`) = one past the last nonzero
     /// `map` index (scanning `map[0x7F]` down to `map[1]`; `1` when
     /// all are zero — the loop's `inc cx` tail).

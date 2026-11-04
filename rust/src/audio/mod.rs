@@ -66,6 +66,7 @@ mod pc_ops;
 mod pc_step;
 mod pc_tick;
 mod pc_voice;
+pub mod pctab;
 mod ports;
 mod speaker;
 mod spk_note;
@@ -76,6 +77,7 @@ mod tandy_sfx;
 mod tandy_step;
 mod tandy_tick;
 mod tandy_voice;
+pub mod ttab;
 
 pub use ar::Ar;
 pub use mpu::Mpu;

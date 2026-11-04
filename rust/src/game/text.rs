@@ -1,6 +1,6 @@
-//! The text layer — `cs:0x6709` string-print interpreter (file
-//! `0x36709`–`0x36791`) and the `0x6B06` ticker enqueue (file
-//! `0x36B06`–`0x36B49`).
+//! The text layer — the `cs:0x6709` string printer (file
+//! `0x36709`–`0x36791`), now compiled, and the `0x6B06` ticker enqueue
+//! (file `0x36B06`–`0x36B49`).
 //!
 //! Interpreter operand bytes: `0xFF` ends the string; `≥ 0x20` draws a
 //! glyph via `[0x1268]` (`Call::Glyph`) at `(bx·4px, dx)` then `bx += 1`;
@@ -15,6 +15,7 @@
 
 use super::cells::{OVERLAY_F, TICK_LEFT, TICK_PUT};
 use super::consts::{PANEL_ON, SND_ON, UIMODE};
+use super::texttab;
 use super::vhost::Call;
 use super::vops::{vsync, Ctx};
 use super::{seq, tick_step};
@@ -33,52 +34,50 @@ const TICK_BASE: u16 = 0x928D;
 /// `cs:0x6709` — print the string at `ds:si`, cursor `(bx, dx)`.
 /// Returns `bx` advanced past the emitted chars — the sidebar and
 /// machine-list sites chain the next print off it.
-pub fn print_str(c: &mut Ctx, mut si: u16, mut bx: u16, mut dx: u16) -> u16 {
+///
+/// GAM-80: strings containing `0x01..0x04` control bytes are compiled
+/// to [`texttab`] draw lists and replayed; everything else is a plain
+/// glyph run (`≥ 0x20` → `Call::Glyph`, `< 0x20`/`0xFF` ends).
+pub fn print_str(c: &mut Ctx, si: u16, bx: u16, dx: u16) -> u16 {
+    if let Some(s) = texttab::at(si) {
+        let ok = (0..4).all(|k| c.vm.r8(c.st, si + k) == s.sig[usize::from(k)]);
+        if ok {
+            return replay(c, bx, dx, s);
+        }
+    }
+    plain(c, si, bx, dx)
+}
+
+/// A compiled draw list — each [`Draw`][texttab::Draw] carries its
+/// cursor deltas and the `pace` gate; `s.bx` is the net `bx` return.
+fn replay(c: &mut Ctx, bx: u16, dx: u16, s: &texttab::Dec) -> u16 {
+    for d in s.draws {
+        put(
+            c,
+            d.ch,
+            bx.wrapping_add(d.bx.cast_unsigned()),
+            dx.wrapping_add(d.dx.cast_unsigned()),
+        );
+        if d.pace {
+            pace(c);
+        }
+    }
+    bx.wrapping_add(s.bx.cast_unsigned())
+}
+
+/// A plain run — glyphs `≥ 0x20` at `bx += 1`; ends on `0xFF` or any
+/// control byte (dynamic strings never carry `0x01..0x04`).
+fn plain(c: &mut Ctx, mut si: u16, mut bx: u16, dx: u16) -> u16 {
     loop {
         let al = c.vm.r8(c.st, si);
         si = si.wrapping_add(1);
-        if al == 0xFF || (al < 0x20 && !esc(c, al, &mut si, &mut bx, &mut dx)) {
+        if al == 0xFF || al < 0x20 {
             return bx;
         }
-        if al >= 0x20 {
-            put(c, al, bx, dx);
-            pace(c);
-            bx = bx.wrapping_add(1);
-        }
+        put(c, al, bx, dx);
+        pace(c);
+        bx = bx.wrapping_add(1);
     }
-}
-
-/// The `0x01`/`0x02`/`0x03`/`0x04` escapes — returns `false` for the
-/// control bytes that terminate the print (file `0x36712`–`0x36791`).
-fn esc(c: &mut Ctx, al: u8, si: &mut u16, bx: &mut u16, dx: &mut u16) -> bool {
-    match al {
-        0x01 | 0x02 => {
-            let n = i8::from_ne_bytes([c.vm.r8(c.st, *si)]);
-            *si = si.wrapping_add(1);
-            let cell = if al == 0x01 { dx } else { bx };
-            *cell = cell.wrapping_add(u16::from_ne_bytes(i16::from(n).to_ne_bytes()));
-            true
-        }
-        0x03 | 0x04 => repeat(c, c.vm.r16(c.st, *si), bx, dx, al == 0x04, si),
-        _ => false,
-    }
-}
-
-/// `0x03`/`0x04` — `{count, char}` word; draw `count` times (`≥ 1`),
-/// `bx += 1` across or `dx += 6` down (file `0x3675B`/`0x36775`).
-fn repeat(c: &mut Ctx, w: u16, bx: &mut u16, dx: &mut u16, vert: bool, si: &mut u16) -> bool {
-    *si = si.wrapping_add(2);
-    let n = u8::try_from(w & 0xFF).unwrap_or(0).max(1);
-    let ch = u8::try_from(w >> 8).unwrap_or(0);
-    for _ in 0..n {
-        put(c, ch, *bx, *dx);
-        if vert {
-            *dx = dx.wrapping_add(6);
-        } else {
-            *bx = bx.wrapping_add(1);
-        }
-    }
-    true
 }
 
 /// `0x68D6` — `[0x1268]` glyph put at `(bx, dx)`; shared by `0x6709`

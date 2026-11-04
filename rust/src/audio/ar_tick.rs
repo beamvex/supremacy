@@ -75,11 +75,11 @@ impl<P: Ports> Ar<P> {
     }
 
     /// `0x23BC` — the queue-`advance`/`reset` block: `cur` back to
-    /// `0x118`, counters clear, `idx++`, wrapped to `hdr[0xD9]` at
+    /// bar 0, counters clear, `idx++`, wrapped to `hdr[0xD9]` at
     /// `nmap`.
     fn advance(&mut self) {
         self.cnt = 0;
-        self.cur = 0x118;
+        self.cur = 0;
         self.rst = 0;
         self.pass = 0;
         self.idx = self.idx.wrapping_add(1);
@@ -88,47 +88,24 @@ impl<P: Ports> Ar<P> {
         }
     }
 
-    /// `0x2317` — one queue `fetch`. `dx` = the 8-channel class bitmap
-    /// at the cursor (2 bits per channel, MSB first): `0` leaves the
-    /// cleared record, `1` reads `{kind, param}`, `2` `{note, prog}`,
-    /// `3` the full 7-byte record. The cursor advances past the
-    /// variable-length events.
+    /// `0x2317` — one queue `fetch`, compiled (GAM-80): `qpages[idx]`
+    /// holds the page's bars decoded at `select`, `cur` counts bars.
+    /// `dx`'s 2-bit classes became [`ArCell`] records at decode time.
     fn fetch(&mut self) {
-        let para = self.t16(u16::from(self.map(self.idx)));
-        let mut si = self.cur;
-        let mut dx = self.s16(para, si);
-        si += 2;
-        for c in 0..usize::from(self.nchans()) {
-            self.chans[c].notes = [0; 4];
-            self.chans[c].prog = 0;
-            self.chans[c].kind = 0;
-            self.chans[c].param = 0;
-            match (dx >> 14) & 3 {
-                1 => {
-                    self.chans[c].kind = self.s8(para, si);
-                    self.chans[c].param = self.s8(para, si + 1);
-                    si += 2;
-                }
-                2 => {
-                    self.chans[c].notes[0] = self.s8(para, si);
-                    self.chans[c].prog = self.s8(para, si + 1);
-                    si += 2;
-                }
-                3 => {
-                    let b = self
-                        .rec(usize::from(para) * 16 + usize::from(si), 7)
-                        .to_vec();
-                    self.chans[c].notes.copy_from_slice(&b[..4]);
-                    self.chans[c].prog = b[4];
-                    self.chans[c].kind = b[5];
-                    self.chans[c].param = b[6];
-                    si += 7;
-                }
-                _ => {}
-            }
-            dx <<= 2;
+        let cells = self
+            .qpages
+            .get(usize::from(self.idx))
+            .and_then(|p| p.get(usize::from(self.cur)))
+            .copied()
+            .unwrap_or_default();
+        self.cur = self.cur.wrapping_add(1);
+        let n = usize::from(self.nchans());
+        for (ch, cell) in self.chans.iter_mut().zip(cells.iter()).take(n) {
+            ch.notes = cell.notes;
+            ch.prog = cell.prog;
+            ch.kind = cell.kind;
+            ch.param = cell.param;
         }
-        self.cur = si;
     }
 
     /// `0x23EF` — the post-`fetch` apply dispatcher (`si` = record,

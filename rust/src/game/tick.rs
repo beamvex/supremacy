@@ -7,7 +7,7 @@ use super::sim::sim_planet;
 use super::vend::{endgame, Ending};
 use super::vm::Flow;
 use super::vops::Ctx;
-use super::{day_tick, vdir, vev, vhud, vops, vord, vup};
+use super::{day_tick, script, vdir, vev, vhud, vord, vup};
 
 /// Which dispatcher arm a `tick_step` ran — mirrors the `bl` switch at
 /// file `0x37619`–`0x376C5`.
@@ -20,8 +20,8 @@ pub enum Tick {
     Planet(bool),
     /// `0x38 + N + i` — planet `i` defence pass.
     Defence(Battle),
-    /// `0x38 + 2N + i` — event slot `i` ran (`cs:0x773D` VM; payload is
-    /// the op count before it suspended).
+    /// `0x38 + 2N + i` — event slot `i` ran (compiled `cs:0x773D`
+    /// script; payload is the op count before it suspended).
     Script(u16),
     /// `0x20..0x38` — ship `bl − 0x20` tick (`cs:0x60EE`).
     Ship(ShipOut),
@@ -97,7 +97,7 @@ fn dispatch(c: &mut Ctx, bl: u8) -> Tick {
         return Tick::Defence(defence_tick(c, b - 0x38 - n));
     }
     if b < 0x56 + 2 * n {
-        return Tick::Script(vops::run(c, b - 0x38 - 2 * n));
+        return Tick::Script(script::run(c, b - 0x38 - 2 * n));
     }
     specials(c, bl)
 }

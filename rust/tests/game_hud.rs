@@ -187,8 +187,11 @@ fn orders_popup_copies_entry() {
     for i in 0..27u16 {
         r.vm.low[usize::from(e + i)] = u8::try_from(i + 1).unwrap();
     }
+    r.vm.low[usize::from(e)] = 0x60; // seq head `0x0360` — a compiled stream
+    r.vm.low[usize::from(e + 1)] = 0x03;
     assert_eq!(r.seq(0xF9), Tick::Orders(true));
-    assert_eq!(r.st.word(0x9198), 0x0201);
+    assert_eq!(r.st.word(0x9198), 0x0364); // `Img` ran, cursor committed
+    assert_eq!(r.host.0.contains(&Call::Image(0xB8)), true);
     assert_eq!(r.st.word(0x9255), 0x0403);
     assert_eq!(r.st.byte(0x91D6), 27);
     assert_eq!(r.st.byte(0x91F4), 0);
